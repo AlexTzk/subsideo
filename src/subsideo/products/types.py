@@ -109,3 +109,23 @@ class DISPValidationResult:
     correlation: float
     bias_mm_yr: float
     pass_criteria: dict[str, bool] = field(default_factory=dict)
+
+
+@dataclass
+class DISTConfig:
+    """Configuration for a DIST-S1 surface disturbance run."""
+
+    mgrs_tile_id: str
+    post_date: str
+    track_number: int
+    output_dir: Path
+
+
+@dataclass
+class DISTResult:
+    """Output from a DIST-S1 processing run."""
+
+    output_paths: list[Path]
+    output_dir: Path
+    valid: bool
+    validation_errors: list[str] = field(default_factory=list)
