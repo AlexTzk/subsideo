@@ -26,7 +26,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **PROD-01**: Library can produce RTC-S1 backscatter products from S1 IW SLC over EU AOIs using ISCE3
 - [x] **PROD-02**: Library can produce CSLC-S1 coregistered SLC products from S1 IW SLC over EU AOIs using ISCE3
-- [ ] **PROD-03**: Library can produce DISP-S1 displacement time-series products using dolphin + tophu + MintPy
+- [x] **PROD-03**: Library can produce DISP-S1 displacement time-series products using dolphin + tophu + MintPy
 - [ ] **PROD-04**: Library can produce DSWx-S2 surface water extent products from S2 L2A over EU AOIs
 - [ ] **PROD-05**: Library can produce DIST-S1 surface disturbance products from RTC time series
 
@@ -106,7 +106,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VAL-01 | Phase 2 | Complete |
 | VAL-02 | Phase 2 | Complete |
 | VAL-03 | Phase 2 | Complete |
-| PROD-03 | Phase 3 | Pending |
+| PROD-03 | Phase 3 | Complete |
 | PROD-05 | Phase 3 | Pending |
 | VAL-04 | Phase 3 | Pending |
 | PROD-04 | Phase 4 | Pending |

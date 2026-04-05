@@ -75,3 +75,37 @@ class CSLCValidationResult:
     phase_rms_rad: float
     coherence: float
     pass_criteria: dict[str, bool] = field(default_factory=dict)
+
+
+
+@dataclass
+class DISPConfig:
+    """Configuration for a DISP-S1 displacement time-series run."""
+
+    cslc_file_list: list[Path]
+    output_dir: Path
+    cdsapirc_path: Path = field(default_factory=lambda: Path.home() / ".cdsapirc")
+    coherence_mask_threshold: float = 0.3
+    ramp_threshold: float = 1.0
+    product_version: str = "0.1.0"
+
+
+@dataclass
+class DISPResult:
+    """Output from a DISP-S1 processing run."""
+
+    velocity_path: Path | None
+    timeseries_paths: list[Path]
+    output_dir: Path
+    valid: bool
+    qc_warnings: list[str] = field(default_factory=list)
+    validation_errors: list[str] = field(default_factory=list)
+
+
+@dataclass
+class DISPValidationResult:
+    """Validation metrics comparing DISP output against EGMS reference."""
+
+    correlation: float
+    bias_mm_yr: float
+    pass_criteria: dict[str, bool] = field(default_factory=dict)
