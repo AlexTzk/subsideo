@@ -66,9 +66,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — DISP-S1 pipeline orchestrator: dolphin phase linking, tophu unwrapping, MintPy time-series inversion with ERA5 correction (PROD-03)
+- [x] 03-01-PLAN.md — DISP-S1 pipeline orchestrator: dolphin phase linking, tophu unwrapping, MintPy time-series inversion with ERA5 correction (PROD-03)
 - [ ] 03-02-PLAN.md — DIST-S1 pipeline orchestrator: dist-s1 wrapper with conditional import, COG validation (PROD-05)
-- [ ] 03-03-PLAN.md — EGMS validation comparison: LOS-to-vertical projection, grid alignment, correlation and bias metrics (VAL-04)
+- [x] 03-03-PLAN.md — EGMS validation comparison: LOS-to-vertical projection, grid alignment, correlation and bias metrics (VAL-04)
 
 ### Phase 4: DSWx-S2 Pipeline and Full Interface
 **Goal**: Users can produce OPERA-spec surface water extent products from Sentinel-2 L2A data over EU AOIs, validated against JRC Global Surface Water; the complete CLI with all subcommands is functional and validation reports are generated

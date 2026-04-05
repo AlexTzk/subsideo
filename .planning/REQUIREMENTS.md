@@ -41,7 +41,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **VAL-01**: Library computes pixel-level RMSE, spatial correlation, bias, and SSIM between products
 - [x] **VAL-02**: Library can compare RTC-S1 output against OPERA N.Am. RTC reference (RMSE < 0.5 dB, r > 0.99)
 - [x] **VAL-03**: Library can compare CSLC-S1 output against OPERA N.Am. CSLC reference (phase RMS < 0.05 rad)
-- [ ] **VAL-04**: Library can compare DISP-S1 output against EGMS EU displacement products (r > 0.92, bias < 3 mm/yr)
+- [x] **VAL-04**: Library can compare DISP-S1 output against EGMS EU displacement products (r > 0.92, bias < 3 mm/yr)
 - [ ] **VAL-05**: Library can compare DSWx-S2 output against JRC Global Surface Water (F1 > 0.90)
 - [ ] **VAL-06**: Library generates HTML/Markdown validation reports with metric tables and diff maps
 
@@ -108,7 +108,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VAL-03 | Phase 2 | Complete |
 | PROD-03 | Phase 3 | Complete |
 | PROD-05 | Phase 3 | Pending |
-| VAL-04 | Phase 3 | Pending |
+| VAL-04 | Phase 3 | Complete |
 | PROD-04 | Phase 4 | Pending |
 | OUT-03 | Phase 4 | Pending |
 | VAL-05 | Phase 4 | Pending |
