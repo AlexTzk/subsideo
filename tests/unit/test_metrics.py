@@ -64,7 +64,8 @@ class TestSSIM:
         a = rng.random((64, 64))
         b = rng.random((64, 64))
         result = ssim(a, b)
-        assert 0.0 < result < 1.0
+        # SSIM can be slightly negative for uncorrelated random data
+        assert -1.0 <= result < 1.0
 
     def test_ssim_nan_crop(self):
         rng = np.random.default_rng(42)
