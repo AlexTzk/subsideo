@@ -243,7 +243,7 @@ def run_dist_from_aoi(
     """
     from datetime import datetime
 
-    from subsideo.burst.db import query_bursts
+    from subsideo.burst.frames import query_bursts_for_aoi
     from subsideo.data.cdse import CDSEClient
     from subsideo.data.dem import fetch_dem
     from subsideo.data.orbits import fetch_orbit
@@ -291,8 +291,8 @@ def run_dist_from_aoi(
     from shapely.geometry import shape
 
     aoi_geom = shape(aoi)
-    bursts = query_bursts(aoi_wkt=aoi_geom.wkt)
-    burst_ids = [b["burst_id"] for b in bursts] if bursts else []
+    bursts = query_bursts_for_aoi(aoi_wkt=aoi_geom.wkt)
+    burst_ids = [b.burst_id_jpl for b in bursts] if bursts else []
 
     # Process each scene through RTC
     for i, scene in enumerate(scenes):
