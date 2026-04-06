@@ -107,11 +107,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VAL-02 | Phase 2 | Complete |
 | VAL-03 | Phase 2 | Complete |
 | PROD-03 | Phase 3 | Complete |
-<<<<<<< Updated upstream
-| PROD-05 | Phase 3 | Pending |
-=======
 | PROD-05 | Phase 3 | Complete |
->>>>>>> Stashed changes
 | VAL-04 | Phase 3 | Complete |
 | PROD-04 | Phase 4 | Pending |
 | OUT-03 | Phase 4 | Pending |
