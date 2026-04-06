@@ -119,10 +119,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 **Coverage:**
 - v1 requirements: 27 total
 - Mapped to phases: 27
-- Satisfied: 20
-- Pending (gap closure): 7 (DATA-01–04, DATA-05, DATA-06, CLI-01, OUT-03)
+- Satisfied: 27
+- Pending: 0
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-05*
-*Last updated: 2026-04-05 after roadmap creation*
+*Last updated: 2026-04-06 after v1.0 milestone completion*
