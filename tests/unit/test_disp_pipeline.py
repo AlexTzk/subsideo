@@ -356,9 +356,16 @@ def test_run_disp_from_aoi_mocked(tmp_path: Path, mocker: MockerFixture) -> None
     """AOI entry point builds CSLC stack then calls run_disp."""
     cdsapirc = _write_cdsapirc(tmp_path / ".cdsapirc")
 
+    # Mock Settings (lazy import target: subsideo.config)
+    mock_settings = MagicMock()
+    mock_settings.cdse_client_id = "test-id"
+    mock_settings.cdse_client_secret = "test-secret"
+    mocker.patch("subsideo.config.Settings", return_value=mock_settings)
+
     # Mock burst query (lazy import target: subsideo.burst.frames)
     mock_burst = MagicMock()
     mock_burst.burst_id_jpl = "T001_000001_IW1"
+    mock_burst.epsg = 32632
     mocker.patch(
         "subsideo.burst.frames.query_bursts_for_aoi",
         return_value=[mock_burst],
@@ -387,10 +394,10 @@ def test_run_disp_from_aoi_mocked(tmp_path: Path, mocker: MockerFixture) -> None
     mock_client_cls = MagicMock(return_value=mock_client_instance)
     mocker.patch("subsideo.data.cdse.CDSEClient", mock_client_cls)
 
-    # Mock fetch_dem
+    # Mock fetch_dem (returns tuple[Path, dict] per actual signature)
     dem_path = tmp_path / "dem.tif"
     dem_path.touch()
-    mocker.patch("subsideo.data.dem.fetch_dem", return_value=dem_path)
+    mocker.patch("subsideo.data.dem.fetch_dem", return_value=(dem_path, {"driver": "GTiff"}))
 
     # Mock fetch_orbit
     orbit_path = tmp_path / "orbit.EOF"
@@ -450,3 +457,9 @@ def test_run_disp_from_aoi_mocked(tmp_path: Path, mocker: MockerFixture) -> None
 
     assert result.valid is True
     assert isinstance(result, DISPResult)
+
+    # Verify CDSEClient was called with credentials from Settings
+    mock_client_cls.assert_called_once_with(
+        client_id="test-id",
+        client_secret="test-secret",
+    )
