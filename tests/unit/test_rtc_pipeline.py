@@ -16,7 +16,7 @@ from rasterio.transform import from_bounds
 from ruamel.yaml import YAML
 
 from subsideo.products.rtc import generate_rtc_runconfig, run_rtc
-from subsideo.products.types import RTCConfig
+from subsideo.products.types import RTCConfig, RTCResult
 
 
 def _make_test_geotiff(
@@ -207,3 +207,116 @@ class TestRunRtc:
 
         assert result.valid is False
         assert "failed" in result.validation_errors[0]
+
+
+MOCK_STAC_ITEM = {
+    "assets": {"data": {"href": "s3://eodata/test.zip"}},
+    "properties": {
+        "datetime": "2025-01-15T00:00:00",
+        "platform": "S1A",
+    },
+}
+
+
+def test_run_rtc_from_aoi_mocked(tmp_path: Path, mocker) -> None:
+    """Verify run_rtc_from_aoi wires all Phase 1 data-access calls correctly."""
+    # Mock Settings (B-01)
+    mock_settings = MagicMock()
+    mock_settings.cdse_client_id = "test-id"
+    mock_settings.cdse_client_secret = "test-secret"
+    mocker.patch("subsideo.config.Settings", return_value=mock_settings)
+
+    # Mock CDSEClient (B-01 + B-02)
+    mock_client_instance = MagicMock()
+    mock_client_instance.search_stac.return_value = [MOCK_STAC_ITEM]
+
+    def _fake_download(s3_path: str, output_path: Path, **kwargs: object) -> Path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.touch()
+        return output_path
+
+    mock_client_instance.download.side_effect = _fake_download
+    mock_client_cls = MagicMock(return_value=mock_client_instance)
+    mocker.patch("subsideo.data.cdse.CDSEClient", mock_client_cls)
+
+    # Mock burst query (B-03)
+    mock_burst = MagicMock()
+    mock_burst.burst_id_jpl = "T001_000001_IW1"
+    mock_burst.epsg = 32632
+    mock_burst_query = mocker.patch(
+        "subsideo.burst.frames.query_bursts_for_aoi",
+        return_value=[mock_burst],
+    )
+
+    # Mock fetch_dem (B-05) — returns tuple
+    dem_path = tmp_path / "dem.tif"
+    dem_path.touch()
+    mock_fetch_dem = mocker.patch(
+        "subsideo.data.dem.fetch_dem",
+        return_value=(dem_path, {"driver": "GTiff"}),
+    )
+
+    # Mock fetch_orbit (B-04)
+    orbit_path = tmp_path / "orbit.EOF"
+    orbit_path.touch()
+    mock_fetch_orbit = mocker.patch(
+        "subsideo.data.orbits.fetch_orbit",
+        return_value=orbit_path,
+    )
+
+    # Mock run_rtc (the inner call)
+    mock_rtc_result = RTCResult(
+        output_paths=[tmp_path / "rtc.tif"],
+        runconfig_path=tmp_path / "runconfig.yaml",
+        burst_ids=["T001_000001_IW1"],
+        valid=True,
+    )
+    mocker.patch("subsideo.products.rtc.run_rtc", return_value=mock_rtc_result)
+
+    aoi = {
+        "type": "Polygon",
+        "coordinates": [
+            [[11.0, 48.0], [12.0, 48.0], [12.0, 49.0], [11.0, 49.0], [11.0, 48.0]]
+        ],
+    }
+
+    from subsideo.products.rtc import run_rtc_from_aoi
+
+    result = run_rtc_from_aoi(
+        aoi=aoi,
+        date_range=("2025-01-01", "2025-03-01"),
+        output_dir=tmp_path / "out",
+    )
+
+    # B-01: CDSEClient gets credentials
+    mock_client_cls.assert_called_once_with(
+        client_id="test-id", client_secret="test-secret"
+    )
+
+    # B-02: search_stac called with correct kwargs
+    mock_client_instance.search_stac.assert_called_once()
+    search_kwargs = mock_client_instance.search_stac.call_args
+    assert search_kwargs.kwargs["collection"] == "SENTINEL-1"
+    assert search_kwargs.kwargs["product_type"] == "IW_SLC__1S"
+    assert isinstance(search_kwargs.kwargs["start"], __import__("datetime").datetime)
+    assert isinstance(search_kwargs.kwargs["end"], __import__("datetime").datetime)
+    assert isinstance(search_kwargs.kwargs["bbox"], list)
+
+    # B-03: burst query uses frames module with aoi_wkt
+    mock_burst_query.assert_called_once()
+    assert "aoi_wkt" in mock_burst_query.call_args.kwargs
+
+    # B-04: fetch_orbit with named args
+    mock_fetch_orbit.assert_called_once()
+    orbit_kwargs = mock_fetch_orbit.call_args.kwargs
+    assert "sensing_time" in orbit_kwargs
+    assert orbit_kwargs["satellite"] == "S1A"
+    assert "output_dir" in orbit_kwargs
+
+    # B-05: fetch_dem with output_epsg and bounds as list
+    mock_fetch_dem.assert_called_once()
+    dem_kwargs = mock_fetch_dem.call_args.kwargs
+    assert dem_kwargs["output_epsg"] == 32632
+    assert isinstance(dem_kwargs["bounds"], list)
+
+    assert result.valid is True
