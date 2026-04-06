@@ -129,3 +129,35 @@ class DISTResult:
     output_dir: Path
     valid: bool
     validation_errors: list[str] = field(default_factory=list)
+
+
+@dataclass
+class DSWxConfig:
+    """Configuration for a DSWx-S2 surface water extent run."""
+
+    s2_band_paths: dict[str, Path]  # keys: "B02","B03","B04","B08","B11","B12"
+    scl_path: Path
+    output_dir: Path
+    output_epsg: int | None = None
+    output_posting_m: float = 30.0
+    product_version: str = "0.1.0"
+
+
+@dataclass
+class DSWxResult:
+    """Output from a DSWx-S2 processing run."""
+
+    output_path: Path | None
+    valid: bool
+    validation_errors: list[str] = field(default_factory=list)
+
+
+@dataclass
+class DSWxValidationResult:
+    """Validation metrics comparing DSWx output against JRC reference."""
+
+    f1: float
+    precision: float
+    recall: float
+    overall_accuracy: float
+    pass_criteria: dict[str, bool] = field(default_factory=dict)

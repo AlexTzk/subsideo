@@ -80,3 +80,45 @@ def ssim(
     if data_range == 0:
         return 1.0 if np.allclose(p, r) else 0.0
     return float(structural_similarity(p, r, data_range=data_range))
+
+
+# ---------------------------------------------------------------------------
+# Binary classification metrics (DSWx / DIST validation)
+# ---------------------------------------------------------------------------
+
+
+def f1_score(predicted: np.ndarray, reference: np.ndarray) -> float:
+    """F1 score for binary classification arrays.
+
+    Accepts 1-D integer or boolean arrays.  Returns 0.0 when no positive
+    predictions or references exist.
+    """
+    tp = np.sum((predicted == 1) & (reference == 1))
+    fp = np.sum((predicted == 1) & (reference == 0))
+    fn = np.sum((predicted == 0) & (reference == 1))
+    precision_val = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall_val = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    if precision_val + recall_val == 0:
+        return 0.0
+    return float(2 * precision_val * recall_val / (precision_val + recall_val))
+
+
+def precision_score(predicted: np.ndarray, reference: np.ndarray) -> float:
+    """Precision (TP / (TP + FP)) for binary classification arrays."""
+    tp = np.sum((predicted == 1) & (reference == 1))
+    fp = np.sum((predicted == 1) & (reference == 0))
+    return float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+
+
+def recall_score(predicted: np.ndarray, reference: np.ndarray) -> float:
+    """Recall (TP / (TP + FN)) for binary classification arrays."""
+    tp = np.sum((predicted == 1) & (reference == 1))
+    fn = np.sum((predicted == 0) & (reference == 1))
+    return float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
+
+
+def overall_accuracy(predicted: np.ndarray, reference: np.ndarray) -> float:
+    """Overall accuracy ((TP + TN) / total) for binary classification arrays."""
+    correct = np.sum(predicted == reference)
+    total = predicted.size
+    return float(correct / total) if total > 0 else 0.0
