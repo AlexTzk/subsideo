@@ -12,6 +12,16 @@ from pathlib import Path
 from loguru import logger
 
 
+def get_software_version() -> str:
+    """Get subsideo package version from installed metadata."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("subsideo")
+    except PackageNotFoundError:
+        return "dev"
+
+
 def inject_opera_metadata(
     product_path: Path,
     product_type: str,

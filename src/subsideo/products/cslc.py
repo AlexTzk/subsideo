@@ -205,6 +205,26 @@ def run_cslc(
     # Validate products
     errors = validate_cslc_product(h5_paths)
 
+    # OUT-03: Inject OPERA metadata
+    from subsideo._metadata import get_software_version, inject_opera_metadata
+
+    sw_version = get_software_version()
+    for h5_path in h5_paths:
+        if h5_path.exists():
+            inject_opera_metadata(
+                h5_path,
+                product_type="CSLC-S1",
+                software_version=sw_version,
+                run_params={
+                    "safe_paths": [str(p) for p in safe_paths],
+                    "orbit_path": str(orbit_path),
+                    "dem_path": str(dem_path),
+                    "burst_ids": burst_ids or [],
+                    "tec_file": str(tec_file) if tec_file else None,
+                    "output_dir": str(output_dir),
+                },
+            )
+
     # Derive burst IDs from result if not provided
     result_burst_ids: list[str]
     if burst_ids:
@@ -340,6 +360,20 @@ def run_cslc_from_aoi(
         output_dir=output_dir / "orbits",
     )
 
+    # DATA-05: Fetch IONEX TEC map (optional)
+    tec_file = None
+    try:
+        from subsideo.data.ionosphere import fetch_ionex
+
+        tec_file = fetch_ionex(
+            date=sensing_time.date(),
+            output_dir=output_dir / "ionex",
+            username=settings.earthdata_username,
+            password=settings.earthdata_password,
+        )
+    except Exception:
+        logger.warning("IONEX download failed; proceeding without ionospheric correction")
+
     # Download first scene
     s3_key = scene.get("assets", {}).get("data", {}).get("href", "")
     safe_path = output_dir / "input" / "scene_0.zip"
@@ -360,4 +394,5 @@ def run_cslc_from_aoi(
         dem_path=dem_path,
         burst_ids=burst_ids,
         output_dir=output_dir,
+        tec_file=tec_file,
     )

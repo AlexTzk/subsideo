@@ -418,12 +418,12 @@ def run_dswx(cfg: DSWxConfig) -> DSWxResult:
         )
 
         # 6. Inject OPERA metadata
-        from subsideo._metadata import inject_opera_metadata
+        from subsideo._metadata import get_software_version, inject_opera_metadata
 
         inject_opera_metadata(
             output_path,
             product_type="DSWx-S2",
-            software_version=cfg.product_version,
+            software_version=get_software_version(),
             run_params={
                 "s2_bands": [str(p) for p in cfg.s2_band_paths.values()],
                 "scl_path": str(cfg.scl_path),

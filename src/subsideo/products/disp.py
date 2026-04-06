@@ -361,6 +361,28 @@ def run_disp(
         if not velocity_path.exists():
             velocity_path = None
 
+        # OUT-03: Inject OPERA metadata into all HDF5 outputs
+        from subsideo._metadata import get_software_version, inject_opera_metadata
+
+        sw_version = get_software_version()
+        all_h5 = ts_paths + (
+            [velocity_path] if velocity_path and velocity_path.exists() else []
+        )
+        for h5_path in all_h5:
+            if h5_path.exists():
+                inject_opera_metadata(
+                    h5_path,
+                    product_type="DISP-S1",
+                    software_version=sw_version,
+                    run_params={
+                        "cslc_count": len(cslc_paths),
+                        "coherence_threshold": coherence_mask_threshold,
+                        "ramp_threshold": ramp_threshold,
+                        "era5_correction": True,
+                        "output_dir": str(output_dir),
+                    },
+                )
+
         return DISPResult(
             velocity_path=velocity_path,
             timeseries_paths=ts_paths,

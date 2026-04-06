@@ -200,6 +200,24 @@ def run_dist(
     # Validate
     errors = validate_dist_product(cog_paths)
 
+    # OUT-03: Inject OPERA metadata
+    from subsideo._metadata import get_software_version, inject_opera_metadata
+
+    sw_version = get_software_version()
+    for cog_path in cog_paths:
+        if cog_path.exists():
+            inject_opera_metadata(
+                cog_path,
+                product_type="DIST-S1",
+                software_version=sw_version,
+                run_params={
+                    "mgrs_tile_id": mgrs_tile_id,
+                    "track_number": track_number,
+                    "post_date": post_date,
+                    "output_dir": str(output_dir),
+                },
+            )
+
     result = DISTResult(
         output_paths=cog_paths,
         output_dir=output_dir,

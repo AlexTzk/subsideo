@@ -236,6 +236,25 @@ def run_rtc(
     # Validate
     errors = validate_rtc_product(cog_paths)
 
+    # OUT-03: Inject OPERA metadata
+    from subsideo._metadata import get_software_version, inject_opera_metadata
+
+    sw_version = get_software_version()
+    for cog_path in cog_paths:
+        if cog_path.exists():
+            inject_opera_metadata(
+                cog_path,
+                product_type="RTC-S1",
+                software_version=sw_version,
+                run_params={
+                    "safe_paths": [str(p) for p in safe_paths],
+                    "orbit_path": str(orbit_path),
+                    "dem_path": str(dem_path),
+                    "burst_ids": burst_ids,
+                    "output_dir": str(output_dir),
+                },
+            )
+
     result = RTCResult(
         output_paths=cog_paths,
         runconfig_path=runconfig_yaml,
