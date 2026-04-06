@@ -105,24 +105,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OUT-02 | Phase 2 | Complete |
 | VAL-01 | Phase 2 | Complete |
 | VAL-02 | Phase 2 | Complete |
-| VAL-03 | Phase 2 | Complete |
+| VAL-03 | Phase 9 | Pending |
 | PROD-03 | Phase 3 | Complete |
 | PROD-05 | Phase 3 | Complete |
-| VAL-04 | Phase 3 | Complete |
+| VAL-04 | Phase 9 | Pending |
 | PROD-04 | Phase 4 | Complete |
 | OUT-03 | Phase 6 | Complete |
 | VAL-05 | Phase 4 | Complete |
-| VAL-06 | Phase 4 | Complete |
+| VAL-06 | Phase 9 | Pending |
 | CLI-01 | Phase 5 | Complete |
 | CLI-02 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 27 total
 - Mapped to phases: 27
-- Satisfied: 27
-- Pending: 0
+- Satisfied: 24
+- Pending: 3
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-05*
-*Last updated: 2026-04-06 after v1.0 milestone completion*
+*Last updated: 2026-04-06 after v1.0 milestone audit gap closure planning*

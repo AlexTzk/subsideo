@@ -19,7 +19,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Fix Cross-Phase Integration Wiring** - Fix all interface contract mismatches between Phase 1 modules and Phase 2/3/4 callers (B-01 through B-06)
 - [x] **Phase 6: Wire Unused Data Modules & OPERA Metadata** - Wire fetch_ionex, ASFClient, and inject_opera_metadata into their consumers
 - [x] **Phase 7: CLI Gaps & Code Cleanup** - Add build-db CLI, wire EGMS auto-fetch, remove orphaned code
-- [ ] **Phase 8: Planning Artifact Cleanup** - Fix stale ROADMAP/REQUIREMENTS/SUMMARY metadata
+- [x] **Phase 8: Planning Artifact Cleanup** - Fix stale ROADMAP/REQUIREMENTS/SUMMARY metadata
+- [ ] **Phase 9: Fix Report Criteria Keys & Clean Orphaned Code** - Fix validation report key mismatches, remove orphaned code, complete SUMMARY frontmatter
 
 ## Phase Details
 
@@ -155,10 +156,25 @@ Plans:
 Plans:
 - [x] 08-01-PLAN.md — Fix stale ROADMAP/REQUIREMENTS/SUMMARY metadata
 
+### Phase 9: Fix Report Criteria Keys & Clean Orphaned Code
+**Goal**: Fix validation report criteria key mismatches (BUG-1, BUG-2), remove orphaned code, and complete SUMMARY frontmatter metadata
+**Depends on**: Phase 8
+**Requirements**: VAL-03, VAL-04, VAL-06
+**Gap Closure:** Closes tech debt from v1.0 milestone audit — report key mismatches, orphaned code, metadata gaps
+**Success Criteria** (what must be TRUE):
+  1. `report.py` `_CRITERIA_MAP` keys match actual `pass_criteria` keys from `compare_disp.py` and `compare_cslc.py`
+  2. Orphaned code removed: `verify_connectivity()`, `DISPConfig`, `DISTConfig`
+  3. All 20 SUMMARY.md files have accurate `requirements-completed` frontmatter
+  4. ROADMAP Phase 8 success criteria text references correct counts (7 phases, 19 SUMMARY files)
+**Plans**: 0 plans
+
+Plans:
+(none yet)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -169,4 +185,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 5. Fix Cross-Phase Integration Wiring | 2/2 | Complete | - |
 | 6. Wire Unused Data Modules & OPERA Metadata | 2/2 | Complete | - |
 | 7. CLI Gaps & Code Cleanup | 1/1 | Complete | - |
-| 8. Planning Artifact Cleanup | 0/1 | In Progress | - |
+| 8. Planning Artifact Cleanup | 1/1 | Complete | - |
+| 9. Fix Report Keys & Cleanup | 0/0 | Not Started | - |
