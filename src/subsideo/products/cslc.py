@@ -227,3 +227,99 @@ def run_cslc(
         valid=len(errors) == 0,
         validation_errors=errors,
     )
+
+
+def run_cslc_from_aoi(
+    aoi: dict | Path,
+    date_range: tuple[str, str],
+    output_dir: Path,
+) -> CSLCResult:
+    """End-to-end CSLC-S1 pipeline from AOI and date range.
+
+    Queries CDSE for Sentinel-1 SLC scenes, downloads orbit and DEM,
+    resolves EU burst IDs, and runs :func:`run_cslc`.
+
+    Parameters
+    ----------
+    aoi:
+        GeoJSON dict or Path to GeoJSON file (Polygon/MultiPolygon).
+    date_range:
+        ``(start_date, end_date)`` in ``YYYY-MM-DD`` format.
+    output_dir:
+        Root output directory.
+
+    Returns
+    -------
+    CSLCResult
+        Processing result.
+    """
+    import json as _json
+    from datetime import datetime
+
+    from shapely.geometry import shape
+
+    from subsideo.data.cdse import CDSEClient
+    from subsideo.data.dem import fetch_dem
+    from subsideo.data.orbits import fetch_orbit
+
+    # Resolve AOI
+    if isinstance(aoi, Path):
+        with open(aoi) as f:
+            aoi = _json.load(f)
+
+    if "type" not in aoi or "coordinates" not in aoi:
+        return CSLCResult(
+            output_paths=[],
+            runconfig_path=output_dir / "runconfig.yaml",
+            burst_ids=[],
+            valid=False,
+            validation_errors=["Invalid GeoJSON: missing type or coordinates"],
+        )
+
+    geom = shape(aoi)
+
+    # Search CDSE for Sentinel-1 SLC
+    client = CDSEClient()
+    start_dt = datetime.strptime(date_range[0], "%Y-%m-%d")
+    end_dt = datetime.strptime(date_range[1], "%Y-%m-%d")
+    items = client.search(
+        collection="sentinel-1-slc",
+        bbox=geom.bounds,
+        datetime_range=(start_dt, end_dt),
+    )
+
+    if not items:
+        return CSLCResult(
+            output_paths=[],
+            runconfig_path=output_dir / "runconfig.yaml",
+            burst_ids=[],
+            valid=False,
+            validation_errors=["No Sentinel-1 SLC scenes found for AOI/date range"],
+        )
+
+    # Download first scene's data
+    safe_paths = [client.download(items[0], output_dir / "input")]
+
+    # Fetch orbit and DEM
+    orbit_path = fetch_orbit(safe_paths[0])
+    dem_path = fetch_dem(geom.bounds, output_dir / "dem")
+
+    # Resolve burst IDs from AOI
+    from subsideo.burst.db import BurstDB
+
+    db = BurstDB()
+    burst_ids = db.query_by_geometry(geom.wkt)
+
+    logger.info(
+        "CSLC from AOI: {} scenes, {} bursts",
+        len(safe_paths),
+        len(burst_ids),
+    )
+
+    return run_cslc(
+        safe_paths=safe_paths,
+        orbit_path=orbit_path,
+        dem_path=dem_path,
+        burst_ids=burst_ids,
+        output_dir=output_dir,
+    )

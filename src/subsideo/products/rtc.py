@@ -250,3 +250,105 @@ def run_rtc(
         logger.warning("RTC pipeline completed with validation errors: {}", errors)
 
     return result
+
+
+def run_rtc_from_aoi(
+    aoi: dict | Path,
+    date_range: tuple[str, str],
+    output_dir: Path,
+) -> RTCResult:
+    """End-to-end RTC-S1 pipeline from AOI and date range.
+
+    Queries CDSE for Sentinel-1 SLC scenes, downloads orbit and DEM,
+    resolves EU burst IDs, and runs :func:`run_rtc`.
+
+    Parameters
+    ----------
+    aoi:
+        GeoJSON dict or Path to GeoJSON file (Polygon/MultiPolygon).
+    date_range:
+        ``(start_date, end_date)`` in ``YYYY-MM-DD`` format.
+    output_dir:
+        Root output directory.
+
+    Returns
+    -------
+    RTCResult
+        Processing result.
+    """
+    import json as _json
+    from datetime import datetime
+
+    from shapely.geometry import shape
+
+    from subsideo.data.cdse import CDSEClient
+    from subsideo.data.dem import fetch_dem
+    from subsideo.data.orbits import fetch_orbit
+    from subsideo.utils.projections import utm_epsg_from_lon
+
+    # Resolve AOI
+    if isinstance(aoi, Path):
+        with open(aoi) as f:
+            aoi = _json.load(f)
+
+    if "type" not in aoi or "coordinates" not in aoi:
+        return RTCResult(
+            output_paths=[],
+            runconfig_path=output_dir / "runconfig.yaml",
+            burst_ids=[],
+            valid=False,
+            validation_errors=["Invalid GeoJSON: missing type or coordinates"],
+        )
+
+    geom = shape(aoi)
+    centroid = geom.centroid
+
+    # Determine UTM EPSG
+    epsg = utm_epsg_from_lon(centroid.x)
+
+    # Search CDSE for Sentinel-1 SLC
+    client = CDSEClient()
+    start_dt = datetime.strptime(date_range[0], "%Y-%m-%d")
+    end_dt = datetime.strptime(date_range[1], "%Y-%m-%d")
+    items = client.search(
+        collection="sentinel-1-slc",
+        bbox=geom.bounds,
+        datetime_range=(start_dt, end_dt),
+    )
+
+    if not items:
+        return RTCResult(
+            output_paths=[],
+            runconfig_path=output_dir / "runconfig.yaml",
+            burst_ids=[],
+            valid=False,
+            validation_errors=["No Sentinel-1 SLC scenes found for AOI/date range"],
+        )
+
+    # Download first scene's data
+    safe_paths = [client.download(items[0], output_dir / "input")]
+
+    # Fetch orbit and DEM
+    orbit_path = fetch_orbit(safe_paths[0])
+    dem_path = fetch_dem(geom.bounds, output_dir / "dem")
+
+    # Resolve burst IDs from AOI
+    from subsideo.burst.db import BurstDB
+
+    db = BurstDB()
+    burst_ids = db.query_by_geometry(geom.wkt)
+
+    logger.info(
+        "RTC from AOI: {} scenes, {} bursts, EPSG:{}",
+        len(safe_paths),
+        len(burst_ids),
+        epsg,
+    )
+
+    return run_rtc(
+        safe_paths=safe_paths,
+        orbit_path=orbit_path,
+        dem_path=dem_path,
+        burst_ids=burst_ids,
+        output_dir=output_dir,
+    )
