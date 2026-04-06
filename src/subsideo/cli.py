@@ -1,8 +1,7 @@
 """subsideo CLI -- OPERA-equivalent SAR/InSAR pipelines for the EU."""
-from __future__ import annotations
-
 import json
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -260,10 +259,10 @@ def validate_cmd(
     year: int = typer.Option(None, "--year", help="Year for JRC comparison (dswx)"),
     month: int = typer.Option(None, "--month", help="Month for JRC comparison (dswx)"),
     start: str = typer.Option(
-        None, "--start", help="Start date for ASF reference search (YYYY-MM-DD)"
+        "", "--start", help="Start date for ASF reference search (YYYY-MM-DD)"
     ),
     end: str = typer.Option(
-        None, "--end", help="End date for ASF reference search (YYYY-MM-DD)"
+        "", "--end", help="End date for ASF reference search (YYYY-MM-DD)"
     ),
     out: Path = typer.Option(Path("."), "--out", help="Report output directory"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),

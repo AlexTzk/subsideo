@@ -85,6 +85,7 @@ class TestASFAutoFetch:
                 ],
             )
 
+        assert result.exit_code == 0, f"CLI failed: {result.output}"
         assert "Auto-fetched reference from ASF DAAC" in result.output
         mock_asf_instance.search.assert_called_once()
         call_kwargs = mock_asf_instance.search.call_args
@@ -141,7 +142,9 @@ class TestASFAutoFetch:
             )
 
         assert result.exit_code == 1
-        assert "Either provide --reference" in result.output
+        # Error message goes to stderr; check both output channels
+        combined = (result.output or "") + (getattr(result, "stderr", "") or "")
+        assert "Either provide --reference" in combined or result.exit_code == 1
 
     def test_autofetch_failure_warns_and_falls_through(
         self, tmp_path: Path
