@@ -28,7 +28,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Success Criteria** (what must be TRUE):
   1. `subsideo check-env` runs and confirms CDSE credentials, ASF DAAC credentials, and (if configured) CDS API key are valid
   2. A STAC query for S1 IW SLC over a given EU bounding box returns scene metadata, and those scenes download to local storage via CDSE S3
-  3. The EU burst SQLite resolves any EU bounding box to a set of Sentinel-1 burst IDs with correct UTM zone assignments (zones 28N–38N)
+  3. The EU burst SQLite resolves any EU bounding box to a set of Sentinel-1 burst IDs with correct UTM zone assignments (zones 28N-38N)
   4. GLO-30 DEM tiles for a given AOI are downloaded, mosaicked, and warped to a uniform 30 m UTM grid; orbit and IONEX files for any S1 acquisition are fetched with POEORB-first fallback
   5. Pydantic config loads from env vars, .env, and a per-run YAML; YAML round-trips without loss
 **Plans**: 4 plans
@@ -90,7 +90,7 @@ Plans:
 
 ### Phase 5: Fix Cross-Phase Integration Wiring
 **Goal**: All five product `*_from_aoi` functions call Phase 1 data-access modules with correct constructor args, method names, and signatures — unblocking every broken E2E flow
-**Depends on**: Phases 1–4 (fixes wiring between them)
+**Depends on**: Phases 1-4 (fixes wiring between them)
 **Requirements**: DATA-01, DATA-02, DATA-03, DATA-04, CLI-01
 **Gap Closure:** Closes integration bugs B-01, B-02, B-03, B-04, B-05, B-06 from v1.0 audit
 **Success Criteria** (what must be TRUE):
@@ -117,13 +117,16 @@ Plans:
   2. `subsideo validate` CLI can automatically fetch OPERA reference products from ASF DAAC via `ASFClient` when `--reference` is not provided
   3. `inject_opera_metadata()` is called in RTC, CSLC, DISP, and DIST product pipelines (not just DSWx)
   4. All five product types include provenance, software version, and run parameters in their output metadata
+**Plans**: 2 plans
 
-Plans: 0 plans
+Plans:
+- [ ] 06-01-PLAN.md — Wire IONEX into CSLC, inject OPERA metadata into all 5 pipelines, get_software_version helper (DATA-05, OUT-03)
+- [ ] 06-02-PLAN.md — Wire ASF auto-fetch into validate CLI for RTC/CSLC reference products (DATA-06)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -132,4 +135,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 3. DISP-S1 and DIST-S1 Pipelines | 0/3 | Not started | - |
 | 4. DSWx-S2 Pipeline and Full Interface | 0/3 | Not started | - |
 | 5. Fix Cross-Phase Integration Wiring | 0/2 | Not started | - |
-| 6. Wire Unused Data Modules & OPERA Metadata | 0/0 | Not started | - |
+| 6. Wire Unused Data Modules & OPERA Metadata | 0/2 | Not started | - |
