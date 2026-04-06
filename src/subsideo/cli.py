@@ -259,6 +259,12 @@ def validate_cmd(
     ),
     year: int = typer.Option(None, "--year", help="Year for JRC comparison (dswx)"),
     month: int = typer.Option(None, "--month", help="Month for JRC comparison (dswx)"),
+    start: str = typer.Option(
+        None, "--start", help="Start date for ASF reference search (YYYY-MM-DD)"
+    ),
+    end: str = typer.Option(
+        None, "--end", help="End date for ASF reference search (YYYY-MM-DD)"
+    ),
     out: Path = typer.Option(Path("."), "--out", help="Report output directory"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
@@ -272,13 +278,94 @@ def validate_cmd(
 
     pt = product_type.lower()
 
+    # DATA-06: ASF auto-fetch for RTC/CSLC when --reference omitted
+    if pt in ("rtc", "cslc") and reference_path is None:
+        from subsideo.config import Settings
+
+        settings = Settings()
+        if settings.earthdata_username and settings.earthdata_password:
+            try:
+                from datetime import datetime as _dt
+                from datetime import timedelta
+
+                import rasterio
+                from pyproj import Transformer
+
+                from subsideo.data.asf import ASFClient
+
+                # Extract bbox from product, reproject UTM -> WGS84
+                ext = "*.tif" if pt == "rtc" else "*.h5"
+                product_files_check = sorted(product_dir.glob(ext))
+                if product_files_check:
+                    with rasterio.open(product_files_check[0]) as ds:
+                        b = ds.bounds
+                        src_crs = ds.crs
+                    transformer = Transformer.from_crs(src_crs, "EPSG:4326", always_xy=True)
+                    x1, y1 = transformer.transform(b.left, b.bottom)
+                    x2, y2 = transformer.transform(b.right, b.top)
+                    bbox = [x1, y1, x2, y2]
+
+                    # Date range: use --start/--end if provided, else 30-day window
+                    if start and end:
+                        start_dt = _dt.fromisoformat(start)
+                        end_dt = _dt.fromisoformat(end)
+                    else:
+                        file_mtime = _dt.fromtimestamp(product_files_check[0].stat().st_mtime)
+                        start_dt = file_mtime - timedelta(days=30)
+                        end_dt = file_mtime + timedelta(days=30)
+
+                    short_name = "OPERA_L2_RTC-S1_V1" if pt == "rtc" else "OPERA_L2_CSLC-S1_V1"
+                    asf = ASFClient(
+                        username=settings.earthdata_username,
+                        password=settings.earthdata_password,
+                    )
+                    results = asf.search(
+                        short_name=short_name,
+                        bbox=bbox,
+                        start=start_dt,
+                        end=end_dt,
+                        max_results=5,
+                    )
+                    if results:
+                        urls = [r.get("url", "") for r in results[:1]]
+                        ref_dir = out / "asf_reference"
+                        downloaded = asf.download(urls, ref_dir)
+                        if downloaded:
+                            reference_path = downloaded[0]
+                            typer.echo(
+                                f"[OK] Auto-fetched reference from ASF DAAC: {reference_path}"
+                            )
+                        else:
+                            typer.echo(
+                                "[WARNING] ASF search found results but download failed",
+                                err=True,
+                            )
+                    else:
+                        typer.echo(
+                            "[WARNING] No OPERA reference products found on ASF DAAC "
+                            "for this AOI/date",
+                            err=True,
+                        )
+            except Exception as exc:
+                typer.echo(f"[WARNING] ASF auto-fetch failed: {exc}", err=True)
+        elif pt in ("rtc", "cslc"):
+            # Clear error when no credentials and no --reference
+            typer.echo(
+                "[FAIL] RTC/CSLC validation requires a reference product.\n"
+                "Either provide --reference <path> or set EARTHDATA_USERNAME "
+                "and EARTHDATA_PASSWORD for automatic ASF DAAC download.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+
     if pt == "rtc":
         from subsideo.validation.compare_rtc import compare_rtc
 
         product_files = sorted(product_dir.glob("*.tif"))
         if not product_files or reference_path is None:
             typer.echo(
-                "[FAIL] rtc validation requires product TIF and --reference", err=True
+                "[FAIL] rtc validation requires product TIF and --reference "
+                "(or Earthdata credentials for auto-fetch)", err=True
             )
             raise typer.Exit(code=1)
         result = compare_rtc(product_files[0], reference_path)
@@ -288,7 +375,8 @@ def validate_cmd(
         product_files = sorted(product_dir.glob("*.h5"))
         if not product_files or reference_path is None:
             typer.echo(
-                "[FAIL] cslc validation requires product HDF5 and --reference", err=True
+                "[FAIL] cslc validation requires product HDF5 and --reference "
+                "(or Earthdata credentials for auto-fetch)", err=True
             )
             raise typer.Exit(code=1)
         result = compare_cslc(product_files[0], reference_path)
