@@ -169,7 +169,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 09-01-PLAN.md — Fix report criteria key mismatches, remove orphaned code, correct ROADMAP metadata (VAL-03, VAL-04, VAL-06)
+- [x] 09-01-PLAN.md — Fix report criteria key mismatches, remove orphaned code, correct ROADMAP metadata (VAL-03, VAL-04, VAL-06)
 
 ## Progress
 

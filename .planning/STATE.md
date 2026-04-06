@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-04-06T18:24:59.747Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-04-06T21:47:10.254Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 20
-  completed_plans: 20
+  total_phases: 9
+  completed_phases: 9
+  total_plans: 21
+  completed_plans: 21
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-06)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 08 — planning-artifact-cleanup
+**Current focus:** Phase 09 — fix-report-keys-and-cleanup
 
 ## Current Position
 
-Phase: 08
-Plan: Not started
+Phase: 09 (fix-report-keys-and-cleanup) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Plan: Not started
 | Phase 06 P02 | 5min | 2 tasks | 2 files |
 | Phase 07 P01 | 4min | 2 tasks | 4 files |
 | Phase 08 P01 | 2min | 3 tasks | 6 files |
+| Phase 09 P01 | 3min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,7 @@ Recent decisions affecting current work:
 - [Phase 06]: Lazy imports for rasterio/pyproj/ASFClient inside auto-fetch try block; 30-day mtime window as default date range
 - [Phase 07]: EGMS auto-fetch placed before if/elif product chain; build-db uses typer.Argument for positional geojson
 - [Phase 08]: No code changes needed -- purely planning artifact metadata corrections
+- [Phase 09]: Fallback lookup using field-name prefix startswith() for correlation ambiguity between RTC and DISP
 
 ### Pending Todos
 
@@ -120,6 +122,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T18:22:31.416Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-04-06T21:47:10.251Z
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None

@@ -105,14 +105,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OUT-02 | Phase 2 | Complete |
 | VAL-01 | Phase 2 | Complete |
 | VAL-02 | Phase 2 | Complete |
-| VAL-03 | Phase 9 | Pending |
+| VAL-03 | Phase 9 | Complete |
 | PROD-03 | Phase 3 | Complete |
 | PROD-05 | Phase 3 | Complete |
-| VAL-04 | Phase 9 | Pending |
+| VAL-04 | Phase 9 | Complete |
 | PROD-04 | Phase 4 | Complete |
 | OUT-03 | Phase 6 | Complete |
 | VAL-05 | Phase 4 | Complete |
-| VAL-06 | Phase 9 | Pending |
+| VAL-06 | Phase 9 | Complete |
 | CLI-01 | Phase 5 | Complete |
 | CLI-02 | Phase 4 | Complete |
 
