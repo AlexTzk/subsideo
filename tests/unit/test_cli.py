@@ -82,6 +82,49 @@ class TestAoiValidation:
         )
         assert result.exit_code != 0
 
+    def test_dist_cmd_iterates_results(self, tmp_path: Path) -> None:
+        """B-06: CLI dist command iterates list[DISTResult], not single result."""
+        from unittest.mock import MagicMock
+
+        mock_result_ok = MagicMock()
+        mock_result_ok.valid = True
+        mock_result_ok.validation_errors = []
+
+        mock_result_fail = MagicMock()
+        mock_result_fail.valid = False
+        mock_result_fail.validation_errors = ["tile failed"]
+
+        aoi_file = tmp_path / "aoi.geojson"
+        aoi_file.write_text(
+            json.dumps(
+                {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [[11, 48], [12, 48], [12, 49], [11, 49], [11, 48]]
+                    ],
+                }
+            )
+        )
+
+        from unittest.mock import patch
+
+        with patch(
+            "subsideo.products.dist.run_dist_from_aoi",
+            return_value=[mock_result_ok, mock_result_fail],
+        ), patch("subsideo.utils.logging.configure_logging"):
+            res = runner.invoke(
+                app,
+                [
+                    "dist",
+                    "--aoi", str(aoi_file),
+                    "--start", "2025-01-01",
+                    "--end", "2025-02-01",
+                    "--out", str(tmp_path / "out"),
+                ],
+            )
+        assert res.exit_code == 1  # one tile failed
+        assert "FAIL" in res.output
+
     def test_feature_collection_polygon_accepted(self, tmp_path: Path) -> None:
         """_load_aoi should accept FeatureCollection with Polygon geometry."""
         from subsideo.cli import _load_aoi

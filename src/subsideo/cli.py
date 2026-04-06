@@ -229,11 +229,13 @@ def dist_cmd(
             err=True,
         )
         raise typer.Exit(code=1)
-    result = run_dist_from_aoi(aoi=aoi, date_range=(start, end), output_dir=product_dir)
-    if not result.valid:
-        typer.echo(f"[FAIL] DIST: {result.validation_errors}", err=True)
+    results = run_dist_from_aoi(aoi=aoi, date_range=(start, end), output_dir=product_dir)
+    failures = [r for r in results if not r.valid]
+    if failures:
+        for r in failures:
+            typer.echo(f"[FAIL] DIST tile: {r.validation_errors}", err=True)
         raise typer.Exit(code=1)
-    typer.echo(f"[OK] DIST products written to {product_dir}")
+    typer.echo(f"[OK] DIST: {len(results)} tiles written to {product_dir}")
 
 
 # ---------------------------------------------------------------------------

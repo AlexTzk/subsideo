@@ -274,7 +274,13 @@ def run_dist_from_aoi(
     start_dt = datetime.fromisoformat(start_str)
     end_dt = datetime.fromisoformat(end_str)
 
-    client = CDSEClient()
+    from subsideo.config import Settings
+
+    settings = Settings()
+    client = CDSEClient(
+        client_id=settings.cdse_client_id,
+        client_secret=settings.cdse_client_secret,
+    )
     scenes = client.search_stac(
         collection="SENTINEL-1",
         bbox=bbox,
@@ -284,15 +290,20 @@ def run_dist_from_aoi(
     )
     logger.info("Found {} S1 scenes for RTC time series", len(scenes))
 
-    # Fetch DEM
-    dem_path = fetch_dem(bounds=bbox, output_dir=output_dir / "dem")
-
     # Query burst DB for the AOI
     from shapely.geometry import shape
 
     aoi_geom = shape(aoi)
     bursts = query_bursts_for_aoi(aoi_wkt=aoi_geom.wkt)
     burst_ids = [b.burst_id_jpl for b in bursts] if bursts else []
+
+    # Fetch DEM (after burst query so we can use burst EPSG)
+    output_epsg = bursts[0].epsg if bursts else 32632
+    dem_path, _dem_profile = fetch_dem(
+        bounds=bbox,
+        output_epsg=output_epsg,
+        output_dir=output_dir / "dem",
+    )
 
     # Process each scene through RTC
     for i, scene in enumerate(scenes):

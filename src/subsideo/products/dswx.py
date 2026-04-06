@@ -524,7 +524,13 @@ def run_dswx_from_aoi(
         start_dt = datetime.fromisoformat(start_str)
         end_dt = datetime.fromisoformat(end_str)
 
-        client = CDSEClient()
+        from subsideo.config import Settings
+
+        settings = Settings()
+        client = CDSEClient(
+            client_id=settings.cdse_client_id,
+            client_secret=settings.cdse_client_secret,
+        )
         scenes = client.search_stac(
             collection="SENTINEL-2",
             bbox=bbox,
