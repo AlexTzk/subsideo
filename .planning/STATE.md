@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 4 context gathered
-last_updated: "2026-04-06T00:06:08.555Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-04-06T05:32:57.869Z"
 progress:
-  total_phases: 4
-  completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
+  total_phases: 6
+  completed_phases: 4
+  total_plans: 16
+  completed_plans: 15
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 03 — disp-s1-and-dist-s1-pipelines
+**Current focus:** Phase 05 — fix-cross-phase-integration-wiring
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
+Phase: 05 (fix-cross-phase-integration-wiring) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -57,6 +57,11 @@ Plan: Not started
 | Phase 03 P01 | 6min | 2 tasks | 3 files |
 | Phase 03 P03 | 2min | 2 tasks | 2 files |
 | Phase 03 P02 | 4min | 2 tasks | 3 files |
+| Phase 04 P01 | 5min | 2 tasks | 7 files |
+| Phase 04 P02 | 4min | 2 tasks | 5 files |
+| Phase 04 P03 | 3min | 1 tasks | 4 files |
+| Phase 05 P01 | 4min | 2 tasks | 4 files |
+| Phase 05 P02 | 3min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -86,6 +91,14 @@ Recent decisions affecting current work:
 - [Phase 03]: EGMStoolkit lazy import in fetch_egms_ortho; LOS-to-vertical via cos(theta) division; grid alignment always reprojects to EGMS grid
 - [Phase 03]: Separate validate_dist_product from validate_rtc_product for module independence
 - [Phase 03]: Simplified MGRS tile resolution from AOI centroid; dist-s1 validates tile availability
+- [Phase 04]: DSWE diagnostic tests use PROTEUS defaults mapped to S2 L2A; inject_opera_metadata is shared utility for all product types
+- [Phase 04]: Markup from markupsafe for SVG inline rendering in Jinja2 autoescape mode
+- [Phase 04]: Adapted validate --disp to use --egms flag matching actual compare_disp API
+- [Phase 04]: Added run_rtc_from_aoi and run_cslc_from_aoi wrappers to complete from_aoi pattern across all products
+- [Phase 05]: Reordered data-access block so burst query precedes DEM fetch (burst epsg needed for output_epsg)
+- [Phase 05]: Added empty-burst early-exit guard in from_aoi functions
+- [Phase 05]: Reordered burst query before DEM fetch in dist.py to access burst EPSG
+- [Phase 05]: Added empty-bursts guard in disp.py run_disp_from_aoi for early error return
 
 ### Pending Todos
 
@@ -98,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T00:06:08.553Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-dswx-s2-pipeline-and-full-interface/04-CONTEXT.md
+Last session: 2026-04-06T05:32:57.867Z
+Stopped at: Completed 05-02-PLAN.md
+Resume file: None

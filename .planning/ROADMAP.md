@@ -16,6 +16,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 2: RTC-S1 and CSLC-S1 Pipelines** - Produce and validate OPERA-spec RTC COG and CSLC HDF5 products over EU AOIs
 - [ ] **Phase 3: DISP-S1 and DIST-S1 Pipelines** - Produce and validate OPERA-spec displacement time-series and surface disturbance products
 - [ ] **Phase 4: DSWx-S2 Pipeline and Full Interface** - Produce and validate OPERA-spec surface water extent products; complete CLI and validation reporting
+- [ ] **Phase 5: Fix Cross-Phase Integration Wiring** - Fix all interface contract mismatches between Phase 1 modules and Phase 2/3/4 callers (B-01 through B-06)
+- [ ] **Phase 6: Wire Unused Data Modules & OPERA Metadata** - Wire fetch_ionex, ASFClient, and inject_opera_metadata into their consumers
 
 ## Phase Details
 
@@ -79,7 +81,44 @@ Plans:
   2. All products (RTC, CSLC, DISP, DIST, DSWx) carry OPERA-compliant identification metadata including provenance, software version, and run parameters
   3. The `subsideo` CLI exposes rtc, cslc, disp, dswx, dist, and validate subcommands; each product subcommand accepts --aoi, --date-range, and --out parameters
   4. Running `subsideo validate` on completed product outputs generates an HTML and Markdown report with metric tables and spatial diff maps
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [x] 04-01-PLAN.md — DSWx types, OPERA metadata utility, and DSWx-S2 pipeline orchestrator (PROD-04, OUT-03)
+- [x] 04-02-PLAN.md — JRC validation comparison and validation report generator (VAL-05, VAL-06)
+- [ ] 04-03-PLAN.md — Complete CLI with all product subcommands and validate command (CLI-01, CLI-02)
+
+### Phase 5: Fix Cross-Phase Integration Wiring
+**Goal**: All five product `*_from_aoi` functions call Phase 1 data-access modules with correct constructor args, method names, and signatures — unblocking every broken E2E flow
+**Depends on**: Phases 1–4 (fixes wiring between them)
+**Requirements**: DATA-01, DATA-02, DATA-03, DATA-04, CLI-01
+**Gap Closure:** Closes integration bugs B-01, B-02, B-03, B-04, B-05, B-06 from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. `CDSEClient` is instantiated with valid `client_id` and `client_secret` in all five product `*_from_aoi` functions
+  2. RTC and CSLC callers use `search_stac()` with correct keyword arguments (`start_date`, `end_date`)
+  3. RTC and CSLC callers use `query_bursts_for_aoi()` from `burst/frames.py` instead of nonexistent `BurstDB` class
+  4. `fetch_orbit()` is called with `(sensing_time, satellite, output_dir)` signature in all callers
+  5. `fetch_dem()` is called with required `output_epsg` arg and callers unpack the `tuple[Path, dict]` return correctly
+  6. CLI DIST command iterates `list[DISTResult]` instead of accessing `.valid` on the list directly
+  7. All five product CLI flows (`subsideo rtc/cslc/disp/dist/dswx --aoi ...`) reach the algorithm invocation step without crashing on data-access calls
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Fix B-01 through B-05 in rtc.py and cslc.py with unit tests (DATA-01, DATA-03, DATA-04)
+- [x] 05-02-PLAN.md — Fix B-01/B-05 in disp/dist/dswx, B-06 in CLI, update existing tests (DATA-02, CLI-01)
+
+### Phase 6: Wire Unused Data Modules & OPERA Metadata
+**Goal**: Every Phase 1 data module has at least one consumer, and all five products carry OPERA-compliant identification metadata
+**Depends on**: Phase 5 (integration wiring must be correct first)
+**Requirements**: DATA-05, DATA-06, OUT-03
+**Gap Closure:** Closes audit gaps DATA-05 (unwired ionex), DATA-06 (unwired ASF), OUT-03 (metadata only in DSWx)
+**Success Criteria** (what must be TRUE):
+  1. CSLC pipeline calls `fetch_ionex()` to obtain TEC maps and passes the result as `tec_file` to the processing step (instead of hardcoded `None`)
+  2. `subsideo validate` CLI can automatically fetch OPERA reference products from ASF DAAC via `ASFClient` when `--reference` is not provided
+  3. `inject_opera_metadata()` is called in RTC, CSLC, DISP, and DIST product pipelines (not just DSWx)
+  4. All five product types include provenance, software version, and run parameters in their output metadata
+
+Plans: 0 plans
 
 ## Progress
 
@@ -91,4 +130,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation, Data Access & Burst DB | 4/4 | Complete | - |
 | 2. RTC-S1 and CSLC-S1 Pipelines | 0/4 | Not started | - |
 | 3. DISP-S1 and DIST-S1 Pipelines | 0/3 | Not started | - |
-| 4. DSWx-S2 Pipeline and Full Interface | 0/TBD | Not started | - |
+| 4. DSWx-S2 Pipeline and Full Interface | 0/3 | Not started | - |
+| 5. Fix Cross-Phase Integration Wiring | 0/2 | Not started | - |
+| 6. Wire Unused Data Modules & OPERA Metadata | 0/0 | Not started | - |
