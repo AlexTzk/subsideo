@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ product_type }} Validation Report</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2em auto; padding: 0 1em; color: #333; }
+    h1 { border-bottom: 2px solid #2563eb; padding-bottom: 0.3em; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+    th { background: #f8f9fa; }
+    .pass { color: #16a34a; font-weight: bold; }
+    .fail { color: #dc2626; font-weight: bold; }
+    .figure { text-align: center; margin: 1.5em 0; }
+    .figure svg, .figure img { max-width: 100%; }
+    .meta { color: #6b7280; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <h1>{{ product_type }} Validation Report</h1>
+  <p class="meta">Generated: {{ generated_at }} | Software: subsideo {{ software_version }}</p>
+
+  <h2>Metric Summary</h2>
+  <table>
+    <tr><th>Metric</th><th>Value</th><th>Criterion</th><th>Status</th></tr>
+    {% for row in metrics_table %}
+    <tr>
+      <td>{{ row.metric }}</td>
+      <td>{{ row.value }}</td>
+      <td>{{ row.criterion }}</td>
+      <td class="{{ 'pass' if row.passed else 'fail' }}">{{ "PASS" if row.passed else "FAIL" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h2>Spatial Difference Map</h2>
+  <div class="figure">{{ diff_map_svg }}</div>
+
+  <h2>Scatter Plot</h2>
+  <div class="figure">{{ scatter_svg }}</div>
+</body>
+</html>
