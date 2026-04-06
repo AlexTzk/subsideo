@@ -150,7 +150,7 @@ Plans:
   1. ROADMAP.md progress table shows all 6 phases as Complete with correct plan counts
   2. All executed plan checkboxes in ROADMAP.md are checked (`[x]`)
   3. REQUIREMENTS.md coverage summary reflects 27/27 satisfied with 0 pending; merge conflict markers removed
-  4. All 18 SUMMARY.md files have `requirements_completed` frontmatter populated
+  4. All 20 SUMMARY.md files have `requirements-completed` frontmatter populated
 **Plans**: 1 plan
 
 Plans:
@@ -166,10 +166,10 @@ Plans:
   2. Orphaned code removed: `verify_connectivity()`, `DISPConfig`, `DISTConfig`
   3. All 20 SUMMARY.md files have accurate `requirements-completed` frontmatter
   4. ROADMAP Phase 8 success criteria text references correct counts (7 phases, 19 SUMMARY files)
-**Plans**: 0 plans
+**Plans**: 1 plan
 
 Plans:
-(none yet)
+- [ ] 09-01-PLAN.md — Fix report criteria key mismatches, remove orphaned code, correct ROADMAP metadata (VAL-03, VAL-04, VAL-06)
 
 ## Progress
 
@@ -186,4 +186,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 6. Wire Unused Data Modules & OPERA Metadata | 2/2 | Complete | - |
 | 7. CLI Gaps & Code Cleanup | 1/1 | Complete | - |
 | 8. Planning Artifact Cleanup | 1/1 | Complete | - |
-| 9. Fix Report Keys & Cleanup | 0/0 | Not Started | - |
+| 9. Fix Report Keys & Cleanup | 0/1 | Not Started | - |
