@@ -185,33 +185,3 @@ class CDSEClient:
 
         msg = f"CDSE S3 download failed after {max_retries} retries: {s3_path}"
         raise RuntimeError(msg)
-
-    # ------------------------------------------------------------------
-    # Connectivity check
-    # ------------------------------------------------------------------
-    def verify_connectivity(self) -> None:
-        """Verify credentials are present and STAC endpoint is reachable.
-
-        Raises
-        ------
-        ValueError
-            If ``client_id`` or ``client_secret`` is empty.
-        """
-        if not self._client_id:
-            msg = (
-                "CDSE_CLIENT_ID is not set. "
-                "Register at https://dataspace.copernicus.eu and set the "
-                "CDSE_CLIENT_ID environment variable."
-            )
-            raise ValueError(msg)
-        if not self._client_secret:
-            msg = (
-                "CDSE_CLIENT_SECRET is not set. "
-                "Register at https://dataspace.copernicus.eu and set the "
-                "CDSE_CLIENT_SECRET environment variable."
-            )
-            raise ValueError(msg)
-
-        # Verify STAC catalog is reachable
-        Client.open(CDSE_STAC_URL)
-        logger.info("CDSE STAC catalog reachable at {}", CDSE_STAC_URL)

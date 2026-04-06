@@ -35,17 +35,6 @@ class TestCDSEClientInit:
         CDSEClient("id", "secret")
         mock_oauth.assert_not_called()
 
-    def test_verify_connectivity_raises_when_no_credentials(self):
-        """Empty client_id triggers ValueError with remediation hint."""
-        client = CDSEClient("", "some_secret")
-        with pytest.raises(ValueError, match="CDSE_CLIENT_ID"):
-            client.verify_connectivity()
-
-    def test_verify_connectivity_raises_when_no_secret(self):
-        """Empty client_secret triggers ValueError with remediation hint."""
-        client = CDSEClient("some_id", "")
-        with pytest.raises(ValueError, match="CDSE_CLIENT_SECRET"):
-            client.verify_connectivity()
 
 
 class TestOAuth2:

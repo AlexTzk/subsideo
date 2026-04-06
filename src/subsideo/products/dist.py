@@ -10,10 +10,9 @@ from pathlib import Path
 
 from loguru import logger
 
-from subsideo.products.types import DISTConfig, DISTResult
+from subsideo.products.types import DISTResult
 
 __all__ = [
-    "DISTConfig",
     "DISTResult",
     "validate_dist_product",
     "run_dist",

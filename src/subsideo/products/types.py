@@ -79,18 +79,6 @@ class CSLCValidationResult:
 
 
 @dataclass
-class DISPConfig:
-    """Configuration for a DISP-S1 displacement time-series run."""
-
-    cslc_file_list: list[Path]
-    output_dir: Path
-    cdsapirc_path: Path = field(default_factory=lambda: Path.home() / ".cdsapirc")
-    coherence_mask_threshold: float = 0.3
-    ramp_threshold: float = 1.0
-    product_version: str = "0.1.0"
-
-
-@dataclass
 class DISPResult:
     """Output from a DISP-S1 processing run."""
 
@@ -109,16 +97,6 @@ class DISPValidationResult:
     correlation: float
     bias_mm_yr: float
     pass_criteria: dict[str, bool] = field(default_factory=dict)
-
-
-@dataclass
-class DISTConfig:
-    """Configuration for a DIST-S1 surface disturbance run."""
-
-    mgrs_tile_id: str
-    post_date: str
-    track_number: int
-    output_dir: Path
 
 
 @dataclass
