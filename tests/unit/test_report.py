@@ -4,7 +4,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from subsideo.products.types import DSWxValidationResult, RTCValidationResult
+from subsideo.products.types import (
+    CSLCValidationResult,
+    DISPValidationResult,
+    DSWxValidationResult,
+    RTCValidationResult,
+)
 from subsideo.validation.report import _metrics_table_from_result, generate_report
 
 
@@ -47,6 +52,56 @@ class TestMetricsTable:
         f1_row = next(r for r in table if r["metric"] == "f1")
         assert f1_row["passed"] is True
         assert f1_row["criterion"] == "F1 > 0.90"
+
+    def test_cslc_criteria_key_matches(self):
+        """phase_rms_lt_0.05rad key must resolve correctly."""
+        result = CSLCValidationResult(
+            phase_rms_rad=0.03,
+            coherence=0.98,
+            pass_criteria={"phase_rms_lt_0.05rad": True},
+        )
+        table = _metrics_table_from_result(result)
+        phase_row = next(r for r in table if r["metric"] == "phase_rms_rad")
+        assert phase_row["passed"] is True
+
+    def test_cslc_criteria_key_fail(self):
+        """phase_rms_lt_0.05rad=False must propagate as passed=False."""
+        result = CSLCValidationResult(
+            phase_rms_rad=0.10,
+            coherence=0.80,
+            pass_criteria={"phase_rms_lt_0.05rad": False},
+        )
+        table = _metrics_table_from_result(result)
+        phase_row = next(r for r in table if r["metric"] == "phase_rms_rad")
+        assert phase_row["passed"] is False
+
+    def test_disp_criteria_keys_match(self):
+        """DISP correlation_gt_0.92 and bias_lt_3mm_yr must resolve correctly."""
+        result = DISPValidationResult(
+            correlation=0.95,
+            bias_mm_yr=1.5,
+            pass_criteria={"correlation_gt_0.92": True, "bias_lt_3mm_yr": False},
+        )
+        table = _metrics_table_from_result(result)
+        corr_row = next(r for r in table if r["metric"] == "correlation")
+        assert corr_row["passed"] is True
+        bias_row = next(r for r in table if r["metric"] == "bias_mm_yr")
+        assert bias_row["passed"] is False
+
+    def test_rtc_criteria_keys_match(self):
+        """RTC rmse_lt_0.5dB and correlation_gt_0.99 must resolve correctly."""
+        result = RTCValidationResult(
+            rmse_db=0.35,
+            correlation=0.995,
+            bias_db=-0.02,
+            ssim_value=0.91,
+            pass_criteria={"rmse_lt_0.5dB": True, "correlation_gt_0.99": False},
+        )
+        table = _metrics_table_from_result(result)
+        rmse_row = next(r for r in table if r["metric"] == "rmse_db")
+        assert rmse_row["passed"] is True
+        corr_row = next(r for r in table if r["metric"] == "correlation")
+        assert corr_row["passed"] is False
 
     def test_failing_criterion(self):
         result = DSWxValidationResult(

@@ -16,18 +16,18 @@ from loguru import logger
 _CRITERIA_MAP: dict[str, tuple[str, str]] = {
     # RTC
     "rmse_db": ("RMSE < 0.5 dB", "rmse_lt_0.5dB"),
-    "correlation": ("r > 0.99", "correlation_gt_0.99"),
+    "correlation": ("r > threshold", "correlation_gt_0.99"),
     "bias_db": ("--", ""),
     "ssim_value": ("--", ""),
     # DISP
-    "bias_mm_yr": ("bias < 3 mm/yr", "bias_lt_3mm"),
+    "bias_mm_yr": ("bias < 3 mm/yr", "bias_lt_3mm_yr"),
     # DSWx
     "f1": ("F1 > 0.90", "f1_gt_0.90"),
     "precision": ("--", ""),
     "recall": ("--", ""),
     "overall_accuracy": ("--", ""),
     # CSLC
-    "phase_rms_rad": ("phase RMS < 0.05 rad", "phase_rms_lt_0.05"),
+    "phase_rms_rad": ("phase RMS < 0.05 rad", "phase_rms_lt_0.05rad"),
     "coherence": ("--", ""),
 }
 
@@ -154,6 +154,16 @@ def _metrics_table_from_result(validation_result) -> list[dict]:  # noqa: ANN001
 
         criterion_label, criterion_key = _CRITERIA_MAP.get(f.name, ("--", ""))
         passed = pass_criteria.get(criterion_key) if criterion_key else None
+
+        # Fallback: if static map key not found, search pass_criteria for
+        # a key starting with the field name (handles correlation ambiguity
+        # between RTC correlation_gt_0.99 and DISP correlation_gt_0.92)
+        if passed is None and criterion_key:
+            for pc_key, pc_val in pass_criteria.items():
+                if pc_key.startswith(f.name):
+                    passed = pc_val
+                    criterion_label = pc_key  # show actual criterion
+                    break
 
         table.append(
             {
