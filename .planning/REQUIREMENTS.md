@@ -13,8 +13,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **DATA-02**: Library can search and download Sentinel-2 L2A data from CDSE via STAC + S3
 - [x] **DATA-03**: Library can download and mosaic GLO-30 Copernicus DEM tiles for a given AOI
 - [x] **DATA-04**: Library can download precise orbit ephemerides (POE/ROE) for Sentinel-1
-- [ ] **DATA-05**: Library can download IONEX TEC maps for ionospheric correction
-- [ ] **DATA-06**: Library can search and download OPERA reference products from ASF DAAC (for validation)
+- [x] **DATA-05**: Library can download IONEX TEC maps for ionospheric correction
+- [x] **DATA-06**: Library can search and download OPERA reference products from ASF DAAC (for validation)
 
 ### Burst Management
 
@@ -34,7 +34,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **OUT-01**: RTC and DSWx products are written as Cloud-Optimised GeoTIFF with correct metadata
 - [x] **OUT-02**: CSLC and DISP products are written as HDF5 following OPERA product specification hierarchy
-- [ ] **OUT-03**: All products include OPERA-compliant identification metadata (provenance, version, params)
+- [x] **OUT-03**: All products include OPERA-compliant identification metadata (provenance, version, params)
 
 ### Validation
 
@@ -92,8 +92,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-02 | Phase 5 | Complete |
 | DATA-03 | Phase 5 | Complete |
 | DATA-04 | Phase 5 | Complete |
-| DATA-05 | Phase 6 | Pending |
-| DATA-06 | Phase 6 | Pending |
+| DATA-05 | Phase 6 | Complete |
+| DATA-06 | Phase 6 | Complete |
 | BURST-01 | Phase 1 | Complete |
 | BURST-02 | Phase 1 | Complete |
 | BURST-03 | Phase 1 | Complete |
@@ -110,7 +110,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROD-05 | Phase 3 | Complete |
 | VAL-04 | Phase 3 | Complete |
 | PROD-04 | Phase 4 | Complete |
-| OUT-03 | Phase 6 | Pending |
+| OUT-03 | Phase 6 | Complete |
 | VAL-05 | Phase 4 | Complete |
 | VAL-06 | Phase 4 | Complete |
 | CLI-01 | Phase 5 | Complete |

@@ -12,12 +12,14 @@ subsideo builds a Python library that produces OPERA-equivalent SAR/InSAR geospa
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation, Data Access & Burst DB** - Establish the conda environment, CDSE/ASF data access layer, EU burst database, DEM/orbit ancillaries, and project config
-- [ ] **Phase 2: RTC-S1 and CSLC-S1 Pipelines** - Produce and validate OPERA-spec RTC COG and CSLC HDF5 products over EU AOIs
-- [ ] **Phase 3: DISP-S1 and DIST-S1 Pipelines** - Produce and validate OPERA-spec displacement time-series and surface disturbance products
-- [ ] **Phase 4: DSWx-S2 Pipeline and Full Interface** - Produce and validate OPERA-spec surface water extent products; complete CLI and validation reporting
-- [ ] **Phase 5: Fix Cross-Phase Integration Wiring** - Fix all interface contract mismatches between Phase 1 modules and Phase 2/3/4 callers (B-01 through B-06)
-- [ ] **Phase 6: Wire Unused Data Modules & OPERA Metadata** - Wire fetch_ionex, ASFClient, and inject_opera_metadata into their consumers
+- [x] **Phase 1: Foundation, Data Access & Burst DB** - Establish the conda environment, CDSE/ASF data access layer, EU burst database, DEM/orbit ancillaries, and project config
+- [x] **Phase 2: RTC-S1 and CSLC-S1 Pipelines** - Produce and validate OPERA-spec RTC COG and CSLC HDF5 products over EU AOIs
+- [x] **Phase 3: DISP-S1 and DIST-S1 Pipelines** - Produce and validate OPERA-spec displacement time-series and surface disturbance products
+- [x] **Phase 4: DSWx-S2 Pipeline and Full Interface** - Produce and validate OPERA-spec surface water extent products; complete CLI and validation reporting
+- [x] **Phase 5: Fix Cross-Phase Integration Wiring** - Fix all interface contract mismatches between Phase 1 modules and Phase 2/3/4 callers (B-01 through B-06)
+- [x] **Phase 6: Wire Unused Data Modules & OPERA Metadata** - Wire fetch_ionex, ASFClient, and inject_opera_metadata into their consumers
+- [ ] **Phase 7: CLI Gaps & Code Cleanup** - Add build-db CLI, wire EGMS auto-fetch, remove orphaned code
+- [ ] **Phase 8: Planning Artifact Cleanup** - Fix stale ROADMAP/REQUIREMENTS/SUMMARY metadata
 
 ## Phase Details
 
@@ -55,7 +57,7 @@ Plans:
 - [x] 02-01-PLAN.md — Shared types (RTCConfig, CSLCResult, etc.) and validation metrics (RMSE, correlation, bias, SSIM) with TDD (VAL-01)
 - [x] 02-02-PLAN.md — RTC-S1 pipeline orchestrator: opera-rtc runconfig generation, API invocation, COG conversion, product validation (PROD-01, OUT-01)
 - [x] 02-03-PLAN.md — CSLC-S1 pipeline orchestrator: compass runconfig generation, API invocation, HDF5 validation (PROD-02, OUT-02)
-- [ ] 02-04-PLAN.md — Validation comparison modules: compare_rtc (dB-domain) and compare_cslc (interferometric phase) vs OPERA N.Am. reference (VAL-02, VAL-03)
+- [x] 02-04-PLAN.md — Validation comparison modules: compare_rtc (dB-domain) and compare_cslc (interferometric phase) vs OPERA N.Am. reference (VAL-02, VAL-03)
 
 ### Phase 3: DISP-S1 and DIST-S1 Pipelines
 **Goal**: Users can produce OPERA-spec surface displacement time-series and surface disturbance products from Sentinel-1 data over EU AOIs, with displacement validated against EGMS EU reference products
@@ -69,7 +71,7 @@ Plans:
 
 Plans:
 - [x] 03-01-PLAN.md — DISP-S1 pipeline orchestrator: dolphin phase linking, tophu unwrapping, MintPy time-series inversion with ERA5 correction (PROD-03)
-- [ ] 03-02-PLAN.md — DIST-S1 pipeline orchestrator: dist-s1 wrapper with conditional import, COG validation (PROD-05)
+- [x] 03-02-PLAN.md — DIST-S1 pipeline orchestrator: dist-s1 wrapper with conditional import, COG validation (PROD-05)
 - [x] 03-03-PLAN.md — EGMS validation comparison: LOS-to-vertical projection, grid alignment, correlation and bias metrics (VAL-04)
 
 ### Phase 4: DSWx-S2 Pipeline and Full Interface
@@ -86,7 +88,7 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — DSWx types, OPERA metadata utility, and DSWx-S2 pipeline orchestrator (PROD-04, OUT-03)
 - [x] 04-02-PLAN.md — JRC validation comparison and validation report generator (VAL-05, VAL-06)
-- [ ] 04-03-PLAN.md — Complete CLI with all product subcommands and validate command (CLI-01, CLI-02)
+- [x] 04-03-PLAN.md — Complete CLI with all product subcommands and validate command (CLI-01, CLI-02)
 
 ### Phase 5: Fix Cross-Phase Integration Wiring
 **Goal**: All five product `*_from_aoi` functions call Phase 1 data-access modules with correct constructor args, method names, and signatures — unblocking every broken E2E flow
@@ -104,7 +106,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — Fix B-01 through B-05 in rtc.py and cslc.py with unit tests (DATA-01, DATA-03, DATA-04)
+- [x] 05-01-PLAN.md — Fix B-01 through B-05 in rtc.py and cslc.py with unit tests (DATA-01, DATA-03, DATA-04)
 - [x] 05-02-PLAN.md — Fix B-01/B-05 in disp/dist/dswx, B-06 in CLI, update existing tests (DATA-02, CLI-01)
 
 ### Phase 6: Wire Unused Data Modules & OPERA Metadata
@@ -120,19 +122,48 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Wire IONEX into CSLC, inject OPERA metadata into all 5 pipelines, get_software_version helper (DATA-05, OUT-03)
-- [ ] 06-02-PLAN.md — Wire ASF auto-fetch into validate CLI for RTC/CSLC reference products (DATA-06)
+- [x] 06-01-PLAN.md — Wire IONEX into CSLC, inject OPERA metadata into all 5 pipelines, get_software_version helper (DATA-05, OUT-03)
+- [x] 06-02-PLAN.md — Wire ASF auto-fetch into validate CLI for RTC/CSLC reference products (DATA-06)
+
+### Phase 7: CLI Gaps & Code Cleanup
+**Goal**: Add missing CLI entry points and clean up orphaned code identified by v1.0 milestone audit
+**Depends on**: Phase 6
+**Requirements**: BURST-01, VAL-04
+**Gap Closure:** Closes tech debt from v1.0 milestone audit — build-db CLI, EGMS auto-fetch, orphaned code removal
+**Success Criteria** (what must be TRUE):
+  1. `subsideo build-db <geojson>` CLI command exists and calls `build_burst_db()` to create `~/.subsideo/eu_burst_db.sqlite`
+  2. `subsideo validate --product-type disp` auto-fetches EGMS reference via `fetch_egms_ortho()` when `--egms` is not provided
+  3. Orphaned `select_utm_epsg()` in `burst/tiling.py` is removed or inlined
+  4. Stale comment in `cli.py:42` about Plan 04 connectivity check is removed
+**Plans**: 1 plan
+
+Plans:
+- [x] 07-01-PLAN.md — Add build-db CLI, wire EGMS auto-fetch, remove dead code (BURST-01, VAL-04)
+
+### Phase 8: Planning Artifact Cleanup
+**Goal**: Fix all stale planning metadata in ROADMAP.md, REQUIREMENTS.md, and SUMMARY frontmatter so artifacts accurately reflect completed v1.0 work
+**Depends on**: Phase 7
+**Requirements**: None (planning artifacts only)
+**Gap Closure:** Closes housekeeping tech debt from v1.0 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. ROADMAP.md progress table shows all 6 phases as Complete with correct plan counts
+  2. All executed plan checkboxes in ROADMAP.md are checked (`[x]`)
+  3. REQUIREMENTS.md coverage summary reflects 27/27 satisfied with 0 pending; merge conflict markers removed
+  4. All 18 SUMMARY.md files have `requirements_completed` frontmatter populated
+**Plans**: 0 plans
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation, Data Access & Burst DB | 4/4 | Complete | - |
-| 2. RTC-S1 and CSLC-S1 Pipelines | 0/4 | Not started | - |
-| 3. DISP-S1 and DIST-S1 Pipelines | 0/3 | Not started | - |
-| 4. DSWx-S2 Pipeline and Full Interface | 0/3 | Not started | - |
-| 5. Fix Cross-Phase Integration Wiring | 0/2 | Not started | - |
-| 6. Wire Unused Data Modules & OPERA Metadata | 0/2 | Not started | - |
+| 2. RTC-S1 and CSLC-S1 Pipelines | 4/4 | Complete | - |
+| 3. DISP-S1 and DIST-S1 Pipelines | 3/3 | Complete | - |
+| 4. DSWx-S2 Pipeline and Full Interface | 3/3 | Complete | - |
+| 5. Fix Cross-Phase Integration Wiring | 2/2 | Complete | - |
+| 6. Wire Unused Data Modules & OPERA Metadata | 2/2 | Complete | - |
+| 7. CLI Gaps & Code Cleanup | 0/1 | In Progress | - |
+| 8. Planning Artifact Cleanup | 0/0 | Not started | - |
