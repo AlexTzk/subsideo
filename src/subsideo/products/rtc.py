@@ -281,10 +281,11 @@ def run_rtc_from_aoi(
 
     from shapely.geometry import shape
 
+    from subsideo.burst.frames import query_bursts_for_aoi
+    from subsideo.config import Settings
     from subsideo.data.cdse import CDSEClient
     from subsideo.data.dem import fetch_dem
     from subsideo.data.orbits import fetch_orbit
-    from subsideo.utils.projections import utm_epsg_from_lon
 
     # Resolve AOI
     if isinstance(aoi, Path):
@@ -301,19 +302,23 @@ def run_rtc_from_aoi(
         )
 
     geom = shape(aoi)
-    centroid = geom.centroid
 
-    # Determine UTM EPSG
-    epsg = utm_epsg_from_lon(centroid.x)
+    # B-01: CDSEClient with credentials from Settings
+    settings = Settings()
+    client = CDSEClient(
+        client_id=settings.cdse_client_id,
+        client_secret=settings.cdse_client_secret,
+    )
 
-    # Search CDSE for Sentinel-1 SLC
-    client = CDSEClient()
+    # B-02: search_stac with correct method name and kwargs
     start_dt = datetime.strptime(date_range[0], "%Y-%m-%d")
     end_dt = datetime.strptime(date_range[1], "%Y-%m-%d")
-    items = client.search(
-        collection="sentinel-1-slc",
-        bbox=geom.bounds,
-        datetime_range=(start_dt, end_dt),
+    items = client.search_stac(
+        collection="SENTINEL-1",
+        bbox=list(geom.bounds),
+        start=start_dt,
+        end=end_dt,
+        product_type="IW_SLC__1S",
     )
 
     if not items:
@@ -325,24 +330,51 @@ def run_rtc_from_aoi(
             validation_errors=["No Sentinel-1 SLC scenes found for AOI/date range"],
         )
 
-    # Download first scene's data
-    safe_paths = [client.download(items[0], output_dir / "input")]
+    # B-03: Burst query via frames module
+    bursts = query_bursts_for_aoi(aoi_wkt=geom.wkt)
+    burst_ids = [b.burst_id_jpl for b in bursts]
 
-    # Fetch orbit and DEM
-    orbit_path = fetch_orbit(safe_paths[0])
-    dem_path = fetch_dem(geom.bounds, output_dir / "dem")
+    if not bursts:
+        return RTCResult(
+            output_paths=[],
+            runconfig_path=output_dir / "runconfig.yaml",
+            burst_ids=[],
+            valid=False,
+            validation_errors=["No EU bursts found for AOI"],
+        )
 
-    # Resolve burst IDs from AOI
-    from subsideo.burst.db import BurstDB
+    # B-05: fetch_dem with output_epsg from burst record, tuple unpack
+    output_epsg = bursts[0].epsg
+    dem_path, _dem_profile = fetch_dem(
+        bounds=list(geom.bounds),
+        output_epsg=output_epsg,
+        output_dir=output_dir / "dem",
+    )
 
-    db = BurstDB()
-    burst_ids = db.query_by_geometry(geom.wkt)
+    # B-04: fetch_orbit with named args from STAC item metadata
+    scene = items[0]
+    sensing_time = datetime.fromisoformat(
+        scene.get("properties", {}).get("datetime", date_range[0]).rstrip("Z")
+    )
+    satellite = scene.get("properties", {}).get("platform", "S1A")
+    orbit_path = fetch_orbit(
+        sensing_time=sensing_time,
+        satellite=satellite,
+        output_dir=output_dir / "orbits",
+    )
+
+    # Download first scene
+    s3_key = scene.get("assets", {}).get("data", {}).get("href", "")
+    safe_path = output_dir / "input" / "scene_0.zip"
+    safe_path.parent.mkdir(parents=True, exist_ok=True)
+    client.download(s3_key, safe_path)
+    safe_paths = [safe_path]
 
     logger.info(
         "RTC from AOI: {} scenes, {} bursts, EPSG:{}",
         len(safe_paths),
         len(burst_ids),
-        epsg,
+        output_epsg,
     )
 
     return run_rtc(
