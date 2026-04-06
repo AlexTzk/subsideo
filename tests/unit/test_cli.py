@@ -25,7 +25,7 @@ class TestHelpOutput:
     def test_main_help_lists_all_subcommands(self) -> None:
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        for cmd in [*PRODUCT_COMMANDS, "validate", "check-env"]:
+        for cmd in [*PRODUCT_COMMANDS, "validate", "check-env", "build-db"]:
             assert cmd in result.output
 
     @pytest.mark.parametrize("cmd", PRODUCT_COMMANDS)

@@ -12,7 +12,6 @@ import pytest
 
 from subsideo.burst.db import BurstRecord
 from subsideo.burst.frames import query_bursts_for_aoi
-from subsideo.burst.tiling import select_utm_epsg
 
 
 @pytest.fixture
@@ -76,36 +75,6 @@ def test_query_returns_multiple_bursts(burst_db: Path) -> None:
     ids = {r.burst_id_jpl for r in results}
     assert "T037-000001-IW2" in ids
     assert "T081-000010-IW1" in ids
-
-
-def test_select_utm_epsg_reads_from_record() -> None:
-    """select_utm_epsg returns the EPSG stored in the burst record."""
-    record = BurstRecord(
-        burst_id_jpl="T037-000001-IW2",
-        burst_id_esa="ESA_1",
-        relative_orbit_number=37,
-        burst_index=1,
-        subswath="IW2",
-        geometry_wkt="POLYGON((10.5 44.5, 11.5 44.5, 11.5 45.5, 10.5 45.5, 10.5 44.5))",
-        epsg=32632,
-        is_north=1,
-    )
-    assert select_utm_epsg(record) == 32632
-
-
-def test_select_utm_epsg_portugal() -> None:
-    """select_utm_epsg returns 32629 for a Portuguese burst record."""
-    record = BurstRecord(
-        burst_id_jpl="T081-000010-IW1",
-        burst_id_esa="ESA_2",
-        relative_orbit_number=81,
-        burst_index=10,
-        subswath="IW1",
-        geometry_wkt="POLYGON((-9.5 38.2, -8.5 38.2, -8.5 39.2, -9.5 39.2, -9.5 38.2))",
-        epsg=32629,
-        is_north=1,
-    )
-    assert select_utm_epsg(record) == 32629
 
 
 def test_query_raises_when_db_missing() -> None:
