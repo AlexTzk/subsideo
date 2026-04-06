@@ -153,7 +153,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 08-01-PLAN.md — Fix stale ROADMAP/REQUIREMENTS/SUMMARY metadata
+- [x] 08-01-PLAN.md — Fix stale ROADMAP/REQUIREMENTS/SUMMARY metadata
 
 ## Progress
 
