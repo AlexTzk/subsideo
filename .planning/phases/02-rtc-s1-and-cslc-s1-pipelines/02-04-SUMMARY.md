@@ -29,6 +29,7 @@ metrics:
   tasks_total: 2
   files_created: 4
   files_modified: 0
+requirements-completed: [VAL-02, VAL-03]
 ---
 
 # Phase 02 Plan 04: Validation Comparison Modules Summary

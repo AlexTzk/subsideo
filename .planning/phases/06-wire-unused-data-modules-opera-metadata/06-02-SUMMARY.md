@@ -25,7 +25,7 @@ metrics:
   tasks_completed: 2
   tasks_total: 2
   files_modified: 2
-requirements_completed: [DATA-06]
+requirements-completed: [DATA-06]
 ---
 
 # Phase 06 Plan 02: ASF Auto-Fetch in Validate CLI Summary
