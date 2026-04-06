@@ -1,4 +1,5 @@
 """subsideo CLI -- OPERA-equivalent SAR/InSAR pipelines for the EU."""
+
 import json
 from pathlib import Path
 from typing import Optional
@@ -34,14 +35,12 @@ def _load_aoi(aoi_path: Path) -> Path:
     elif geom_type == "Feature":
         geom_type = geojson["geometry"]["type"]
     if geom_type not in ("Polygon", "MultiPolygon"):
-        raise typer.BadParameter(
-            f"AOI must be Polygon or MultiPolygon, got {geom_type}"
-        )
+        raise typer.BadParameter(f"AOI must be Polygon or MultiPolygon, got {geom_type}")
     return aoi_path
 
 
 # ---------------------------------------------------------------------------
-# check-env (existing)
+# check-env
 # ---------------------------------------------------------------------------
 
 
@@ -98,6 +97,31 @@ def check_env(
         raise typer.Exit(code=1)
 
     typer.echo("[OK] All required credentials present")
+
+
+# ---------------------------------------------------------------------------
+# build-db
+# ---------------------------------------------------------------------------
+
+
+@app.command("build-db")
+def build_db_cmd(
+    geojson: Path = typer.Argument(..., help="Path to ESA Sentinel-1 burst ID GeoJSON"),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Output SQLite path (default: ~/.subsideo/eu_burst_db.sqlite)"
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Debug-level logging"),
+) -> None:
+    """Build the EU burst database from ESA burst ID GeoJSON."""
+    from subsideo.utils.logging import configure_logging
+
+    configure_logging(verbose=verbose)
+    if not geojson.exists():
+        raise typer.BadParameter(f"GeoJSON file not found: {geojson}")
+    from subsideo.burst.db import build_burst_db
+
+    db_path = build_burst_db(geojson_source=geojson, output_path=output)
+    typer.echo(f"[OK] EU burst database built at {db_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -223,8 +247,7 @@ def dist_cmd(
         from subsideo.products.dist import run_dist_from_aoi
     except ImportError:
         typer.echo(
-            "[FAIL] DIST: dist-s1 not installed. "
-            "Install via: mamba install -c conda-forge dist-s1",
+            "[FAIL] DIST: dist-s1 not installed. Install via: mamba install -c conda-forge dist-s1",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -244,9 +267,7 @@ def dist_cmd(
 
 @app.command("validate")
 def validate_cmd(
-    product_dir: Path = typer.Option(
-        ..., "--product-dir", help="Directory with product outputs"
-    ),
+    product_dir: Path = typer.Option(..., "--product-dir", help="Directory with product outputs"),
     product_type: str = typer.Option(
         ..., "--product-type", help="Product type: rtc|cslc|disp|dswx"
     ),
@@ -261,9 +282,7 @@ def validate_cmd(
     start: str = typer.Option(
         "", "--start", help="Start date for ASF reference search (YYYY-MM-DD)"
     ),
-    end: str = typer.Option(
-        "", "--end", help="End date for ASF reference search (YYYY-MM-DD)"
-    ),
+    end: str = typer.Option("", "--end", help="End date for ASF reference search (YYYY-MM-DD)"),
     out: Path = typer.Option(Path("."), "--out", help="Report output directory"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
@@ -357,6 +376,32 @@ def validate_cmd(
             )
             raise typer.Exit(code=1)
 
+    # VAL-04: EGMS auto-fetch for DISP when --egms omitted
+    if pt == "disp" and egms_path is None:
+        velocity_files = sorted(product_dir.glob("*velocity*.tif")) + sorted(
+            product_dir.glob("*velocity*.h5")
+        )
+        if velocity_files:
+            try:
+                import rasterio
+                from pyproj import Transformer
+
+                from subsideo.validation.compare_disp import fetch_egms_ortho
+
+                with rasterio.open(velocity_files[0]) as ds:
+                    b = ds.bounds
+                    src_crs = ds.crs
+                transformer = Transformer.from_crs(src_crs, "EPSG:4326", always_xy=True)
+                x1, y1 = transformer.transform(b.left, b.bottom)
+                x2, y2 = transformer.transform(b.right, b.top)
+                bbox = (x1, y1, x2, y2)
+
+                egms_dir = out / "egms_reference"
+                egms_path = fetch_egms_ortho(bbox=bbox, output_dir=egms_dir)
+                typer.echo(f"[OK] Auto-fetched EGMS Ortho reference: {egms_path}")
+            except Exception as exc:
+                typer.echo(f"[WARNING] EGMS auto-fetch failed: {exc}", err=True)
+
     if pt == "rtc":
         from subsideo.validation.compare_rtc import compare_rtc
 
@@ -364,7 +409,8 @@ def validate_cmd(
         if not product_files or reference_path is None:
             typer.echo(
                 "[FAIL] rtc validation requires product TIF and --reference "
-                "(or Earthdata credentials for auto-fetch)", err=True
+                "(or Earthdata credentials for auto-fetch)",
+                err=True,
             )
             raise typer.Exit(code=1)
         result = compare_rtc(product_files[0], reference_path)
@@ -375,7 +421,8 @@ def validate_cmd(
         if not product_files or reference_path is None:
             typer.echo(
                 "[FAIL] cslc validation requires product HDF5 and --reference "
-                "(or Earthdata credentials for auto-fetch)", err=True
+                "(or Earthdata credentials for auto-fetch)",
+                err=True,
             )
             raise typer.Exit(code=1)
         result = compare_cslc(product_files[0], reference_path)
