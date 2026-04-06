@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: DSWx-S2 Pipeline and Full Interface** - Produce and validate OPERA-spec surface water extent products; complete CLI and validation reporting
 - [x] **Phase 5: Fix Cross-Phase Integration Wiring** - Fix all interface contract mismatches between Phase 1 modules and Phase 2/3/4 callers (B-01 through B-06)
 - [x] **Phase 6: Wire Unused Data Modules & OPERA Metadata** - Wire fetch_ionex, ASFClient, and inject_opera_metadata into their consumers
-- [ ] **Phase 7: CLI Gaps & Code Cleanup** - Add build-db CLI, wire EGMS auto-fetch, remove orphaned code
+- [x] **Phase 7: CLI Gaps & Code Cleanup** - Add build-db CLI, wire EGMS auto-fetch, remove orphaned code
 - [ ] **Phase 8: Planning Artifact Cleanup** - Fix stale ROADMAP/REQUIREMENTS/SUMMARY metadata
 
 ## Phase Details
@@ -150,7 +150,10 @@ Plans:
   2. All executed plan checkboxes in ROADMAP.md are checked (`[x]`)
   3. REQUIREMENTS.md coverage summary reflects 27/27 satisfied with 0 pending; merge conflict markers removed
   4. All 18 SUMMARY.md files have `requirements_completed` frontmatter populated
-**Plans**: 0 plans
+**Plans**: 1 plan
+
+Plans:
+- [ ] 08-01-PLAN.md — Fix stale ROADMAP/REQUIREMENTS/SUMMARY metadata
 
 ## Progress
 
@@ -165,5 +168,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 4. DSWx-S2 Pipeline and Full Interface | 3/3 | Complete | - |
 | 5. Fix Cross-Phase Integration Wiring | 2/2 | Complete | - |
 | 6. Wire Unused Data Modules & OPERA Metadata | 2/2 | Complete | - |
-| 7. CLI Gaps & Code Cleanup | 0/1 | In Progress | - |
-| 8. Planning Artifact Cleanup | 0/0 | Not started | - |
+| 7. CLI Gaps & Code Cleanup | 1/1 | Complete | - |
+| 8. Planning Artifact Cleanup | 0/1 | In Progress | - |
