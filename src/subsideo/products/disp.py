@@ -475,6 +475,14 @@ def run_disp_from_aoi(
 
         # Query burst DB for AOI
         bursts = query_bursts_for_aoi(aoi_wkt)
+        if not bursts:
+            return DISPResult(
+                velocity_path=None,
+                timeseries_paths=[],
+                output_dir=output_dir,
+                valid=False,
+                validation_errors=["No EU bursts found for AOI"],
+            )
         burst_ids = [b.burst_id_jpl for b in bursts]
         logger.info("Found {} bursts for AOI", len(burst_ids))
 
@@ -483,7 +491,13 @@ def run_disp_from_aoi(
         start_dt = datetime.fromisoformat(start_str)
         end_dt = datetime.fromisoformat(end_str)
 
-        client = CDSEClient()
+        from subsideo.config import Settings
+
+        settings = Settings()
+        client = CDSEClient(
+            client_id=settings.cdse_client_id,
+            client_secret=settings.cdse_client_secret,
+        )
         scenes = client.search_stac(
             collection="SENTINEL-1",
             bbox=bbox,
@@ -494,7 +508,12 @@ def run_disp_from_aoi(
         logger.info("Searching CDSE for {} scenes...", len(scenes))
 
         # Download scenes and fetch DEM/orbits
-        dem_path = fetch_dem(bounds=bbox, output_dir=output_dir / "dem")
+        output_epsg = bursts[0].epsg
+        dem_path, _dem_profile = fetch_dem(
+            bounds=bbox,
+            output_epsg=output_epsg,
+            output_dir=output_dir / "dem",
+        )
 
         cslc_paths: list[Path] = []
         for i, scene in enumerate(scenes):
