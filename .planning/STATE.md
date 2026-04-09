@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
+status: v1.0 milestone complete
 stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-04-06T21:51:29.042Z"
+last_updated: "2026-04-09T01:40:19.023Z"
+last_activity: 2026-04-09
 progress:
   total_phases: 9
   completed_phases: 9
@@ -16,15 +17,15 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-06)
+See: .planning/PROJECT.md (updated 2026-04-09)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 09 — fix-report-keys-and-cleanup
+**Current focus:** v1.0 shipped — planning next milestone
 
 ## Current Position
 
-Phase: 09
-Plan: Not started
+Milestone: v1.0 complete
+Next: `/gsd:new-milestone` to define v2.0
 
 ## Performance Metrics
 
@@ -128,7 +129,7 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-04-09 - Completed quick task 260408-pfx: Fix stale ROADMAP.md Phase 9 progress row and checkbox
+Last activity: 2026-04-09
 Last session: 2026-04-06T21:47:10.251Z
 Stopped at: Completed 09-01-PLAN.md
 Resume file: None
