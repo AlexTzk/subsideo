@@ -120,8 +120,15 @@ None yet.
 - DIST-S1 (Phase 3) depends on opera-adt/dist-s1 ~April 2026 conda-forge release; treat as conditional until confirmed
 - DSWx threshold calibration (Phase 4) has no published EU recipe; budget research time within the phase
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260408-pfx | Fix stale ROADMAP.md Phase 9 progress row and checkbox | 2026-04-09 | 40790d5 | [260408-pfx-fix-stale-roadmap-md-phase-9-progress-ro](./quick/260408-pfx-fix-stale-roadmap-md-phase-9-progress-ro/) |
+
 ## Session Continuity
 
+Last activity: 2026-04-09 - Completed quick task 260408-pfx: Fix stale ROADMAP.md Phase 9 progress row and checkbox
 Last session: 2026-04-06T21:47:10.251Z
 Stopped at: Completed 09-01-PLAN.md
 Resume file: None
