@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Wire Unused Data Modules & OPERA Metadata** - Wire fetch_ionex, ASFClient, and inject_opera_metadata into their consumers
 - [x] **Phase 7: CLI Gaps & Code Cleanup** - Add build-db CLI, wire EGMS auto-fetch, remove orphaned code
 - [x] **Phase 8: Planning Artifact Cleanup** - Fix stale ROADMAP/REQUIREMENTS/SUMMARY metadata
-- [ ] **Phase 9: Fix Report Criteria Keys & Clean Orphaned Code** - Fix validation report key mismatches, remove orphaned code, complete SUMMARY frontmatter
+- [x] **Phase 9: Fix Report Criteria Keys & Clean Orphaned Code** - Fix validation report key mismatches, remove orphaned code, complete SUMMARY frontmatter
 
 ## Phase Details
 
@@ -186,4 +186,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 6. Wire Unused Data Modules & OPERA Metadata | 2/2 | Complete | - |
 | 7. CLI Gaps & Code Cleanup | 1/1 | Complete | - |
 | 8. Planning Artifact Cleanup | 1/1 | Complete | - |
-| 9. Fix Report Keys & Cleanup | 0/1 | Not Started | - |
+| 9. Fix Report Keys & Cleanup | 1/1 | Complete | - |
