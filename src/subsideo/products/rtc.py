@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from loguru import logger
-from ruamel.yaml import YAML
+import yaml
 
 from subsideo.products.types import RTCConfig, RTCResult
 
@@ -67,10 +67,8 @@ def generate_rtc_runconfig(cfg: RTCConfig, output_yaml: Path) -> Path:
     }
 
     output_yaml.parent.mkdir(parents=True, exist_ok=True)
-    yaml = YAML()
-    yaml.default_flow_style = False
     with open(output_yaml, "w") as fh:
-        yaml.dump(runconfig, fh)
+        yaml.dump(runconfig, fh, default_flow_style=False, sort_keys=False)
 
     logger.debug("Wrote RTC runconfig to {}", output_yaml)
     return output_yaml

@@ -49,40 +49,40 @@ classifiers = [
 # ---------------------------------------------------------------------------
 dependencies = [
     # --- Data access ---
-    "pystac-client>=0.8",       # STAC API search (CDSE + ASF DAAC validation queries)
-    "boto3>=1.34",              # S3 direct access to CDSE eodata bucket
-    "requests-oauthlib>=1.3",   # CDSE OAuth2 client credentials flow
-    "requests>=2.31",           # HTTP client (CDDIS IONEX, general)
-    "dem-stitcher>=2.5",        # GLO-30 Copernicus DEM download and stitching
-    "sentineleof>=0.11",        # Sentinel-1 POE/RESORB orbit file download
-    "s1-orbits>=0.2",           # Alternative orbit download from AWS Open Data
-    "earthaccess>=0.9",         # NASA Earthdata auth and bulk download
-    "asf-search>=7.0",          # ASF DAAC search for OPERA reference products
-    "geopandas>=0.14",          # GeoDataFrame: spatial joins, burst footprint DB
+    "pystac-client>=0.8,<1",    # STAC API search (CDSE + ASF DAAC validation queries)
+    "boto3>=1.34,<2",           # S3 direct access to CDSE eodata bucket
+    "requests-oauthlib>=1.3,<3",# CDSE OAuth2 client credentials flow
+    "requests>=2.31,<3",        # HTTP client (CDDIS IONEX, general)
+    "dem-stitcher>=2.5,<3",     # GLO-30 Copernicus DEM download and stitching
+    "sentineleof>=0.11,<1",     # Sentinel-1 POE/RESORB orbit file download
+    "s1-orbits>=0.2,<1",        # Alternative orbit download from AWS Open Data
+    "earthaccess>=0.9,<1",      # NASA Earthdata auth and bulk download
+    "asf-search>=7.0,<13",      # ASF DAAC search for OPERA reference products
+    "geopandas>=1.0,<2",        # GeoDataFrame: spatial joins, burst footprint DB
 
     # --- Raster I/O and geospatial ---
-    "rasterio>=1.3",
-    "pyproj>=3.6",
-    "shapely>=2.0",
-    "h5py>=3.10",               # HDF5 for CSLC/DISP/RTC products
+    "rasterio>=1.3,<2",
+    "pyproj>=3.6,<4",
+    "shapely>=2.0,<3",
+    "h5py>=3.10,<4",            # HDF5 for CSLC/DISP/RTC products
     "xarray>=2024.2",
-    "zarr>=2.17",               # cloud-optimised intermediate storage
+    "zarr>=2.17,<3",            # cloud-optimised intermediate storage
     "fsspec>=2024.2",
     "s3fs>=2024.2",
 
     # --- Numerics ---
-    "numpy>=1.26",
-    "scipy>=1.12",
+    "numpy>=1.26,<3",
+    "scipy>=1.12,<2",
 
     # --- Utilities ---
-    "typer>=0.12",              # CLI entrypoint
-    "pydantic>=2.6",            # config/schema validation
-    "pydantic-settings>=2.2",   # BaseSettings with env/dotenv/YAML layered config
-    "rich>=13.7",               # progress / console output
-    "python-dotenv>=1.0",       # credential management (.env)
-    "tqdm>=4.66",
-    "loguru>=0.7",
-    "ruamel.yaml>=0.18",        # YAML config parsing (ISCE3 workflow files)
+    "typer>=0.12,<1",           # CLI entrypoint
+    "pydantic>=2.6,<3",         # config/schema validation
+    "pydantic-settings>=2.2,<3",# BaseSettings with env/dotenv/YAML layered config
+    "rich>=13.7,<15",           # progress / console output
+    "python-dotenv>=1.0,<2",    # credential management (.env)
+    "tqdm>=4.66,<5",
+    "loguru>=0.7,<1",
+    "pyyaml>=6.0,<7",          # YAML config parsing (ISCE3 workflow files)
 ]
 
 # ---------------------------------------------------------------------------

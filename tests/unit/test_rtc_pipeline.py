@@ -13,7 +13,7 @@ import pytest
 import rasterio
 from rasterio.crs import CRS
 from rasterio.transform import from_bounds
-from ruamel.yaml import YAML
+import yaml
 
 from subsideo.products.rtc import generate_rtc_runconfig, run_rtc
 from subsideo.products.types import RTCConfig, RTCResult
@@ -76,9 +76,8 @@ class TestGenerateRtcRunconfig:
         assert out == tmp_path / "runconfig.yaml"
         assert out.exists()
 
-        yaml = YAML()
         with open(out) as fh:
-            data = yaml.load(fh)
+            data = yaml.safe_load(fh)
 
         rc = data["runconfig"]
         assert rc["name"] == "rtc_s1_workflow"

@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
-from ruamel.yaml import YAML
+import yaml
 
 from pydantic_settings import SettingsConfigDict, YamlConfigSettingsSource, PydanticBaseSettingsSource
 from subsideo.config import Settings, dump_config, load_config
@@ -70,8 +70,7 @@ def test_yaml_loading(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("CDSE_CLIENT_ID", raising=False)
     monkeypatch.delenv("CDSE_CLIENT_SECRET", raising=False)
     yaml_file = tmp_path / "config.yaml"
-    yaml = YAML()
-    yaml.dump({"cdse_client_id": "from_yaml", "cdse_client_secret": "yaml_secret"}, yaml_file)
+    yaml_file.write_text(yaml.dump({"cdse_client_id": "from_yaml", "cdse_client_secret": "yaml_secret"}))
     YamlSettings = _make_yaml_settings(yaml_file)
     s = YamlSettings()
     assert s.cdse_client_id == "from_yaml"
@@ -82,8 +81,7 @@ def test_env_overrides_yaml(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     """Env var takes precedence over YAML value for the same key."""
     monkeypatch.setenv("CDSE_CLIENT_ID", "from_env")
     yaml_file = tmp_path / "config.yaml"
-    yaml = YAML()
-    yaml.dump({"cdse_client_id": "from_yaml"}, yaml_file)
+    yaml_file.write_text(yaml.dump({"cdse_client_id": "from_yaml"}))
     YamlSettings = _make_yaml_settings(yaml_file)
     s = YamlSettings()
     assert s.cdse_client_id == "from_env"
@@ -144,8 +142,8 @@ def test_isce3_yaml_compatibility(tmp_path: Path) -> None:
     dump_config(settings, yaml_path)
 
     # Load and verify structure
-    yaml = YAML()
-    data = yaml.load(yaml_path)
+    with open(yaml_path) as fh:
+        data = yaml.safe_load(fh)
 
     # Top-level is a mapping (dict), not a sequence or scalar
     assert isinstance(data, dict), f"Expected mapping, got {type(data)}"

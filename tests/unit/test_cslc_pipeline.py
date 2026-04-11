@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import h5py
 import numpy as np
 from pytest_mock import MockerFixture
-from ruamel.yaml import YAML
+import yaml
 
 from subsideo.products.cslc import (
     generate_cslc_runconfig,
@@ -55,9 +55,8 @@ def test_generate_cslc_runconfig(tmp_path: Path) -> None:
     assert result == yaml_path
     assert yaml_path.exists()
 
-    yaml = YAML()
     with open(yaml_path) as fh:
-        data = yaml.load(fh)
+        data = yaml.safe_load(fh)
 
     groups = data["runconfig"]["groups"]
     assert groups["primary_executable"]["product_type"] == "CSLC_S1"
@@ -74,9 +73,8 @@ def test_generate_cslc_runconfig_no_tec(tmp_path: Path) -> None:
 
     generate_cslc_runconfig(cfg, yaml_path)
 
-    yaml = YAML()
     with open(yaml_path) as fh:
-        data = yaml.load(fh)
+        data = yaml.safe_load(fh)
 
     tec = data["runconfig"]["groups"]["dynamic_ancillary_file_group"]["tec_file"]
     assert tec is None

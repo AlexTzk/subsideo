@@ -11,7 +11,7 @@ from pydantic_settings import (
     SettingsConfigDict,
     YamlConfigSettingsSource,
 )
-from ruamel.yaml import YAML
+import yaml
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -62,15 +62,12 @@ class Settings(BaseSettings):
 def dump_config(config: BaseModel, path: Path) -> None:
     """Serialize a Pydantic model to YAML (ISCE3 runconfig compatible).
 
-    Uses ruamel.yaml round-trip mode with ``model_dump(mode="json")``
-    to ensure Path objects become plain strings and no Python-specific
-    YAML tags are emitted.
+    Uses ``model_dump(mode="json")`` to ensure Path objects become plain
+    strings and no Python-specific YAML tags are emitted.
     """
-    yaml = YAML()
-    yaml.default_flow_style = False
     data = config.model_dump(mode="json")
     with open(path, "w") as fh:
-        yaml.dump(data, fh)
+        yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
 
 
 def load_config(cls: type[T], path: Path) -> T:
@@ -79,7 +76,6 @@ def load_config(cls: type[T], path: Path) -> T:
     Uses ``model_validate`` (not ``cls(**data)``) so that type coercion
     (e.g. str -> Path) works correctly on round-trip.
     """
-    yaml = YAML()
     with open(path) as fh:
-        data: dict[str, Any] = yaml.load(fh)
+        data: dict[str, Any] = yaml.safe_load(fh)
     return cls.model_validate(data)

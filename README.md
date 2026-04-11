@@ -90,7 +90,7 @@ install via pip on top.
 
 ```bash
 mamba create -n subsideo -c conda-forge python=3.12 \
-    isce3 gdal dolphin snaphu \
+    isce3 gdal dolphin snaphu pyyaml \
     opera-utils s1reader compass mintpy dist-s1
 conda activate subsideo
 ```
@@ -102,7 +102,49 @@ conda activate subsideo
 pip install tophu
 
 # opera-rtc (not on conda-forge or PyPI — install from GitHub)
-pip install "opera-rtc @ git+https://github.com/opera-adt/RTC"
+Instructions to install RTC under a conda environment.
+
+1. Download the source code:
+
+```bash
+git clone https://github.com/opera-adt/RTC.git RTC
+```
+
+2. Install `isce3`:
+
+```bash
+conda install -c conda-forge isce3
+```
+
+3. Install `s1-reader` via pip:
+```bash
+git clone https://github.com/opera-adt/s1-reader.git s1-reader
+conda install -c conda-forge --file s1-reader/requirements.txt
+python -m pip install ./s1-reader
+```
+
+4. Install `RTC` via pip:
+```bash
+git clone https://github.com/opera-adt/RTC.git RTC
+python -m pip install ./RTC
+```
+
+
+
+### Usage
+
+The command below generates the RTC product:
+
+```bash
+rtc_s1.py <path to rtc yaml file>
+```
+
+To compare the RTC-S1 products, use `rtc_compare.py`.
+
+```bash
+python rtc_s1.py <1st product HDF5> <2nd product HDF5>
+```
+
 
 # Install subsideo itself
 pip install -e ".[dev]"
