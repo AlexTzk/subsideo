@@ -83,28 +83,38 @@ EU burst/frame geometry -> `products/` runs processing pipelines ->
 ## Installation
 
 subsideo requires a two-layer install. Heavy native dependencies (ISCE3, GDAL,
-dolphin, tophu, snaphu) are only available from conda-forge. Pure-Python
-components install via pip on top.
+dolphin, snaphu) are only available from conda-forge. Pure-Python components
+install via pip on top.
 
 **Step 1: Create the conda environment**
 
 ```bash
-mamba create -n subsideo -c conda-forge python=3.11 \
-    isce3 gdal dolphin tophu snaphu-py \
-    opera-utils s1-reader compass opera-rtc mintpy dist-s1
+mamba create -n subsideo -c conda-forge python=3.12 \
+    isce3 gdal dolphin snaphu \
+    opera-utils s1reader compass mintpy dist-s1
 conda activate subsideo
 ```
 
-**Step 2: Install subsideo (pure-Python layer)**
+**Step 2: Install pip-only dependencies and subsideo**
 
 ```bash
+# tophu (Linux only — skip on macOS; phase unwrapping will not be available)
+pip install tophu
+
+# opera-rtc (not on conda-forge or PyPI — install from GitHub)
+pip install "opera-rtc @ git+https://github.com/opera-adt/RTC"
+
+# Install subsideo itself
 pip install -e ".[dev]"
 ```
 
+> **Note:** `tophu` requires Linux (`__linux` constraint on conda-forge). On
+> macOS, install via pip (`pip install tophu`) for the pure-Python portion, but
+> the SNAPHU unwrapping backend will only work on Linux.
+
 > **Important:** Never `pip install isce3`, `pip install gdal`, `pip install
-> dolphin`, `pip install tophu`, or `pip install snaphu`. These packages either
-> do not exist on PyPI or refer to unrelated projects. Always install them from
-> conda-forge.
+> dolphin`, or `pip install snaphu`. These packages either do not exist on PyPI
+> or refer to unrelated projects. Always install them from conda-forge.
 
 ## Configuration
 
