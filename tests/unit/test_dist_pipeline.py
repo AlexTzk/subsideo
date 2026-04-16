@@ -68,11 +68,23 @@ _AOI = {
 
 @pytest.fixture(autouse=True)
 def _mock_rio_cogeo(mocker):
-    """Ensure rio_cogeo modules are present in sys.modules for lazy imports."""
+    """Ensure rio_cogeo modules are present in sys.modules for lazy imports.
+
+    ``_metadata.inject_opera_metadata`` calls ``rio_cogeo.cogeo.cog_translate``
+    to re-translate a COG after tag injection. We stub this to just copy the
+    source file to the destination so the downstream ``tmp_path.replace(path)``
+    call can find the expected output file.
+    """
+    import shutil as _shutil
+
     mock_cog_validate_mod = MagicMock()
     mock_cog_validate_mod.cog_validate = MagicMock(return_value=(True, [], []))
 
+    def _fake_cog_translate(src, dst, *args, **kwargs):
+        _shutil.copyfile(str(src), str(dst))
+
     mock_cogeo_mod = MagicMock()
+    mock_cogeo_mod.cog_translate = _fake_cog_translate
     mock_profiles_mod = MagicMock()
 
     modules = {

@@ -59,6 +59,7 @@ dependencies = [
     "earthaccess>=0.12,<1",     # NASA Earthdata auth and bulk download
     "asf-search>=8.0,<13",     # ASF DAAC search for OPERA reference products
     "geopandas>=1.0,<2",        # GeoDataFrame: spatial joins, burst footprint DB
+    "mgrs>=1.5,<2",             # MGRS tile ID resolver (GeoTrans C wrapper, pure-Python install)
 
     # --- Raster I/O and geospatial ---
     "rasterio>=1.4,<2",
@@ -122,6 +123,11 @@ validation = [
     "pandas>=2.2",
     "scikit-image>=0.22",       # image comparison metrics (SSIM, RMSE)
     "statsmodels>=0.14",        # spatial statistics for validation reports
+    # EGMStoolkit 0.3.0 is GitHub-only; the upstream setup.cfg is missing
+    # a src-layout package_dir entry, so a plain `pip install` of the tag
+    # installs dist-info only. Use the fork/branch below once published,
+    # or install manually per run_eval_disp_egms.py header.
+    # "EGMStoolkit @ git+https://github.com/alexisInSAR/EGMStoolkit.git",
 ]
 
 # Async downloads for large EU frame sets

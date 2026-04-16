@@ -70,12 +70,16 @@ def validate_dist_product(cog_paths: list[Path]) -> list[str]:
 
 
 def _aoi_to_mgrs_tiles(aoi: dict) -> list[dict]:
-    """Resolve an AOI GeoJSON geometry to MGRS tile IDs and track numbers.
+    """Resolve an AOI GeoJSON geometry to an MGRS tile ID and track number.
 
-    Uses a simplified mapping based on the AOI centroid longitude to UTM
-    zone, then constructs MGRS tile IDs from the UTM zone + latitude band.
-    This is a best-effort mapping -- the actual dist-s1 workflow will
-    validate tile availability.
+    Uses the ``mgrs`` library (a GeoTrans C wrapper) to resolve the AOI
+    centroid to a canonical 100 km MGRS square ID (zone + band + 2-letter
+    square, e.g. ``"32UPU"``). For multi-tile AOIs the caller is
+    responsible for iterating sub-polygons — this function returns a single
+    representative tile covering the centroid.
+
+    The track number is a rough longitude-based heuristic; for accurate
+    Sentinel-1 relative-orbit resolution use the burst database.
 
     Parameters
     ----------
@@ -85,8 +89,11 @@ def _aoi_to_mgrs_tiles(aoi: dict) -> list[dict]:
     Returns
     -------
     list[dict]
-        Each dict has ``"mgrs_tile_id"`` and ``"track_number"`` keys.
+        Single-element list; the dict has ``"mgrs_tile_id"`` (str) and
+        ``"track_number"`` (int) keys.
     """
+    import mgrs
+
     coords = aoi["coordinates"][0]
     lons = [c[0] for c in coords]
     lats = [c[1] for c in coords]
@@ -95,27 +102,16 @@ def _aoi_to_mgrs_tiles(aoi: dict) -> list[dict]:
     center_lon = sum(lons) / len(lons)
     center_lat = sum(lats) / len(lats)
 
-    # UTM zone from centroid longitude
-    utm_zone = int((center_lon + 180) / 6) + 1
+    # Resolve centroid -> canonical 100 km MGRS square via GeoTrans.
+    # MGRSPrecision=0 returns the 5-character square ID (zone + band + col + row).
+    mgrs_tile_id = mgrs.MGRS().toMGRS(
+        latitude=center_lat,
+        longitude=center_lon,
+        MGRSPrecision=0,
+    )
 
-    # Latitude band letter (simplified: C-X, 8-degree bands from -80 to 84)
-    lat_bands = "CDEFGHJKLMNPQRSTUVWX"
-    band_idx = min(max(int((center_lat + 80) / 8), 0), len(lat_bands) - 1)
-    lat_band = lat_bands[band_idx]
-
-    # Column letter within 6-degree UTM zone (simplified: use U as default)
-    # MGRS 100km square IDs vary by zone set; use a representative letter
-    col_letter = "U"
-
-    # Row letter from latitude within the band (simplified)
-    row_letters = "ABCDEFGHJKLMNPQRSTUV"
-    row_idx = int((center_lat % 8) / 0.4) % len(row_letters)
-    row_letter = row_letters[row_idx]
-
-    mgrs_tile_id = f"{utm_zone:02d}{lat_band}{col_letter}{row_letter}"
-
-    # Track number: simplified assignment based on longitude
-    # Sentinel-1 has 175 relative orbits; approximate from longitude
+    # Track number: simplified longitude heuristic. Sentinel-1 has 175
+    # relative orbits. For accurate resolution use the burst DB.
     track_number = (int((center_lon + 180) * 175 / 360) % 175) + 1
 
     logger.debug(
