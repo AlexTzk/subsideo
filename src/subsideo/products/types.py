@@ -32,6 +32,7 @@ class CSLCConfig:
     burst_id: list[str] | None
     output_dir: Path
     tec_file: Path | None = None
+    burst_database_file: Path | None = None
     product_version: str = "0.1.0"
 
 
@@ -74,6 +75,8 @@ class CSLCValidationResult:
 
     phase_rms_rad: float
     coherence: float
+    amplitude_correlation: float = 0.0
+    amplitude_rmse_db: float = float("inf")
     pass_criteria: dict[str, bool] = field(default_factory=dict)
 
 
@@ -107,6 +110,25 @@ class DISTResult:
     output_dir: Path
     valid: bool
     validation_errors: list[str] = field(default_factory=list)
+
+
+@dataclass
+class DISTValidationResult:
+    """Validation metrics comparing DIST-S1 output against OPERA DIST-S1 reference.
+
+    All fields are binary-classification metrics over the disturbed/
+    not-disturbed label, computed on the intersection of valid pixels
+    between the product and the reference after reprojection to a
+    shared grid. ``pass_criteria`` is a dict of named threshold checks
+    that the caller's harness can iterate to produce a pass/fail verdict.
+    """
+
+    f1: float
+    precision: float
+    recall: float
+    overall_accuracy: float
+    n_valid_pixels: int
+    pass_criteria: dict[str, bool] = field(default_factory=dict)
 
 
 @dataclass
