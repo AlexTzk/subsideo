@@ -150,6 +150,11 @@ python rtc_s1.py <1st product HDF5> <2nd product HDF5>
 pip install -e ".[dev]"
 ```
 
+# You may also check the env with
+```bash
+/Users/<YOUR_USERNAME>/.local/share/mamba/envs/subsideo/bin/subsideo check-env
+```
+
 > **Note:** `tophu` requires Linux (`__linux` constraint on conda-forge). On
 > macOS, install via pip (`pip install tophu`) for the pure-Python portion, but
 > the SNAPHU unwrapping backend will only work on Linux.

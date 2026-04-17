@@ -88,9 +88,11 @@ class TestSearchStac:
         # Verify STAC URL
         mock_catalog.assert_called_once_with(CDSE_STAC_URL)
 
-        # Verify search params
+        # Verify search params: legacy ("SENTINEL-1", "IW_SLC__1S") is
+        # translated to the concrete per-product collection id.
         call_kwargs = mock_catalog.return_value.search.call_args.kwargs
-        assert "SENTINEL-1" in call_kwargs["collections"]
+        assert "sentinel-1-slc" in call_kwargs["collections"]
+        assert "query" not in call_kwargs
         assert call_kwargs["bbox"] == [9.5, 44.5, 12.5, 45.5]
 
     def test_search_stac_sentinel2(self, mocker):
@@ -117,7 +119,7 @@ class TestSearchStac:
 
         assert len(results) == 1
         call_kwargs = mock_catalog.return_value.search.call_args.kwargs
-        assert "SENTINEL-2" in call_kwargs["collections"]
+        assert "sentinel-2-l2a" in call_kwargs["collections"]
         assert "Sentinel-2" in results[0]["assets"]["data"]["href"]
 
     def test_search_stac_passes_max_items(self, mocker):
@@ -142,12 +144,21 @@ class TestSearchStac:
 class TestDownload:
     """S3 download with correct endpoint, retry, and path parsing."""
 
+    def _client(self) -> CDSEClient:
+        # CDSE S3 uses a dedicated key pair separate from OAuth credentials.
+        return CDSEClient(
+            "test_id",
+            "test_secret",
+            s3_access_key="test_s3_key",
+            s3_secret_key="test_s3_secret",
+        )
+
     def test_download_calls_correct_endpoint(self, mocker, tmp_path):
         """boto3 S3 client uses CDSE custom endpoint + region_name='default'."""
         mock_s3 = mocker.patch("subsideo.data.cdse.boto3.client")
         mock_s3.return_value.download_file.return_value = None
 
-        client = CDSEClient("test_id", "test_secret")
+        client = self._client()
         result = client.download(
             "s3://eodata/Sentinel-1/test.zip", tmp_path / "out.zip"
         )
@@ -156,8 +167,8 @@ class TestDownload:
             "s3",
             endpoint_url="https://eodata.dataspace.copernicus.eu",
             region_name="default",
-            aws_access_key_id="test_id",
-            aws_secret_access_key="test_secret",
+            aws_access_key_id="test_s3_key",
+            aws_secret_access_key="test_s3_secret",
         )
         mock_s3.return_value.download_file.assert_called_once_with(
             "eodata", "Sentinel-1/test.zip", str(tmp_path / "out.zip")
@@ -169,7 +180,7 @@ class TestDownload:
         mock_s3 = mocker.patch("subsideo.data.cdse.boto3.client")
         mock_s3.return_value.download_file.return_value = None
 
-        client = CDSEClient("id", "secret")
+        client = self._client()
         client.download(
             "s3://eodata/Sentinel-2/MSI/L2A/test.zip", tmp_path / "s2.zip"
         )
@@ -184,7 +195,7 @@ class TestDownload:
         mock_s3.return_value.download_file.return_value = None
 
         nested = tmp_path / "a" / "b" / "c" / "out.zip"
-        client = CDSEClient("id", "secret")
+        client = self._client()
         client.download("s3://eodata/test.zip", nested)
 
         assert nested.parent.exists()
@@ -201,7 +212,7 @@ class TestDownload:
             None,  # success on 3rd attempt
         ]
 
-        client = CDSEClient("id", "secret")
+        client = self._client()
         result = client.download(
             "s3://eodata/test.zip", tmp_path / "out.zip", max_retries=5
         )
@@ -218,7 +229,7 @@ class TestDownload:
             error_resp, "download_file"
         )
 
-        client = CDSEClient("id", "secret")
+        client = self._client()
         with pytest.raises(RuntimeError, match="failed after 3 retries"):
             client.download(
                 "s3://eodata/test.zip", tmp_path / "out.zip", max_retries=3

@@ -61,11 +61,29 @@ def inject_opera_metadata(
 
 
 def _inject_geotiff(path: Path, metadata: dict[str, str]) -> None:
-    """Write metadata as GeoTIFF tags."""
-    import rasterio
+    """Write metadata as GeoTIFF tags.
 
-    with rasterio.open(path, "r+") as ds:
+    Updating tags on an existing COG pushes the main IFD past the 300-byte
+    header threshold and invalidates the COG layout. After writing tags we
+    re-translate the file in place via ``rio_cogeo.cogeo.cog_translate`` so
+    the output remains a valid COG.
+    """
+    import rasterio
+    from rio_cogeo.cogeo import cog_translate
+    from rio_cogeo.profiles import cog_profiles
+
+    with rasterio.open(path, "r+", IGNORE_COG_LAYOUT_BREAK="YES") as ds:
         ds.update_tags(**metadata)
+
+    tmp_path = path.with_suffix(path.suffix + ".cogtmp")
+    cog_translate(
+        str(path),
+        str(tmp_path),
+        cog_profiles.get("deflate"),
+        in_memory=False,
+        quiet=True,
+    )
+    tmp_path.replace(path)
     logger.debug("Injected OPERA metadata into GeoTIFF {}", path)
 
 

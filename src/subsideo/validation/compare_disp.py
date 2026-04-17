@@ -1,21 +1,35 @@
-"""DISP-S1 product validation against EGMS EU Ortho reference.
+"""DISP-S1 product validation against EGMS EU reference products.
 
-Downloads EGMS Ortho products via EGMStoolkit, then compares vertical velocity
-component: projects subsideo LOS velocity to vertical using incidence angle,
-then compares against EGMS Ortho vertical displacement field.
-Grid alignment reprojects subsideo output to match the EGMS reference grid.
+Two comparison paths:
+
+* :func:`compare_disp` -- EGMS **L3 Ortho** raster (vertical displacement).
+  Projects subsideo LOS velocity to vertical via the incidence angle and
+  resamples onto the EGMS reference grid.
+* :func:`compare_disp_egms_l2a` -- EGMS **L2a** per-track PS point cloud
+  (LOS mean_velocity, mm/yr). Samples our LOS velocity raster at each PS
+  location; no vertical projection is needed because both fields are LOS
+  on the same orbit track.
+
+The L2a path is preferred for per-track comparisons because EGMS L2a is
+calibrated per ascending/descending pass and is directly co-geometric with
+a subsideo DISP run on the matching S1 relative orbit.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import rasterio
 from loguru import logger
 from rasterio.warp import Resampling, reproject
 
 from subsideo.products.types import DISPValidationResult
-from subsideo.validation.metrics import bias, spatial_correlation
+from subsideo.validation.metrics import bias, rmse, spatial_correlation
+
+# Sentinel-1 C-band carrier wavelength (m) -- used to convert LOS phase
+# velocity (rad/yr) to surface-motion velocity (mm/yr).
+SENTINEL1_WAVELENGTH_M = 0.05546576
 
 
 def fetch_egms_ortho(
@@ -159,6 +173,185 @@ def compare_disp(
     bias_val = bias(vert_masked, egms_masked)
 
     logger.info(f"DISP validation: r={corr:.4f}, bias={bias_val:.2f} mm/yr")
+
+    return DISPValidationResult(
+        correlation=corr,
+        bias_mm_yr=bias_val,
+        pass_criteria={
+            "correlation_gt_0.92": corr > 0.92,
+            "bias_lt_3mm_yr": abs(bias_val) < 3.0,
+        },
+    )
+
+
+def _load_egms_l2a_points(
+    csv_paths: list[Path],
+    velocity_col: str = "mean_velocity",
+) -> pd.DataFrame:
+    """Load one or more EGMS L2a CSV files into a single DataFrame.
+
+    EGMS L2a CSV schema (per the EGMS user manual / EGMStoolkit
+    ``datamergingcsv`` output): pid, easting/northing or longitude/latitude,
+    height, mean_velocity (mm/yr), mean_velocity_std, acceleration, ...,
+    followed by per-epoch displacement columns (YYYYMMDD).
+
+    Column naming varies between EGMS releases: some use ``longitude``/
+    ``latitude``, others use ``easting``/``northing`` (EPSG:3035 metres).
+    This loader accepts either.
+
+    Returns a DataFrame with at least ``lon``, ``lat``, and
+    ``velocity_col`` columns.
+    """
+    frames: list[pd.DataFrame] = []
+    for p in csv_paths:
+        df = pd.read_csv(p)
+        cols = {c.lower(): c for c in df.columns}
+        if "longitude" in cols and "latitude" in cols:
+            df = df.rename(columns={cols["longitude"]: "lon", cols["latitude"]: "lat"})
+        elif "easting" in cols and "northing" in cols:
+            # EGMS releases 2018_2022 / 2019_2023 publish L2a in EPSG:3035
+            # (ETRS89-LAEA) metres. Reproject to lon/lat for a uniform downstream API.
+            from pyproj import Transformer
+
+            t = Transformer.from_crs(3035, 4326, always_xy=True)
+            lon, lat = t.transform(df[cols["easting"]].values, df[cols["northing"]].values)
+            df["lon"] = lon
+            df["lat"] = lat
+        else:
+            raise ValueError(
+                f"EGMS L2a file {p.name} has no lon/lat or easting/northing columns: "
+                f"{list(df.columns)[:10]}"
+            )
+
+        if velocity_col not in df.columns:
+            raise ValueError(
+                f"EGMS L2a file {p.name} is missing velocity column "
+                f"'{velocity_col}'. Available: {list(df.columns)[:15]}"
+            )
+
+        frames.append(df[["lon", "lat", velocity_col]])
+
+    merged = pd.concat(frames, ignore_index=True)
+    logger.info("Loaded {} EGMS L2a points from {} file(s)", len(merged), len(csv_paths))
+    return merged
+
+
+def compare_disp_egms_l2a(
+    velocity_path: Path,
+    egms_csv_paths: list[Path],
+    velocity_col: str = "mean_velocity",
+    velocity_units: str = "rad_per_year",
+) -> DISPValidationResult:
+    """Compare subsideo DISP LOS velocity against EGMS L2a PS points.
+
+    Samples the subsideo LOS velocity raster at every EGMS PS location
+    (nearest-neighbour via :meth:`rasterio.DatasetReader.sample`), converts
+    our velocity to mm/yr if needed, and computes correlation, bias, and
+    RMSE over the paired samples.
+
+    Both fields are LOS on the matching S1 ascending track, so no vertical
+    projection is applied -- this is the fairest per-track comparison.
+
+    Args:
+        velocity_path: subsideo DISP velocity GeoTIFF. Units are controlled
+            by ``velocity_units``; dolphin writes LOS phase-rate in rad/yr
+            by default.
+        egms_csv_paths: One or more EGMS L2a CSV files (typically produced
+            by ``EGMStoolkit.datamergingcsv``).
+        velocity_col: EGMS column with LOS mean velocity in mm/yr.
+            Default ``"mean_velocity"``.
+        velocity_units: ``"rad_per_year"`` (default, dolphin native) or
+            ``"mm_per_year"`` (already post-processed). If rad/yr, values
+            are converted via the Sentinel-1 wavelength: ``v_mm = -v_rad *
+            λ / (4π) * 1000``.
+
+    Returns:
+        DISPValidationResult with correlation, bias (mm/yr), and the
+        project pass criteria (r > 0.92, |bias| < 3 mm/yr).
+    """
+    import geopandas as gpd
+    from shapely.geometry import Point
+
+    df = _load_egms_l2a_points([Path(p) for p in egms_csv_paths], velocity_col=velocity_col)
+
+    # Build PS points in EPSG:4326, then reproject to the velocity raster CRS
+    points = gpd.GeoDataFrame(
+        df,
+        geometry=[Point(xy) for xy in zip(df["lon"], df["lat"], strict=True)],
+        crs="EPSG:4326",
+    )
+
+    with rasterio.open(velocity_path) as src:
+        raster_crs = src.crs
+        points_proj = points.to_crs(raster_crs)
+
+        # Clip to raster bounds before sampling to avoid wasted I/O
+        left, bottom, right, top = src.bounds
+        in_bounds = (
+            (points_proj.geometry.x >= left)
+            & (points_proj.geometry.x <= right)
+            & (points_proj.geometry.y >= bottom)
+            & (points_proj.geometry.y <= top)
+        )
+        points_in = points_proj[in_bounds].copy()
+        logger.info(
+            "EGMS PS points inside velocity raster: {} / {}",
+            len(points_in),
+            len(points_proj),
+        )
+
+        if len(points_in) == 0:
+            logger.warning("No EGMS PS points fall inside the velocity raster extent")
+            return DISPValidationResult(
+                correlation=float("nan"),
+                bias_mm_yr=float("nan"),
+                pass_criteria={"correlation_gt_0.92": False, "bias_lt_3mm_yr": False},
+            )
+
+        xy = list(zip(points_in.geometry.x, points_in.geometry.y, strict=True))
+        sampled = np.array([v[0] for v in src.sample(xy)], dtype=np.float64)
+
+    nodata = src.nodata if src.nodata is not None else None
+    if nodata is not None:
+        sampled = np.where(sampled == nodata, np.nan, sampled)
+
+    # Convert our velocity to mm/yr if needed
+    if velocity_units == "rad_per_year":
+        our_mm = -sampled * SENTINEL1_WAVELENGTH_M / (4.0 * np.pi) * 1000.0
+    elif velocity_units == "mm_per_year":
+        our_mm = sampled
+    else:
+        raise ValueError(f"Unknown velocity_units: {velocity_units!r}")
+
+    ref_mm = points_in[velocity_col].to_numpy(dtype=np.float64)
+
+    valid = np.isfinite(our_mm) & np.isfinite(ref_mm) & (our_mm != 0)
+    n_valid = int(valid.sum())
+    logger.info("Valid paired samples: {} / {}", n_valid, len(ref_mm))
+
+    if n_valid < 100:
+        logger.warning("Too few valid pairs ({}) for meaningful statistics", n_valid)
+        return DISPValidationResult(
+            correlation=float("nan"),
+            bias_mm_yr=float("nan"),
+            pass_criteria={"correlation_gt_0.92": False, "bias_lt_3mm_yr": False},
+        )
+
+    # Metrics helpers expect same-shape arrays; pass 1-D paired slices
+    pred = our_mm[valid]
+    ref = ref_mm[valid]
+
+    corr = spatial_correlation(pred, ref)
+    bias_val = bias(pred, ref)
+    rmse_val = rmse(pred, ref)
+
+    logger.info(
+        "DISP vs EGMS L2a: r={:.4f}  bias={:+.2f} mm/yr  RMSE={:.2f} mm/yr  N={}",
+        corr,
+        bias_val,
+        rmse_val,
+        n_valid,
+    )
 
     return DISPValidationResult(
         correlation=corr,

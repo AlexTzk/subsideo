@@ -40,7 +40,13 @@ def validate_dist_product(cog_paths: list[Path]) -> list[str]:
         Error descriptions.  Empty list means all products are valid.
     """
     import rasterio
-    from rio_cogeo.cog_validate import cog_validate
+
+    # rio_cogeo >= 7.0 moved cog_validate from rio_cogeo.cog_validate to
+    # rio_cogeo.cogeo. Support both to avoid coupling to a specific version.
+    try:
+        from rio_cogeo.cogeo import cog_validate  # rio_cogeo >= 7.0
+    except ImportError:
+        from rio_cogeo.cog_validate import cog_validate  # rio_cogeo < 7.0
 
     errors: list[str] = []
     for p in cog_paths:

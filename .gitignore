@@ -209,3 +209,47 @@ __marimo__/
 # Claude
 .planning/*
 CLAUDE.md
+
+# Eval folders
+eval-cslc/*
+eval-disp/*
+eval-disp-egms/*
+eval-dist/*
+eval-dist-eu/*
+eval-dist-eu-nov15/*
+eval-dswx/*
+eval-rtc/*
+
+*.zip
+*.jp2
+*.h5
+*.vrt
+*.nc
+*.EOF
+# Geospatial Data
+*.shp
+*.shx
+*.dbf
+*.prj
+*.sbn
+*.sbx
+*.gpkg
+*.geojson
+*.kml
+*.tif
+*.tiff
+*.ovr
+
+# QGIS
+.qgs.bak
+.qgz.bak
+*.lock
+
+# ArcGIS
+*.gdb/
+*.mxd.bak
+
+# System/Environment
+.DS_Store
+.env
+__pycache__/

@@ -44,11 +44,13 @@ def generate_rtc_runconfig(cfg: RTCConfig, output_yaml: Path) -> Path:
     Path
         *output_yaml* (for chaining convenience).
     """
+    scratch_dir = cfg.output_dir / "scratch"
     runconfig: dict = {
         "runconfig": {
             "name": "rtc_s1_workflow",
             "groups": {
                 "primary_executable": {"product_type": "RTC_S1"},
+                "pge_name_group": {"pge_name": "RTC_S1_PGE"},
                 "input_file_group": {
                     "safe_file_path": [str(p) for p in cfg.safe_file_paths],
                     "orbit_file_path": [str(cfg.orbit_file_path)],
@@ -57,10 +59,15 @@ def generate_rtc_runconfig(cfg: RTCConfig, output_yaml: Path) -> Path:
                 "dynamic_ancillary_file_group": {
                     "dem_file": str(cfg.dem_file),
                 },
+                "static_ancillary_file_group": {},
                 "product_group": {
                     "product_path": str(cfg.output_dir),
+                    "scratch_path": str(scratch_dir),
                     "output_dir": str(cfg.output_dir),
                     "product_version": cfg.product_version,
+                },
+                "processing": {
+                    "polarization": "dual-pol",
                 },
             },
         }
@@ -129,7 +136,7 @@ def validate_rtc_product(cog_paths: list[Path]) -> list[str]:
         Error descriptions.  Empty list means all products are valid.
     """
     import rasterio
-    from rio_cogeo.cog_validate import cog_validate
+    from rio_cogeo import cog_validate
 
     errors: list[str] = []
     for p in cog_paths:
@@ -209,10 +216,20 @@ def run_rtc(
 
     try:
         from rtc.rtc_s1 import run_parallel
-        from rtc.runconfig import RunConfig
+        from rtc.runconfig import RunConfig, load_parameters
 
         logger.info("Loading opera-rtc runconfig from {}", runconfig_yaml)
         opera_cfg = RunConfig.load_from_yaml(str(runconfig_yaml))
+
+        # load_parameters converts string values to isce3 enums (e.g.
+        # dem_interpolation_method → dem_interpolation_method_enum) that
+        # run_parallel expects but load_from_yaml never calls.
+        load_parameters(opera_cfg)
+
+        # Override output format to plain GTiff so opera-rtc skips its
+        # internal COG step (which has a timestamp-mismatch bug when the
+        # run takes >1 second).  ensure_cog() below handles COG conversion.
+        opera_cfg.groups.product_group.output_imagery_format = "GTiff"
 
         logger.info("Running opera-rtc for bursts {}", burst_ids)
         run_parallel(opera_cfg, str(output_dir / "rtc.log"), True)
@@ -228,7 +245,11 @@ def run_rtc(
         )
 
     # Collect output GeoTIFFs and convert to COG
-    output_tifs = sorted(output_dir.glob("*.tif"))
+    # opera-rtc writes outputs into a per-burst subdirectory; exclude any
+    # already-converted .cog.tif files from previous partial runs.
+    output_tifs = sorted(
+        p for p in output_dir.rglob("*.tif") if not p.name.endswith(".cog.tif")
+    )
     cog_paths = [ensure_cog(p) for p in output_tifs]
 
     # Validate

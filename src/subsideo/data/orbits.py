@@ -26,18 +26,23 @@ def fetch_orbit(sensing_time: datetime, satellite: str, output_dir: Path) -> Pat
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        logger.info(f"Fetching orbit for {satellite} at {sensing_time} via sentineleof")
+        logger.info(f"Fetching orbit for {satellite} at {sensing_time} via sentineleof (ESA POD)")
         paths = download_eofs(
             [sensing_time],
             missions=[satellite],
             orbit_type="precise",
-            output_directory=output_dir,
+            save_dir=str(output_dir),
         )
         return Path(paths[0])
     except Exception as esa_err:
         logger.warning(
-            f"ESA POD hub unreachable ({esa_err}), falling back to s1-orbits (AWS)"
+            f"ESA POD hub unreachable ({esa_err}), falling back to ASF via sentineleof"
         )
-        from s1_orbits import fetch_for_scene
-
-        return Path(fetch_for_scene(sensing_time, satellite, output_dir))
+        paths = download_eofs(
+            [sensing_time],
+            missions=[satellite],
+            orbit_type="precise",
+            save_dir=str(output_dir),
+            force_asf=True,
+        )
+        return Path(paths[0])

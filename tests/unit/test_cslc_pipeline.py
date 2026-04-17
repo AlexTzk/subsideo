@@ -67,7 +67,7 @@ def test_generate_cslc_runconfig(tmp_path: Path) -> None:
 
 
 def test_generate_cslc_runconfig_no_tec(tmp_path: Path) -> None:
-    """Runconfig with tec_file=None writes null in YAML."""
+    """Runconfig with tec_file=None omits tec_file key (yamale compat)."""
     cfg = _make_cslc_config(tmp_path, tec_file=None)
     yaml_path = tmp_path / "runconfig.yaml"
 
@@ -76,8 +76,10 @@ def test_generate_cslc_runconfig_no_tec(tmp_path: Path) -> None:
     with open(yaml_path) as fh:
         data = yaml.safe_load(fh)
 
-    tec = data["runconfig"]["groups"]["dynamic_ancillary_file_group"]["tec_file"]
-    assert tec is None
+    # tec_file key should be absent when tec_file=None
+    # (yamale str(required=False) accepts absent key but rejects null)
+    ancillary = data["runconfig"]["groups"]["dynamic_ancillary_file_group"]
+    assert "tec_file" not in ancillary
 
 
 # --- validate_cslc_product tests ---
@@ -120,6 +122,11 @@ def test_run_cslc_mocked(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_module = MagicMock()
     mock_module.run = _fake_compass_run
     mocker.patch.dict("sys.modules", {"compass": MagicMock(), "compass.s1_cslc": mock_module})
+
+    # Mock the numpy 2.x compatibility patches (they import real compass/s1reader)
+    mocker.patch("subsideo.products.cslc._patch_compass_burst_db_none_guard")
+    mocker.patch("subsideo.products.cslc._patch_s1reader_numpy2_compat")
+    mocker.patch("subsideo.products.cslc._patch_burst_az_carrier_poly")
 
     result = run_cslc(
         safe_paths=[tmp_path / "S1A.zip"],

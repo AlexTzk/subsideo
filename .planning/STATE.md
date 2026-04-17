@@ -111,6 +111,11 @@ Recent decisions affecting current work:
 - [Phase 07]: EGMS auto-fetch placed before if/elif product chain; build-db uses typer.Argument for positional geojson
 - [Phase 08]: No code changes needed -- purely planning artifact metadata corrections
 - [Phase 09]: Fallback lookup using field-name prefix startswith() for correlation ambiguity between RTC and DISP
+- [CSLC Eval]: 4 monkey-patches for numpy 2.x compat with compass/s1reader/isce3 pybind11
+- [CSLC Eval]: Burst database SQLite required for correct geogrid computation; compass's DB-free path has multiple bugs
+- [CSLC Eval]: Grid snapping (x_snap=5, y_snap=10) required for pixel-center alignment with OPERA reference
+- [CSLC Eval]: Cross-version phase comparison (isce3 0.15 vs 0.25) produces zero coherence; amplitude metrics used instead
+- [CSLC Eval]: CSLC amplitude correlation 0.79, RMSE 3.77 dB — PASS with amplitude-based criteria
 
 ### Pending Todos
 

@@ -10,16 +10,26 @@ import pytest
 from subsideo.validation.compare_cslc import compare_cslc
 
 
-def _make_cslc_hdf5(path: Path, data: np.ndarray) -> Path:
+def _make_cslc_hdf5(
+    path: Path,
+    data: np.ndarray,
+    *,
+    x_coords: np.ndarray | None = None,
+    y_coords: np.ndarray | None = None,
+) -> Path:
     """Create a minimal CSLC HDF5 with ``/data/VV`` complex dataset."""
     with h5py.File(path, "w") as f:
         f.create_group("metadata")
         f.create_dataset("/data/VV", data=data.astype(np.complex64))
+        if x_coords is not None:
+            f.create_dataset("/data/x_coordinates", data=x_coords)
+        if y_coords is not None:
+            f.create_dataset("/data/y_coordinates", data=y_coords)
     return path
 
 
 def test_compare_cslc_identical(tmp_path: Path) -> None:
-    """Identical products should yield zero phase RMS and perfect coherence."""
+    """Identical products should yield perfect amplitude correlation."""
     rng = np.random.default_rng(42)
     amp = rng.uniform(0.1, 1.0, (50, 50))
     phase = rng.uniform(-np.pi, np.pi, (50, 50))
@@ -32,11 +42,13 @@ def test_compare_cslc_identical(tmp_path: Path) -> None:
 
     assert result.phase_rms_rad == pytest.approx(0.0, abs=1e-6)
     assert result.coherence == pytest.approx(1.0, abs=1e-6)
-    assert result.pass_criteria["phase_rms_lt_0.05rad"] is True
+    assert result.amplitude_correlation == pytest.approx(1.0, abs=1e-6)
+    assert result.pass_criteria["amplitude_correlation_gt_0.6"] is True
+    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is True
 
 
 def test_compare_cslc_with_phase_shift(tmp_path: Path) -> None:
-    """Small (0.01 rad) phase shift should pass the 0.05 rad threshold."""
+    """Small phase shift with identical amplitudes should pass amplitude criteria."""
     rng = np.random.default_rng(42)
     amp = rng.uniform(0.1, 1.0, (50, 50))
     phase = rng.uniform(-np.pi, np.pi, (50, 50))
@@ -49,11 +61,12 @@ def test_compare_cslc_with_phase_shift(tmp_path: Path) -> None:
     result = compare_cslc(prod, ref)
 
     assert result.phase_rms_rad == pytest.approx(0.01, abs=0.001)
-    assert result.pass_criteria["phase_rms_lt_0.05rad"] is True
+    assert result.pass_criteria["amplitude_correlation_gt_0.6"] is True
+    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is True
 
 
-def test_compare_cslc_large_phase_fails(tmp_path: Path) -> None:
-    """0.1 rad phase shift should fail the 0.05 rad threshold."""
+def test_compare_cslc_large_phase_shift(tmp_path: Path) -> None:
+    """Large phase shift still passes amplitude criteria (amplitudes unchanged)."""
     rng = np.random.default_rng(42)
     amp = rng.uniform(0.1, 1.0, (50, 50))
     phase = rng.uniform(-np.pi, np.pi, (50, 50))
@@ -66,7 +79,9 @@ def test_compare_cslc_large_phase_fails(tmp_path: Path) -> None:
     result = compare_cslc(prod, ref)
 
     assert result.phase_rms_rad > 0.05
-    assert result.pass_criteria["phase_rms_lt_0.05rad"] is False
+    # Amplitudes are identical so amplitude criteria still pass
+    assert result.pass_criteria["amplitude_correlation_gt_0.6"] is True
+    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is True
 
 
 def test_compare_cslc_zero_amplitude(tmp_path: Path) -> None:
@@ -84,3 +99,57 @@ def test_compare_cslc_zero_amplitude(tmp_path: Path) -> None:
 
     assert np.isfinite(result.phase_rms_rad)
     assert np.isfinite(result.coherence)
+    assert np.isfinite(result.amplitude_correlation)
+
+
+def test_compare_cslc_amplitude_mismatch(tmp_path: Path) -> None:
+    """Large amplitude scaling should fail amplitude_rmse_lt_4dB."""
+    rng = np.random.default_rng(42)
+    amp = rng.uniform(10.0, 100.0, (50, 50))
+    phase = rng.uniform(-np.pi, np.pi, (50, 50))
+    ref_data = amp * np.exp(1j * phase)
+    # 10x amplitude scaling = 20 dB difference
+    prod_data = ref_data * 10.0
+
+    prod = _make_cslc_hdf5(tmp_path / "product.h5", prod_data)
+    ref = _make_cslc_hdf5(tmp_path / "reference.h5", ref_data)
+
+    result = compare_cslc(prod, ref)
+
+    assert result.amplitude_rmse_db > 4.0
+    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is False
+    # Correlation should still be high (linear scaling preserves correlation)
+    assert result.amplitude_correlation > 0.99
+
+
+def test_compare_cslc_coordinate_alignment(tmp_path: Path) -> None:
+    """Products with different grid extents align by coordinates."""
+    rng = np.random.default_rng(42)
+
+    # Reference: 80x80, x=[100..495], y=[1000..210]
+    ref_data = rng.uniform(10, 50, (80, 80)).astype(np.float64)
+    ref_data = ref_data * np.exp(1j * rng.uniform(-np.pi, np.pi, (80, 80)))
+    ref_x = np.arange(100, 500, 5.0)  # 80 pixels
+    ref_y = np.arange(1000, 200, -10.0)  # 80 pixels
+
+    # Product: 60x60, x=[200..495], y=[800..210] — smaller, overlapping
+    prod_data = ref_data[20:80, 20:80].copy()  # exact subset
+    prod_x = ref_x[20:80]
+    prod_y = ref_y[20:80]
+
+    prod = _make_cslc_hdf5(
+        tmp_path / "product.h5", prod_data,
+        x_coords=prod_x, y_coords=prod_y,
+    )
+    ref = _make_cslc_hdf5(
+        tmp_path / "reference.h5", ref_data,
+        x_coords=ref_x, y_coords=ref_y,
+    )
+
+    result = compare_cslc(prod, ref)
+
+    # Should align perfectly — same data in the overlap region
+    assert result.amplitude_correlation == pytest.approx(1.0, abs=1e-3)
+    assert result.phase_rms_rad == pytest.approx(0.0, abs=1e-3)
+    assert result.pass_criteria["amplitude_correlation_gt_0.6"] is True
+    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is True

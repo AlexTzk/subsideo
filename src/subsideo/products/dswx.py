@@ -41,6 +41,43 @@ PSWT2_SWIR2 = 1000  # scaled reflectance (0.10)
 # SCL cloud mask values (D-02): cloud shadow(3), cloud med(8), cloud high(9), cirrus(10)
 SCL_MASK_VALUES = frozenset({3, 8, 9, 10})
 
+# Radius (in 20 m pixels, the B11 native grid) within which a class-3
+# "potential wetland" pixel is kept if it touches a class-1/2 core water
+# component. 3 px = 60 m at 20 m, which is the approximate Sentinel-2
+# shoreline mixed-pixel footprint. Isolated class-3 blobs beyond this
+# buffer (typically dry agriculture / wet soil false positives) are
+# demoted to class 0 (not water).
+WETLAND_RESCUE_RADIUS_PX = 3
+
+# ---------------------------------------------------------------------------
+# Sentinel-2 -> Landsat-8 OLI cross-calibration (Claverie et al. 2018,
+# Table 5 / NASA HLS v2 ATBD).
+#
+# Reason: PROTEUS DSWE thresholds are fit against Landsat surface reflectance.
+# Sentinel-2 L2A (Sen2Cor) reflectance has small per-band offsets vs L8 OLI
+# that, uncorrected, drive PSWT2 ("partial surface water, aggressive") to
+# over-fire on wet soil and low-NDVI agriculture -- empirically ~23% of a
+# Pannonia tile classified as class 3.
+#
+# Linear model: refl_L8 = slope * refl_S2 + intercept, with reflectance in
+# the 0-1 domain. Applied in DN-space (0-10000) as:
+#     dn_L8 = slope * dn_S2 + intercept * 10000
+#
+# Coefficients below are for Sentinel-2A. Sentinel-2B values differ by
+# <0.5% and fall within the calibration noise -- we use the S2A set for
+# both platforms. If platform-specific precision becomes important, add a
+# _S2B dict and branch on scene ID prefix.
+# ---------------------------------------------------------------------------
+HLS_XCAL_S2A: dict[str, tuple[float, float]] = {
+    # band : (slope, intercept in 0-1 reflectance)
+    "B02": (0.9778, -0.00411),  # Blue
+    "B03": (1.0053, -0.00093),  # Green
+    "B04": (0.9765,  0.00094),  # Red
+    "B08": (0.9983, -0.00029),  # NIR (B8A coefs; B08 wider bandpass, delta <0.2%)
+    "B11": (0.9987, -0.00015),  # SWIR1
+    "B12": (1.0030, -0.00097),  # SWIR2
+}
+
 # Diagnostic-to-water-class lookup (32 entries, from PROTEUS)
 # 0=Not Water, 1=High Confidence, 2=Moderate, 3=Potential Wetland, 4=Low Confidence
 INTERPRETED_WATER_CLASS: dict[int, int] = {
@@ -135,6 +172,49 @@ def _classify_water(diagnostic: np.ndarray) -> np.ndarray:
     return lut[clipped]
 
 
+def _rescue_connected_wetlands(
+    water_class: np.ndarray,
+    radius_px: int = WETLAND_RESCUE_RADIUS_PX,
+) -> np.ndarray:
+    """Keep class-3 pixels only when they adjoin a class-1/2 core component.
+
+    PROTEUS class 3 ("potential wetland") fires anywhere the aggressive
+    partial-surface-water test is satisfied. On dry Pannonia-style summer
+    landscapes this includes large swathes of agriculture/wet soil with
+    low SWIR2 -- empirically ~23% of a tile. Genuine shoreline wetlands,
+    however, always border open water. This post-classification pass
+    enforces that spatial constraint:
+
+        1. Build a boolean "core water" mask from classes 1 and 2.
+        2. Dilate by ``radius_px`` (8-connected, ``2*radius+1`` cross).
+        3. Retain class-3 pixels that fall inside the dilated core;
+           demote the rest to class 0 (not water).
+
+    Class 4 (low confidence) is passed through unchanged -- it is already
+    excluded by :func:`subsideo.validation.compare_dswx._binarize_dswx`.
+    """
+    from scipy.ndimage import binary_dilation
+
+    core = (water_class == 1) | (water_class == 2)
+    if not core.any():
+        # No open water to anchor a rescue -- drop all class 3 to avoid
+        # hallucinating wetlands in scenes with no core water.
+        result = water_class.copy()
+        result[water_class == 3] = 0
+        return result
+
+    # 8-connected dilation iterated `radius_px` times gives a square
+    # buffer of side (2*radius+1). Using binary_dilation with a 3x3
+    # structuring element and iterations=radius_px is equivalent.
+    struct = np.ones((3, 3), dtype=bool)
+    dilated_core = binary_dilation(core, structure=struct, iterations=radius_px)
+
+    result = water_class.copy()
+    isolated_class3 = (water_class == 3) & (~dilated_core)
+    result[isolated_class3] = 0
+    return result
+
+
 def _apply_scl_mask(
     water_class: np.ndarray,
     scl: np.ndarray,
@@ -162,6 +242,97 @@ def _apply_scl_mask(
 # ---------------------------------------------------------------------------
 # Internal: band I/O and COG output
 # ---------------------------------------------------------------------------
+
+# Sentinel-2 MTD band_id ordering (per ESA Product Specification):
+# 0=B01, 1=B02, 2=B03, 3=B04, 4=B05, 5=B06, 6=B07, 7=B08, 8=B8A,
+# 9=B09, 10=B10, 11=B11, 12=B12
+_MTD_BAND_INDEX: dict[str, int] = {
+    "B02": 1, "B03": 2, "B04": 3, "B08": 7,
+    "B8A": 8, "B11": 11, "B12": 12,
+}
+
+
+def _find_safe_root(path: Path) -> Path | None:
+    """Walk up from a band file to locate the enclosing ``*.SAFE`` directory."""
+    for parent in (path, *path.parents):
+        if parent.suffix == ".SAFE":
+            return parent
+    return None
+
+
+def _read_boa_offsets(safe_root: Path) -> dict[str, int]:
+    """Parse ``BOA_ADD_OFFSET`` values from ``MTD_MSIL2A.xml``.
+
+    Post-processing-baseline N0400 (25 Jan 2022) S2 L2A products encode a
+    ``-1000`` DN offset per band that must be added to the raw integer DN
+    before dividing by ``QUANTIFICATION_VALUE`` to recover physical
+    reflectance. Pre-N0400 products omit the tag; in that case offsets are
+    zero and the raw DN is already in the 0-10000 reflectance scale that
+    PROTEUS DSWE expects.
+
+    Returns a dict mapping band names used by the DSWx pipeline to integer
+    offsets (typically 0 or -1000). Missing bands default to 0.
+    """
+    mtd = safe_root / "MTD_MSIL2A.xml"
+    if not mtd.exists():
+        logger.warning(
+            "MTD_MSIL2A.xml not found under {} -- assuming pre-N0400 baseline "
+            "with zero BOA offsets", safe_root,
+        )
+        return {k: 0 for k in _MTD_BAND_INDEX}
+
+    import xml.etree.ElementTree as ET
+
+    root = ET.parse(mtd).getroot()
+    offsets_by_id: dict[int, int] = {}
+    # Tag lives under Level-2A_User_Product/General_Info/Product_Image_Characteristics/
+    # BOA_ADD_OFFSET_VALUES_LIST/BOA_ADD_OFFSET (band_id attribute). The file
+    # uses a namespace-less root so a simple .iter() match is robust.
+    for el in root.iter():
+        if el.tag.endswith("BOA_ADD_OFFSET"):
+            bid = el.attrib.get("band_id")
+            if bid is None or el.text is None:
+                continue
+            try:
+                offsets_by_id[int(bid)] = int(float(el.text))
+            except ValueError:
+                continue
+
+    if not offsets_by_id:
+        logger.info(
+            "No BOA_ADD_OFFSET tags in {} -- treating as pre-N0400 baseline",
+            mtd.name,
+        )
+        return {k: 0 for k in _MTD_BAND_INDEX}
+
+    out: dict[str, int] = {}
+    for band, idx in _MTD_BAND_INDEX.items():
+        out[band] = offsets_by_id.get(idx, 0)
+    logger.info("BOA offsets from {}: {}", mtd.name, out)
+    return out
+
+
+def _apply_hls_cross_calibration(
+    bands: dict[str, np.ndarray],
+    coefs: dict[str, tuple[float, float]] = HLS_XCAL_S2A,
+) -> dict[str, np.ndarray]:
+    """Apply Claverie-2018 S2 -> L8 OLI linear cross-calibration in DN space.
+
+    Input arrays are scaled-DN reflectance (0-10000). The 0-1-domain
+    intercept is multiplied by 10000 to convert to DN space, then:
+
+        dn_L8 = slope * dn_S2 + intercept_dn
+
+    Output arrays are clipped to ``[0, 65535]`` and cast back to uint16 so
+    the downstream PROTEUS integer thresholds remain valid.
+    """
+    out: dict[str, np.ndarray] = {}
+    for band, arr in bands.items():
+        slope, intercept_refl = coefs.get(band, (1.0, 0.0))
+        corrected = arr.astype(np.float32) * slope + intercept_refl * 10000.0
+        np.clip(corrected, 0, 65535, out=corrected)
+        out[band] = corrected.astype(arr.dtype, copy=False)
+    return out
 
 
 def _read_s2_bands_at_20m(
@@ -203,6 +374,34 @@ def _read_s2_bands_at_20m(
                 resampling=Resampling.bilinear,
             )
             band_arrays[band_name] = dst_arr
+
+    # -- Post-read calibration chain -----------------------------------------
+    # (1) BOA_ADD_OFFSET: shift raw DN to pre-N0400-equivalent scale so
+    #     PROTEUS integer thresholds (0-10000 domain) apply uniformly to
+    #     scenes from any processing baseline. No-op for pre-2022 products.
+    # (2) S2 -> L8 OLI linear cross-calibration (Claverie et al. 2018) so
+    #     DSWE thresholds calibrated on Landsat surface reflectance are
+    #     applied to Landsat-equivalent reflectance.
+    safe_root = _find_safe_root(next(iter(band_paths.values())))
+    if safe_root is not None:
+        boa_offsets = _read_boa_offsets(safe_root)
+        for band_name, arr in band_arrays.items():
+            offset = boa_offsets.get(band_name, 0)
+            if offset == 0:
+                continue
+            # Offset is negative (-1000) for post-N0400; shift in float then
+            # clip and recast so under/overflow can't poison later math.
+            shifted = arr.astype(np.int32) + offset
+            np.clip(shifted, 0, 65535, out=shifted)
+            band_arrays[band_name] = shifted.astype(arr.dtype, copy=False)
+    else:
+        logger.warning(
+            "Could not locate SAFE root from band path {} -- skipping "
+            "BOA offset correction (safe for pre-N0400 scenes only)",
+            next(iter(band_paths.values())),
+        )
+
+    band_arrays = _apply_hls_cross_calibration(band_arrays)
 
     # Read SCL with nearest resampling (categorical)
     with rasterio.open(scl_path) as scl_ds:
@@ -331,7 +530,7 @@ def _validate_dswx_product(cog_path: Path) -> list[str]:
     Returns list of error strings (empty = valid).
     """
     import rasterio
-    from rio_cogeo.cog_validate import cog_validate
+    from rio_cogeo.cogeo import cog_validate
 
     errors: list[str] = []
 
@@ -404,6 +603,17 @@ def run_dswx(cfg: DSWxConfig) -> DSWxResult:
 
         # 3. Classify water
         water_class = _classify_water(diagnostic)
+
+        # 3b. Rescue only spatially-connected class-3 pixels
+        logger.info("Rescuing shoreline-connected class-3 pixels...")
+        before_c3 = int((water_class == 3).sum())
+        water_class = _rescue_connected_wetlands(water_class)
+        after_c3 = int((water_class == 3).sum())
+        logger.info(
+            "Class 3 after rescue: {}/{} retained ({:.1%})",
+            after_c3, before_c3,
+            (after_c3 / before_c3) if before_c3 else 0.0,
+        )
 
         # 4. Apply SCL cloud mask
         logger.info("Applying SCL cloud mask...")

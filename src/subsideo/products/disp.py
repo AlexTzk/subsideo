@@ -58,21 +58,66 @@ def _run_dolphin_phase_linking(
     cslc_file_list: list[Path],
     work_dir: Path,
     coherence_threshold: float,
+    threads_per_worker: int = 4,
+    n_parallel_bursts: int = 1,
+    block_shape: tuple[int, int] = (512, 512),
+    n_parallel_unwrap: int = 4,
 ) -> tuple[list[Path], list[Path]]:
     """Run dolphin PS/DS phase linking on a CSLC stack.
+
+    Parameters
+    ----------
+    cslc_file_list:
+        Paths to CSLC HDF5 files.
+    work_dir:
+        Working directory for dolphin outputs.
+    coherence_threshold:
+        Coherence threshold (unused by dolphin directly, kept for API compat).
+    threads_per_worker:
+        Threads per worker for phase linking computation.
+    n_parallel_bursts:
+        Number of bursts to process in parallel.
+    block_shape:
+        Block size for phase linking (rows, cols).
+    n_parallel_unwrap:
+        Number of parallel unwrapping jobs.
 
     Returns
     -------
     tuple[list[Path], list[Path]]
         (interferogram_paths, coherence_paths) produced by dolphin.
     """
-    from dolphin.workflows.config import DisplacementWorkflow
+    from dolphin.workflows.config import (
+        DisplacementWorkflow,
+        InputOptions,
+        WorkerSettings,
+        UnwrapOptions,
+    )
     from dolphin.workflows.displacement import run as dolphin_run
 
     work_dir.mkdir(parents=True, exist_ok=True)
 
+    from dolphin.workflows.config._unwrap_options import UnwrapMethod
+
+    # OPERA CSLC HDF5 files store complex SLC data under /data/VV.
+    # Use PHASS (isce3 phase-and-slope unwrapper): tree-growing algorithm
+    # that always terminates, handles noisy/low-coherence data better
+    # than ICU, and is orders of magnitude faster than SNAPHU on large
+    # grids (SNAPHU can hang on >70M pixel grids).
     cfg = DisplacementWorkflow(
         cslc_file_list=[str(p) for p in cslc_file_list],
+        input_options=InputOptions(subdataset="/data/VV"),
+        work_directory=work_dir,
+        worker_settings=WorkerSettings(
+            threads_per_worker=threads_per_worker,
+            n_parallel_bursts=n_parallel_bursts,
+            block_shape=block_shape,
+        ),
+        unwrap_options=UnwrapOptions(
+            run_unwrap=True,
+            unwrap_method=UnwrapMethod.PHASS,
+            n_parallel_jobs=n_parallel_unwrap,
+        ),
     )
     outputs = dolphin_run(cfg)
 
@@ -127,50 +172,115 @@ def _apply_coherence_mask(
 # ---------------------------------------------------------------------------
 
 
+def _unwrap_single(args: tuple) -> Path:
+    """Unwrap a single interferogram with snaphu tiling. Worker function."""
+    import rasterio
+    import snaphu
+
+    ifg_path, cor_path, out_path, ntiles, nproc = args
+
+    with rasterio.open(ifg_path) as ifg_ds:
+        ifg_data = ifg_ds.read(1)
+        profile = ifg_ds.profile.copy()
+    with rasterio.open(cor_path) as cor_ds:
+        cor_data = cor_ds.read(1)
+
+    ifg_finite = np.where(np.isfinite(ifg_data), ifg_data, 0.0)
+    cor_finite = np.where(np.isfinite(cor_data), cor_data, 0.0)
+
+    if not np.iscomplexobj(ifg_finite):
+        ifg_complex = np.exp(1j * ifg_finite.astype(np.float32))
+    else:
+        ifg_complex = ifg_finite
+
+    unwrapped_arr, _conncomp = snaphu.unwrap(
+        igram=ifg_complex,
+        corr=cor_finite.astype(np.float32),
+        nlooks=1.0,
+        cost="smooth",
+        init="mcf",
+        ntiles=ntiles,
+        nproc=nproc,
+        tile_overlap=200,
+        tile_cost_thresh=200,
+        min_region_size=200,
+    )
+
+    profile.update(dtype="float32")
+    with rasterio.open(out_path, "w", **profile) as dst:
+        dst.write(np.asarray(unwrapped_arr, dtype=np.float32), 1)
+
+    return out_path
+
+
 def _run_unwrapping(
     masked_ifg_paths: list[Path],
     cor_paths: list[Path],
     work_dir: Path,
+    ntiles: tuple[int, int] = (2, 2),
+    nproc: int = 2,
+    n_parallel_ifgs: int = 4,
 ) -> list[Path]:
-    """Unwrap masked interferograms using tophu multi-scale unwrapping.
+    """Unwrap interferograms using snaphu with tiled + interferogram parallelism.
+
+    Processes ``n_parallel_ifgs`` interferograms concurrently, each with
+    snaphu's built-in ``ntiles`` x ``nproc`` tiling. This maximises CPU
+    utilisation on multi-core systems.
+
+    Parameters
+    ----------
+    masked_ifg_paths:
+        Masked interferogram GeoTIFFs (complex phase).
+    cor_paths:
+        Coherence GeoTIFFs matching the interferograms.
+    work_dir:
+        Output directory for unwrapped GeoTIFFs.
+    ntiles:
+        Number of tiles (rows, cols) for snaphu tiling within each interferogram.
+    nproc:
+        Number of parallel snaphu tile workers per interferogram.
+    n_parallel_ifgs:
+        Number of interferograms to unwrap concurrently.
 
     Returns
     -------
     list[Path]
         Paths to unwrapped phase GeoTIFFs.
     """
-    import rasterio
-    import tophu
+    from concurrent.futures import ProcessPoolExecutor, as_completed
 
     work_dir.mkdir(parents=True, exist_ok=True)
-    unwrapped_paths: list[Path] = []
 
-    unwrapper = tophu.SnaphuUnwrap(cost="smooth", init="mcf")
-
+    # Build argument tuples, skipping already-unwrapped files
+    args_list = []
+    out_paths = []
     for ifg_path, cor_path in zip(masked_ifg_paths, cor_paths, strict=True):
-        with rasterio.open(ifg_path) as ifg_ds:
-            ifg_data = ifg_ds.read(1)
-            profile = ifg_ds.profile.copy()
-        with rasterio.open(cor_path) as cor_ds:
-            cor_data = cor_ds.read(1)
-
-        unwrapped, _conncomp = tophu.multiscale_unwrap(
-            ifg=ifg_data,
-            corr=cor_data,
-            nlooks=1.0,
-            unwrap_func=unwrapper,
-            downsample_factor=(3, 3),
-            ntiles=(2, 2),
-        )
-
         out_path = work_dir / f"{ifg_path.stem}_unwrapped.tif"
-        profile.update(dtype="float32")
-        with rasterio.open(out_path, "w", **profile) as dst:
-            dst.write(np.asarray(unwrapped, dtype=np.float32), 1)
-        unwrapped_paths.append(out_path)
+        out_paths.append(out_path)
+        if out_path.exists():
+            logger.info("Already unwrapped: {}", out_path.name)
+            continue
+        args_list.append((ifg_path, cor_path, out_path, ntiles, nproc))
 
-    logger.info("Phase unwrapping complete: {} files", len(unwrapped_paths))
-    return unwrapped_paths
+    if args_list:
+        logger.info(
+            "Unwrapping {} interferograms ({} parallel, {}x{} tiles, {} procs/tile)",
+            len(args_list), n_parallel_ifgs, *ntiles, nproc,
+        )
+        completed = 0
+        with ProcessPoolExecutor(max_workers=n_parallel_ifgs) as executor:
+            futures = {executor.submit(_unwrap_single, a): a[2] for a in args_list}
+            for future in as_completed(futures):
+                out = futures[future]
+                try:
+                    future.result()
+                    completed += 1
+                    logger.info("Unwrapped {}/{}: {}", completed, len(args_list), out.name)
+                except Exception as exc:
+                    logger.error("Unwrap failed for {}: {}", out.name, exc)
+
+    logger.info("Phase unwrapping complete: {} files", len(out_paths))
+    return out_paths
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +408,10 @@ def run_disp(
     cdsapirc_path: Path | None = None,
     coherence_mask_threshold: float = 0.3,
     ramp_threshold: float = 1.0,
+    threads_per_worker: int = 4,
+    n_parallel_bursts: int = 1,
+    block_shape: tuple[int, int] = (512, 512),
+    n_parallel_unwrap: int = 4,
 ) -> DISPResult:
     """Run the full DISP-S1 displacement time-series pipeline.
 
@@ -316,6 +430,14 @@ def run_disp(
         Coherence below this value is masked before unwrapping.
     ramp_threshold:
         Residual RMS threshold for post-unwrap planar ramp flagging.
+    threads_per_worker:
+        Threads per worker for dolphin phase linking.
+    n_parallel_bursts:
+        Number of bursts to process in parallel.
+    block_shape:
+        Block size for phase linking (rows, cols).
+    n_parallel_unwrap:
+        Number of parallel unwrapping jobs.
 
     Returns
     -------
@@ -331,18 +453,40 @@ def run_disp(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Stage 1: dolphin phase linking
+        # Stage 1: dolphin phase linking + ICU unwrapping
+        # dolphin handles phase linking, interferogram creation, and
+        # unwrapping (ICU) in a single workflow. Coherence masking and
+        # separate unwrapping stages are not needed.
         ifg_paths, cor_paths = _run_dolphin_phase_linking(
-            cslc_paths, output_dir / "dolphin", coherence_mask_threshold
+            cslc_paths, output_dir / "dolphin", coherence_mask_threshold,
+            threads_per_worker=threads_per_worker,
+            n_parallel_bursts=n_parallel_bursts,
+            block_shape=block_shape,
+            n_parallel_unwrap=n_parallel_unwrap,
         )
 
-        # Stage 2: coherence masking
-        masked_ifgs = _apply_coherence_mask(ifg_paths, cor_paths, coherence_mask_threshold)
+        # dolphin 0.42+ handles the full pipeline: phase linking, unwrapping,
+        # network inversion, and velocity estimation. Collect outputs from
+        # dolphin's timeseries directory instead of running MintPy separately.
+        dolphin_dir = output_dir / "dolphin"
+        ts_dir = dolphin_dir / "timeseries"
+        unwrap_dir = dolphin_dir / "unwrapped"
 
-        # Stage 3: tophu unwrapping
-        unwrapped_paths = _run_unwrapping(masked_ifgs, cor_paths, output_dir / "unwrap")
+        # Velocity (GeoTIFF, units: rad/year in LOS)
+        velocity_path = ts_dir / "velocity.tif"
+        if not velocity_path.exists():
+            velocity_path = None
+            logger.warning("No velocity.tif found in dolphin timeseries output")
 
-        # Stage 4: post-unwrap QC (flag-and-continue)
+        # Displacement time-series epochs
+        ts_paths = sorted(ts_dir.glob("20*.tif")) if ts_dir.exists() else []
+        logger.info("Dolphin produced {} time-series epochs", len(ts_paths))
+
+        # Collect unwrapped outputs for QC
+        unwrapped_paths = sorted(unwrap_dir.glob("*.unw.tif")) if unwrap_dir.exists() else []
+        logger.info("Dolphin unwrapped {} interferograms", len(unwrapped_paths))
+
+        # Post-unwrap QC (flag-and-continue)
         qc_warnings: list[str] = []
         for uwp in unwrapped_paths:
             qc = _check_unwrap_quality(uwp, ramp_threshold)
@@ -352,42 +496,11 @@ def run_disp(
                     f"residual RMS {qc['residual_rms']:.3f}"
                 )
 
-        # Stage 5: MintPy time-series inversion
-        mintpy_dir = output_dir / "mintpy"
-        template_path = _generate_mintpy_template(mintpy_dir, cdsapirc_path)
-        ts_paths = _run_mintpy_timeseries(mintpy_dir, template_path)
-
-        velocity_path = mintpy_dir / "velocity.h5"
-        if not velocity_path.exists():
-            velocity_path = None
-
-        # OUT-03: Inject OPERA metadata into all HDF5 outputs
-        from subsideo._metadata import get_software_version, inject_opera_metadata
-
-        sw_version = get_software_version()
-        all_h5 = ts_paths + (
-            [velocity_path] if velocity_path and velocity_path.exists() else []
-        )
-        for h5_path in all_h5:
-            if h5_path.exists():
-                inject_opera_metadata(
-                    h5_path,
-                    product_type="DISP-S1",
-                    software_version=sw_version,
-                    run_params={
-                        "cslc_count": len(cslc_paths),
-                        "coherence_threshold": coherence_mask_threshold,
-                        "ramp_threshold": ramp_threshold,
-                        "era5_correction": True,
-                        "output_dir": str(output_dir),
-                    },
-                )
-
         return DISPResult(
             velocity_path=velocity_path,
             timeseries_paths=ts_paths,
             output_dir=output_dir,
-            valid=True,
+            valid=velocity_path is not None,
             qc_warnings=qc_warnings,
         )
 

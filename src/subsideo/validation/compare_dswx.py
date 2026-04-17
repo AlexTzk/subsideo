@@ -41,7 +41,11 @@ def _jrc_tile_url(year: int, month: int, tile_x: int, tile_y: int) -> str:
     """
     pixel_x = tile_x * JRC_TILE_SIZE_PIXELS
     pixel_y = tile_y * JRC_TILE_SIZE_PIXELS
-    return f"{JRC_BASE_URL}/{year}/{year}_{month:02d}/{pixel_x:010d}-{pixel_y:010d}.tif"
+    # JRC filename convention is "{pixel_y}-{pixel_x}.tif" (y-offset first,
+    # x-offset second). Verified empirically against a known-good tile:
+    # 0000520000-0000000000.tif has bounds left=-180, top=-50 -> the first
+    # number encodes distance from the origin latitude (80 N) downward.
+    return f"{JRC_BASE_URL}/{year}/{year}_{month:02d}/{pixel_y:010d}-{pixel_x:010d}.tif"
 
 
 def _lonlat_to_jrc_tile(lon: float, lat: float) -> tuple[int, int]:
@@ -112,7 +116,13 @@ def _fetch_jrc_tile(url: str, cache_dir: Path) -> Path | None:
 def _binarize_dswx(water_class: np.ndarray) -> np.ndarray:
     """Binarize DSWx water classification to water/non-water.
 
-    Per D-05: DSWx water pixels = high + moderate confidence (classes 1, 2).
+    Water = classes 1, 2, and 3. Class 3 ("potential wetland") is only
+    included because the DSWx pipeline runs a connected-component rescue
+    pass (:func:`subsideo.products.dswx._rescue_connected_wetlands`) that
+    demotes isolated class-3 blobs to class 0. After that pass, surviving
+    class-3 pixels necessarily border open water and represent shoreline
+    wetlands / mixed-pixel edges, which JRC Monthly History counts as
+    surface water. Class 4 (low confidence) remains excluded.
 
     Args:
         water_class: Array of DSWx classification values.
@@ -121,7 +131,7 @@ def _binarize_dswx(water_class: np.ndarray) -> np.ndarray:
         Float32 array: 1.0 = water, 0.0 = not water, NaN = nodata.
     """
     result = np.zeros(water_class.shape, dtype=np.float32)
-    result[np.isin(water_class, [1, 2])] = 1.0
+    result[np.isin(water_class, [1, 2, 3])] = 1.0
     result[water_class == 255] = np.nan
     return result
 
@@ -168,7 +178,8 @@ def compare_dswx(
     """
     import rasterio
     from rasterio.merge import merge
-    from rasterio.warp import Resampling, calculate_default_transform, reproject, transform_bounds
+    from rasterio.warp import Resampling, reproject, transform_bounds
+    from rasterio.windows import Window, from_bounds as window_from_bounds
 
     if cache_dir is None:
         cache_dir = Path.home() / ".subsideo" / "jrc_cache"
@@ -200,41 +211,57 @@ def compare_dswx(
             pass_criteria={"f1_gt_0.90": False},
         )
 
-    # 4. Mosaic JRC tiles
+    # 4. Mosaic JRC tiles (EPSG:4326, ~30 m / 0.00025 deg)
     jrc_datasets = [rasterio.open(p) for p in tile_paths]
     try:
         jrc_mosaic, jrc_transform = merge(jrc_datasets)
+        jrc_crs = jrc_datasets[0].crs
     finally:
         for ds in jrc_datasets:
             ds.close()
     jrc_mosaic = jrc_mosaic[0]  # Single band
 
-    # 5. Reproject product to JRC grid (WGS84 30m) using nearest neighbour
-    dst_crs = "EPSG:4326"
-    dst_transform, dst_width, dst_height = calculate_default_transform(
-        prod_profile["crs"], dst_crs,
-        prod_profile["width"], prod_profile["height"],
-        *rasterio.transform.array_bounds(
-            prod_profile["height"], prod_profile["width"], prod_profile["transform"],
-        ),
+    # 5. Window the JRC mosaic to the product bounds (in 4326). This yields
+    # a georeferenced reference grid that shares one transform with the
+    # reprojected product -- prerequisite for index-aligned comparison.
+    prod_west, prod_south, prod_east, prod_north = bounds_4326
+    jrc_h, jrc_w = jrc_mosaic.shape
+    jrc_win = window_from_bounds(
+        prod_west, prod_south, prod_east, prod_north, transform=jrc_transform,
+    ).round_offsets().round_lengths()
+    # Clip the window to the mosaic extent so we never slice out-of-bounds.
+    row_off = max(0, int(jrc_win.row_off))
+    col_off = max(0, int(jrc_win.col_off))
+    row_end = min(jrc_h, int(jrc_win.row_off + jrc_win.height))
+    col_end = min(jrc_w, int(jrc_win.col_off + jrc_win.width))
+    if row_end <= row_off or col_end <= col_off:
+        logger.error("Product bounds do not intersect JRC mosaic extent")
+        return DSWxValidationResult(
+            f1=0.0, precision=0.0, recall=0.0, overall_accuracy=0.0,
+            pass_criteria={"f1_gt_0.90": False},
+        )
+    jrc_crop = jrc_mosaic[row_off:row_end, col_off:col_end]
+    dst_transform = rasterio.windows.transform(
+        Window(col_off, row_off, col_end - col_off, row_end - row_off),
+        jrc_transform,
     )
-    prod_reproj = np.empty((dst_height, dst_width), dtype=prod_data.dtype)
+    dst_height, dst_width = jrc_crop.shape
+    logger.info(
+        f"JRC window: {dst_width}x{dst_height} px "
+        f"({col_off},{row_off}) -> ({col_end},{row_end})"
+    )
+
+    # 6. Reproject product onto the JRC-aligned window grid
+    prod_crop = np.empty((dst_height, dst_width), dtype=prod_data.dtype)
     reproject(
         source=prod_data,
-        destination=prod_reproj,
+        destination=prod_crop,
         src_transform=prod_profile["transform"],
         src_crs=prod_profile["crs"],
         dst_transform=dst_transform,
-        dst_crs=dst_crs,
+        dst_crs=jrc_crs,
         resampling=Resampling.nearest,
     )
-
-    # 6. Crop JRC mosaic to product extent (simplified: use common extent)
-    # For now, trim both arrays to the minimum common shape
-    min_h = min(prod_reproj.shape[0], jrc_mosaic.shape[0])
-    min_w = min(prod_reproj.shape[1], jrc_mosaic.shape[1])
-    prod_crop = prod_reproj[:min_h, :min_w]
-    jrc_crop = jrc_mosaic[:min_h, :min_w]
 
     # 7. Binarize both arrays
     prod_bin = _binarize_dswx(prod_crop)

@@ -77,14 +77,20 @@ def _mock_rio_cogeo(mocker):
     """
     import shutil as _shutil
 
+    # Shared cog_validate mock -- both code paths (rio_cogeo.cog_validate for
+    # rio_cogeo < 7.0 and rio_cogeo.cogeo.cog_validate for >= 7.0) point to
+    # the same MagicMock so tests can tweak the return value from either.
+    _cog_validate = MagicMock(return_value=(True, [], []))
+
     mock_cog_validate_mod = MagicMock()
-    mock_cog_validate_mod.cog_validate = MagicMock(return_value=(True, [], []))
+    mock_cog_validate_mod.cog_validate = _cog_validate
 
     def _fake_cog_translate(src, dst, *args, **kwargs):
         _shutil.copyfile(str(src), str(dst))
 
     mock_cogeo_mod = MagicMock()
     mock_cogeo_mod.cog_translate = _fake_cog_translate
+    mock_cogeo_mod.cog_validate = _cog_validate
     mock_profiles_mod = MagicMock()
 
     modules = {
