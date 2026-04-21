@@ -206,10 +206,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Claude
-.planning/*
-CLAUDE.md
-
 # Eval folders
 eval-cslc/*
 eval-disp/*

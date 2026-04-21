@@ -1,37 +1,39 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: v1.0 milestone complete
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-04-09T01:40:19.023Z"
-last_activity: 2026-04-09
+milestone: v1.1
+milestone_name: N.Am./EU Validation Parity & Scientific PASS
+status: Roadmap created — ready for phase planning
+stopped_at: Roadmap created (7 phases, 49 requirements mapped, 100% coverage)
+last_updated: "2026-04-20T00:00:00.000Z"
+last_activity: 2026-04-20
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 21
-  completed_plans: 21
+  total_phases: 7
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-09)
+See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** v1.0 shipped — planning next milestone
+**Current focus:** v1.1 N.Am./EU Validation Parity & Scientific PASS — drive every product to PASS / honest FAIL with named upgrade path / deferral with dated unblock condition.
 
 ## Current Position
 
-Milestone: v1.0 complete
-Next: `/gsd:new-milestone` to define v2.0
+Phase: Not started — roadmap created
+Plan: —
+Status: Roadmap created, ready for `/gsd:plan-phase 1`
+Last activity: 2026-04-20 — ROADMAP.md written with 7 phases, 49 v1.1 requirements mapped (100% coverage)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 0 (v1.1); 21 (v1.0, shipped)
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -47,6 +49,9 @@ Next: `/gsd:new-milestone` to define v2.0
 - Trend: —
 
 *Updated after each plan completion*
+
+**v1.0 historical (reference):**
+
 | Phase 01 P01 | 8min | 3 tasks | 12 files |
 | Phase 01 P04 | 5min | 2 tasks | 8 files |
 | Phase 01 P03 | 5min | 2 tasks | 5 files |
@@ -74,57 +79,39 @@ Next: `/gsd:new-milestone` to define v2.0
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+Recent decisions affecting current work (v1.1):
+
+- [v1.1 Roadmap]: Phase numbering reset to start at 1 (v1.0 phases archived to `.planning/milestones/v1.0-phases/`)
+- [v1.1 Roadmap]: BOOTSTRAP Phase 0 expanded to GSD Phase 1 with 17 requirements (+ CSLC-01/CSLC-02 moved from CSLC phase so shared stable_terrain.py + selfconsistency.py modules land before Phases 3 and 4 consume them — per research SUMMARY §0.5.5)
+- [v1.1 Roadmap]: 4 BOOTSTRAP corrections baked into Phase 1 criteria — tophu via conda-forge (not pip), rio-cogeo==6.0.0 (not 7.x, Python 3.10 drop), full `_mp.py` bundle (MPLBACKEND + RLIMIT_NOFILE + session close + forkserver fallback, not just set_start_method), `bounds_for_burst` as harness function (not separate module)
+- [v1.1 Roadmap]: Phase 1 internal ordering: 0.1 → 0.3 → 0.4 → 0.5+0.5.5 → 0.6abc → 0.2 → 0.7+0.8+0.9 per research ARCHITECTURE Build Order
+- [v1.1 Roadmap]: Research flags surfaced as planning artifacts (not roadmap-level commitments): Phase 3 coherence metric choice (mean/median/persistently-coherent); Phase 4 multilook method default (Gaussian vs block-mean — PITFALLS/FEATURES in tension, requires Phase 4 ADR)
+- [v1.1 Roadmap]: Phase 5 soft runtime dependency — CMR probe auto-supersede handles OPERA operational DIST-S1 publication without re-planning
+- [v1.1 Roadmap]: Phase 6 internal ordering — AOI research (DSWX-02) precedes fit-set compute commit
+- [v1.1 Roadmap]: No `prepare_for_reference` default `method=` argument (DISP-01) — validation discipline, per PITFALLS P3.1 tension with FEATURES anti-feature
+- [v1.1 Roadmap]: `results/matrix.md` uses manifest + per-eval `metrics.json` sidecars (never glob-parse CONCLUSIONS markdown) — per PITFALLS R3/R5
+
+**v1.0 decisions (reference):** see PROJECT.md Key Decisions table + historical log below for ordering context.
 
 - [Init]: CDSE over ASF for EU data — CDSE is the native Copernicus hub; STAC endpoint is `stac.dataspace.copernicus.eu/v1` (changed Nov 2025)
 - [Init]: EU burst DB must be built from ESA CC-BY 4.0 GeoJSON — opera-burstdb covers North America only
 - [Init]: Two-layer install enforced — conda-forge for ISCE3/GDAL/dolphin/snaphu; pip for pure-Python layer
-- [Phase 01]: Moved conda-forge-only deps to optional [conda] group so pip install works in dev environments
-- [Phase 01]: YamlConfigSettingsSource reads yaml_file from model_config not init kwargs; tests use dynamic subclass
-- [Phase 01]: Lazy imports for orbit backends (sentineleof/s1-orbits) to handle partial conda installs
-- [Phase 01]: UTM EPSG stored at DB build time via pyproj; never derived at query time
-- [Phase 01]: Spatial query uses Python-side shapely intersection (no SpatiaLite dependency)
-- [Phase 01]: S3 auth uses client_id/secret as AWS credentials, separate from OAuth2 bearer token
-- [Phase 02]: Dataclasses over Pydantic for result types -- plain containers, not settings
-- [Phase 02]: Lazy import for skimage in ssim() to avoid heavy import on module load
-- [Phase 02]: Lazy import for compass/h5py inside functions for partial conda install support
-- [Phase 02]: HDF5 validation checks /data group existence rather than hardcoded dataset paths
-- [Phase 02]: Lazy imports for opera-rtc and rio-cogeo inside function bodies to support partial conda installs
-- [Phase 02]: dB-domain RTC comparison and interferometric phase CSLC comparison per RESEARCH.md pitfalls
-- [Phase 03]: Lazy imports for all conda-forge deps (dolphin, tophu, mintpy, scipy) inside function bodies
-- [Phase 03]: Post-unwrap QC uses plane-fit residual RMS, flags but does not fail pipeline
-- [Phase 03]: CDS credential validation at pipeline start before any processing (fail-fast)
-- [Phase 03]: EGMStoolkit lazy import in fetch_egms_ortho; LOS-to-vertical via cos(theta) division; grid alignment always reprojects to EGMS grid
-- [Phase 03]: Separate validate_dist_product from validate_rtc_product for module independence
-- [Phase 03]: Simplified MGRS tile resolution from AOI centroid; dist-s1 validates tile availability
-- [Phase 04]: DSWE diagnostic tests use PROTEUS defaults mapped to S2 L2A; inject_opera_metadata is shared utility for all product types
-- [Phase 04]: Markup from markupsafe for SVG inline rendering in Jinja2 autoescape mode
-- [Phase 04]: Adapted validate --disp to use --egms flag matching actual compare_disp API
-- [Phase 04]: Added run_rtc_from_aoi and run_cslc_from_aoi wrappers to complete from_aoi pattern across all products
-- [Phase 05]: Reordered data-access block so burst query precedes DEM fetch (burst epsg needed for output_epsg)
-- [Phase 05]: Added empty-burst early-exit guard in from_aoi functions
-- [Phase 05]: Reordered burst query before DEM fetch in dist.py to access burst EPSG
-- [Phase 05]: Added empty-bursts guard in disp.py run_disp_from_aoi for early error return
-- [Phase 06]: get_software_version uses importlib.metadata with dev fallback for editable installs
-- [Phase 06]: IONEX failure warns and continues with tec_file=None rather than failing CSLC pipeline
-- [Phase 06]: Lazy imports for rasterio/pyproj/ASFClient inside auto-fetch try block; 30-day mtime window as default date range
-- [Phase 07]: EGMS auto-fetch placed before if/elif product chain; build-db uses typer.Argument for positional geojson
-- [Phase 08]: No code changes needed -- purely planning artifact metadata corrections
-- [Phase 09]: Fallback lookup using field-name prefix startswith() for correlation ambiguity between RTC and DISP
-- [CSLC Eval]: 4 monkey-patches for numpy 2.x compat with compass/s1reader/isce3 pybind11
-- [CSLC Eval]: Burst database SQLite required for correct geogrid computation; compass's DB-free path has multiple bugs
-- [CSLC Eval]: Grid snapping (x_snap=5, y_snap=10) required for pixel-center alignment with OPERA reference
-- [CSLC Eval]: Cross-version phase comparison (isce3 0.15 vs 0.25) produces zero coherence; amplitude metrics used instead
+- [CSLC Eval]: 4 monkey-patches for numpy 2.x compat with compass/s1reader/isce3 pybind11 — scheduled for removal in v1.1 Phase 1 (ENV-02)
+- [CSLC Eval]: Cross-version phase comparison (isce3 0.15 vs 0.25) produces zero coherence; amplitude metrics used instead — consolidated into docs/validation_methodology.md in v1.1 Phase 3 (CSLC-06)
 - [CSLC Eval]: CSLC amplitude correlation 0.79, RMSE 3.77 dB — PASS with amplitude-based criteria
 
 ### Pending Todos
 
-None yet.
+None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 
 ### Blockers/Concerns
 
-- DIST-S1 (Phase 3) depends on opera-adt/dist-s1 ~April 2026 conda-forge release; treat as conditional until confirmed
-- DSWx threshold calibration (Phase 4) has no published EU recipe; budget research time within the phase
+- **Phase 1 P0.1 macOS fork pitfalls**: research identified 4 failure modes beyond BOOTSTRAP's simple `set_start_method('fork')`; full `_mp.py` bundle mandated by success criteria — acceptance = 3 consecutive fresh `make eval-all` runs
+- **Phase 1 tophu channel**: tophu is not on PyPI (BOOTSTRAP had pip:; must be conda-forge dependencies:); regression test is `import tophu`, not `from dolphin.unwrap import run` (succeeds without tophu)
+- **Phase 3 coherence metric choice**: MEDIUM uncertainty; `/gsd:research-phase 3` may be required before SoCal calibration
+- **Phase 4 multilook method ADR**: PITFALLS P3.1 and FEATURES anti-feature table in direct tension; plan-phase must surface and resolve
+- **Phase 5 operational OPERA DIST publication**: soft runtime dependency on CMR — handled by automatic probe-and-supersede, but if publication lands mid-milestone the 4:N.Am. matrix cell shifts from "vs v0.1" to "vs operational"
+- **Phase 6 fit-set quality**: P5.2 JRC labelling noise + drought-year wet/dry ratio (P5.4) can silently cap F1 below bar; AOI research artifact (DSWX-02) is first-class sub-task, not planning
 
 ### Quick Tasks Completed
 
@@ -135,7 +122,7 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-04-09
-Last session: 2026-04-09T01:51:40Z
-Stopped at: Completed quick task 260408-q2i
+Last activity: 2026-04-20 — v1.1 roadmap written (7 phases, 49 requirements, 100% coverage)
+Last session: 2026-04-20
+Stopped at: Roadmap created; ready for `/gsd:plan-phase 1`
 Resume file: None
