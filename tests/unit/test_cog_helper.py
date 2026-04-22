@@ -124,3 +124,57 @@ def test_ensure_valid_cog_heals_warning(
     _cog.ensure_valid_cog(cog)
     after = cog.stat().st_mtime
     assert after > before
+
+
+def test_ensure_valid_cog_heals_ifd_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """rio-cogeo 6.0.0 reports IFD-offset as an ERROR with is_valid=False.
+
+    ``ensure_valid_cog`` must treat the IFD-offset error as heal-triggering
+    (not a fatal RuntimeError).  This mirrors real behaviour observed on a
+    COG after a rasterio ``update_tags`` call pushes the IFD past the 300-byte
+    header -- which is the entire point of the P0.3 heal path.
+    """
+    from subsideo import _cog
+
+    cog = _write_cog(tmp_path / "ok.tif")
+
+    calls = {"n": 0}
+    real_validate = _cog.cog_validate
+
+    def fake_validate(path: str | Path) -> tuple[bool, list[str], list[str]]:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return (
+                False,
+                [
+                    "The offset of the main IFD should be < 300. It is 17128 instead",
+                    "The offset of the first block of the image should be after its IFD",
+                ],
+                [],
+            )
+        return real_validate(path)
+
+    monkeypatch.setattr(_cog, "cog_validate", fake_validate)
+    before = cog.stat().st_mtime
+    time.sleep(0.05)
+    _cog.ensure_valid_cog(cog)  # must NOT raise
+    after = cog.stat().st_mtime
+    assert after > before
+
+
+def test_ensure_valid_cog_raises_on_non_healable_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A non-IFD error (e.g. missing overview) is not a heal trigger; raise."""
+    from subsideo import _cog
+
+    cog = _write_cog(tmp_path / "ok.tif")
+
+    def fake_validate(path: str | Path) -> tuple[bool, list[str], list[str]]:
+        return (False, ["This file is not a valid GeoTIFF"], [])
+
+    monkeypatch.setattr(_cog, "cog_validate", fake_validate)
+    with pytest.raises(RuntimeError, match="not a valid COG"):
+        _cog.ensure_valid_cog(cog)

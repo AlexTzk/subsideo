@@ -76,29 +76,41 @@ def cog_profiles() -> Any:  # noqa: ANN401 -- COGProfiles is rio_cogeo-internal;
 
 
 def ensure_valid_cog(path: str | Path) -> None:
-    """Validate *path*; if IFD-offset/layout warning is present, re-translate.
+    """Validate *path*; if IFD-offset/layout error or warning, re-translate.
 
     Fixes PITFALLS P0.3 silent-COG-degradation.  All metadata-injection code
     paths (``products/rtc.py::ensure_cog``, ``products/dswx.py``, and
     ``_metadata.py::_inject_geotiff``) MUST call this AFTER their tag-write
     pass so the updated GeoTIFF is recertified as a valid COG.
 
-    Raises
-    ------
-    RuntimeError
-        If ``cog_validate`` reports structural errors (not just warnings).
+    rio-cogeo 6.0.0 reports IFD-offset-past-header and broken-layout signals
+    in the **errors** list with ``is_valid=False`` (empirically confirmed
+    against the 6.0.0 source); earlier guidance described them as
+    ``warnings``.  This function treats either variant as heal-triggering:
+    we re-translate on IFD/offset/layout signals regardless of which list
+    they land in, and propagate other (non-healable) errors as RuntimeError.
     """
     path = Path(path)
-    is_valid, errors, warnings = cog_validate(path)
-    if errors:
-        raise RuntimeError(f"{path} is not a valid COG: {errors}")
-    ifd_bad = any(
-        ("ifd" in w.lower() or "offset" in w.lower() or "layout" in w.lower())
-        for w in warnings
-    )
-    if not ifd_bad:
+    _is_valid, errors, warnings = cog_validate(path)
+    all_msgs = [*errors, *warnings]
+
+    def _is_ifd_or_layout(msg: str) -> bool:
+        low = msg.lower()
+        return "ifd" in low or "offset" in low or "layout" in low
+
+    heal_signals = [m for m in all_msgs if _is_ifd_or_layout(m)]
+    non_heal_errors = [e for e in errors if not _is_ifd_or_layout(e)]
+
+    if non_heal_errors:
+        raise RuntimeError(f"{path} is not a valid COG: {non_heal_errors}")
+    if not heal_signals:
         return
-    logger.info("Re-translating {} to heal rio_cogeo warning: {}", path, warnings)
+
+    logger.info(
+        "Re-translating {} to heal rio_cogeo IFD/layout signal: {}",
+        path,
+        heal_signals,
+    )
     tmp = path.with_suffix(path.suffix + ".cogtmp")
     profile = cog_profiles().get("deflate")
     cog_translate(
