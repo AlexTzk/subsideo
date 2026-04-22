@@ -2,6 +2,8 @@
 # Downloads S1 SLC from ASF (not CDSE — CDSE covers EU only)
 import warnings; warnings.filterwarnings("ignore")
 
+EXPECTED_WALL_S = 1800   # Plan 01-07 supervisor AST-parses this constant (D-11)
+
 # Required on macOS: multiprocessing uses 'spawn', which re-imports this
 # script in worker processes.  All top-level work must be inside this guard.
 if __name__ == "__main__":
@@ -12,8 +14,17 @@ if __name__ == "__main__":
     from subsideo.data.dem import fetch_dem
     from subsideo.data.orbits import fetch_orbit
     from subsideo.products.rtc import run_rtc
+    from subsideo.validation.harness import (
+        bounds_for_burst,
+        credential_preflight,
+        download_reference_with_retry,
+        ensure_resume_safe,
+        select_opera_frame_by_utc_hour,
+    )
     from dotenv import load_dotenv
     load_dotenv()  # loads .env from the current working directory
+
+    credential_preflight(["EARTHDATA_USERNAME", "EARTHDATA_PASSWORD"])
 
     OUT = Path("./eval-rtc")
     BURST_ID = "t144_308029_iw1"   # lowercase for opera-rtc; 308029 is inside our downloaded SAFE
@@ -66,7 +77,7 @@ if __name__ == "__main__":
     # ── 3. Download DEM and orbit ─────────────────────────────────────────────────
     print("Fetching DEM and orbit...")
     dem_path, _ = fetch_dem(
-        bounds=[-119.7, 33.2, -118.3, 34.0],  # t144_308029_iw1 footprint + 0.2° buffer
+        bounds=bounds_for_burst(BURST_ID, buffer_deg=0.2),  # ENV-08: no hand-coded literal
         output_epsg=32611,   # UTM zone 11N — Southern California
         output_dir=OUT / "dem",
     )

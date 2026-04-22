@@ -1,0 +1,70 @@
+{
+  "type": "FeatureCollection",
+  "name": "v1.1 MGRS-100km tile seed for subsideo.validation.harness.bounds_for_mgrs_tile",
+  "crs": {
+    "type": "name",
+    "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "tile_id": "10TFK",
+        "region": "nam",
+        "used_by": "run_eval_dist.py"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-122.9, 39.5],
+            [-121.7, 39.5],
+            [-121.7, 40.4],
+            [-122.9, 40.4],
+            [-122.9, 39.5]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "tile_id": "29TNF",
+        "region": "eu",
+        "used_by": "run_eval_dist_eu.py, run_eval_dist_eu_nov15.py"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-8.8, 39.5],
+            [-7.5, 39.5],
+            [-7.5, 40.5],
+            [-8.8, 40.5],
+            [-8.8, 39.5]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "tile_id": "33TXP",
+        "region": "eu",
+        "used_by": "run_eval_dswx.py"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [16.6, 46.5],
+            [18.5, 46.5],
+            [18.5, 47.5],
+            [16.6, 47.5],
+            [16.6, 46.5]
+          ]
+        ]
+      }
+    }
+  ]
+}

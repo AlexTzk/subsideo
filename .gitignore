@@ -231,6 +231,9 @@ eval-rtc/*
 *.sbx
 *.gpkg
 *.geojson
+# Packaged assets shipped with subsideo (Plan 01-06 ENV-08) — the seed
+# GeoJSON must travel with the wheel for bounds_for_mgrs_tile fallback.
+!src/subsideo/validation/_mgrs_tiles.geojson
 *.kml
 *.tif
 *.tiff
