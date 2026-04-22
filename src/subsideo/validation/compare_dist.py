@@ -47,6 +47,7 @@ from subsideo.validation.metrics import (
     precision_score,
     recall_score,
 )
+from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
 
 # -----------------------------------------------------------------------------
 # OPERA DIST-S1 GEN-DIST-STATUS class labels
@@ -182,12 +183,17 @@ def compare_dist(
             n_valid,
         )
         return DISTValidationResult(
-            f1=float("nan"),
-            precision=float("nan"),
-            recall=float("nan"),
-            overall_accuracy=float("nan"),
-            n_valid_pixels=n_valid,
-            pass_criteria={"f1_gt_0.80": False, "accuracy_gt_0.85": False},
+            product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+            reference_agreement=ReferenceAgreementResult(
+                measurements={
+                    "f1": float("nan"),
+                    "precision": float("nan"),
+                    "recall": float("nan"),
+                    "accuracy": float("nan"),
+                    "n_valid_pixels": float(n_valid),
+                },
+                criterion_ids=["dist.f1_min", "dist.accuracy_min"],
+            ),
         )
 
     pred = prod_bin[valid].astype(np.int32)
@@ -209,16 +215,16 @@ def compare_dist(
         n_valid,
     )
 
-    pass_criteria = {
-        "f1_gt_0.80": bool(f1 > 0.80),
-        "accuracy_gt_0.85": bool(acc > 0.85),
-    }
-
     return DISTValidationResult(
-        f1=f1,
-        precision=prec,
-        recall=rec,
-        overall_accuracy=acc,
-        n_valid_pixels=n_valid,
-        pass_criteria=pass_criteria,
+        product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+        reference_agreement=ReferenceAgreementResult(
+            measurements={
+                "f1": f1,
+                "precision": prec,
+                "recall": rec,
+                "accuracy": acc,
+                "n_valid_pixels": float(n_valid),
+            },
+            criterion_ids=["dist.f1_min", "dist.accuracy_min"],
+        ),
     )

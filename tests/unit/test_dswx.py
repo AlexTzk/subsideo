@@ -11,7 +11,7 @@ from subsideo.validation.metrics import (
     precision_score,
     recall_score,
 )
-
+from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
 
 # ---- DSWx type smoke tests ------------------------------------------------
 
@@ -33,9 +33,16 @@ class TestDSWxTypes:
 
     def test_dswx_validation_result(self):
         vr = DSWxValidationResult(
-            f1=0.92, precision=0.90, recall=0.94, overall_accuracy=0.95
+            product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+            reference_agreement=ReferenceAgreementResult(
+                measurements={
+                    "f1": 0.92, "precision": 0.90, "recall": 0.94, "accuracy": 0.95,
+                },
+                criterion_ids=["dswx.f1_min"],
+            ),
         )
-        assert vr.pass_criteria == {}
+        assert vr.product_quality.measurements == {}
+        assert vr.reference_agreement.measurements["f1"] == 0.92
 
 
 # ---- Binary classification metrics ----------------------------------------

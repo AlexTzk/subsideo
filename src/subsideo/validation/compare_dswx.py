@@ -14,6 +14,7 @@ from subsideo.validation.metrics import (
     precision_score,
     recall_score,
 )
+from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
 
 JRC_BASE_URL = (
     "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata"
@@ -207,8 +208,16 @@ def compare_dswx(
     if not tile_paths:
         logger.error("No JRC tiles available for the product extent")
         return DSWxValidationResult(
-            f1=0.0, precision=0.0, recall=0.0, overall_accuracy=0.0,
-            pass_criteria={"f1_gt_0.90": False},
+            product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+            reference_agreement=ReferenceAgreementResult(
+                measurements={
+                    "f1": float("nan"),
+                    "precision": float("nan"),
+                    "recall": float("nan"),
+                    "accuracy": float("nan"),
+                },
+                criterion_ids=["dswx.f1_min"],
+            ),
         )
 
     # 4. Mosaic JRC tiles (EPSG:4326, ~30 m / 0.00025 deg)
@@ -237,8 +246,16 @@ def compare_dswx(
     if row_end <= row_off or col_end <= col_off:
         logger.error("Product bounds do not intersect JRC mosaic extent")
         return DSWxValidationResult(
-            f1=0.0, precision=0.0, recall=0.0, overall_accuracy=0.0,
-            pass_criteria={"f1_gt_0.90": False},
+            product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+            reference_agreement=ReferenceAgreementResult(
+                measurements={
+                    "f1": float("nan"),
+                    "precision": float("nan"),
+                    "recall": float("nan"),
+                    "accuracy": float("nan"),
+                },
+                criterion_ids=["dswx.f1_min"],
+            ),
         )
     jrc_crop = jrc_mosaic[row_off:row_end, col_off:col_end]
     dst_transform = rasterio.windows.transform(
@@ -275,8 +292,16 @@ def compare_dswx(
     if pred.size == 0:
         logger.warning("No valid overlapping pixels between DSWx and JRC")
         return DSWxValidationResult(
-            f1=0.0, precision=0.0, recall=0.0, overall_accuracy=0.0,
-            pass_criteria={"f1_gt_0.90": False},
+            product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+            reference_agreement=ReferenceAgreementResult(
+                measurements={
+                    "f1": float("nan"),
+                    "precision": float("nan"),
+                    "recall": float("nan"),
+                    "accuracy": float("nan"),
+                },
+                criterion_ids=["dswx.f1_min"],
+            ),
         )
 
     # 9. Compute metrics
@@ -291,9 +316,14 @@ def compare_dswx(
     )
 
     return DSWxValidationResult(
-        f1=f1,
-        precision=prec,
-        recall=rec,
-        overall_accuracy=acc,
-        pass_criteria={"f1_gt_0.90": f1 > 0.90},
+        product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+        reference_agreement=ReferenceAgreementResult(
+            measurements={
+                "f1": f1,
+                "precision": prec,
+                "recall": rec,
+                "accuracy": acc,
+            },
+            criterion_ids=["dswx.f1_min"],
+        ),
     )

@@ -243,8 +243,9 @@ testpaths       = ["tests"]
 addopts         = "-ra -q --cov=subsideo --cov-report=term-missing"
 asyncio_mode    = "auto"
 markers = [
-    "slow: tests that run real processing pipelines (deselect with -m 'not slow')",
     "integration: tests requiring live CDSE or ASF DAAC credentials",
+    "reference_agreement: plumbing-only tests that never assert criteria.py thresholds (GATE-04)",
+    "slow: tests that run real processing pipelines (deselect with -m 'not slow')",
     "validation: cross-comparison against OPERA reference products",
 ]
 

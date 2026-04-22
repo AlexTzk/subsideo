@@ -26,6 +26,7 @@ from rasterio.warp import Resampling, reproject
 
 from subsideo.products.types import DISPValidationResult
 from subsideo.validation.metrics import bias, rmse, spatial_correlation
+from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
 
 # Sentinel-1 C-band carrier wavelength (m) -- used to convert LOS phase
 # velocity (rad/yr) to surface-motion velocity (mm/yr).
@@ -175,12 +176,11 @@ def compare_disp(
     logger.info(f"DISP validation: r={corr:.4f}, bias={bias_val:.2f} mm/yr")
 
     return DISPValidationResult(
-        correlation=corr,
-        bias_mm_yr=bias_val,
-        pass_criteria={
-            "correlation_gt_0.92": corr > 0.92,
-            "bias_lt_3mm_yr": abs(bias_val) < 3.0,
-        },
+        product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+        reference_agreement=ReferenceAgreementResult(
+            measurements={"correlation": corr, "bias_mm_yr": bias_val},
+            criterion_ids=["disp.correlation_min", "disp.bias_mm_yr_max"],
+        ),
     )
 
 
@@ -303,9 +303,14 @@ def compare_disp_egms_l2a(
         if len(points_in) == 0:
             logger.warning("No EGMS PS points fall inside the velocity raster extent")
             return DISPValidationResult(
-                correlation=float("nan"),
-                bias_mm_yr=float("nan"),
-                pass_criteria={"correlation_gt_0.92": False, "bias_lt_3mm_yr": False},
+                product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+                reference_agreement=ReferenceAgreementResult(
+                    measurements={
+                        "correlation": float("nan"),
+                        "bias_mm_yr": float("nan"),
+                    },
+                    criterion_ids=["disp.correlation_min", "disp.bias_mm_yr_max"],
+                ),
             )
 
         xy = list(zip(points_in.geometry.x, points_in.geometry.y, strict=True))
@@ -332,9 +337,14 @@ def compare_disp_egms_l2a(
     if n_valid < 100:
         logger.warning("Too few valid pairs ({}) for meaningful statistics", n_valid)
         return DISPValidationResult(
-            correlation=float("nan"),
-            bias_mm_yr=float("nan"),
-            pass_criteria={"correlation_gt_0.92": False, "bias_lt_3mm_yr": False},
+            product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+            reference_agreement=ReferenceAgreementResult(
+                measurements={
+                    "correlation": float("nan"),
+                    "bias_mm_yr": float("nan"),
+                },
+                criterion_ids=["disp.correlation_min", "disp.bias_mm_yr_max"],
+            ),
         )
 
     # Metrics helpers expect same-shape arrays; pass 1-D paired slices
@@ -354,10 +364,9 @@ def compare_disp_egms_l2a(
     )
 
     return DISPValidationResult(
-        correlation=corr,
-        bias_mm_yr=bias_val,
-        pass_criteria={
-            "correlation_gt_0.92": corr > 0.92,
-            "bias_lt_3mm_yr": abs(bias_val) < 3.0,
-        },
+        product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
+        reference_agreement=ReferenceAgreementResult(
+            measurements={"correlation": corr, "bias_mm_yr": bias_val},
+            criterion_ids=["disp.correlation_min", "disp.bias_mm_yr_max"],
+        ),
     )

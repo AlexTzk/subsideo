@@ -2,11 +2,18 @@
 
 Dataclasses (not Pydantic) -- these are plain result containers consumed
 by pipeline orchestrators and validation comparison modules.
+
+ValidationResult classes (RTC/CSLC/DISP/DIST/DSWx) are nested composites
+per D-06 / GATE-02: each exposes `product_quality` and `reference_agreement`
+sub-results. There is no top-level .passed bool -- call
+`subsideo.validation.results.evaluate(...)` at read time.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
 
 
 @dataclass
@@ -60,25 +67,27 @@ class CSLCResult:
 
 @dataclass
 class RTCValidationResult:
-    """Validation metrics comparing RTC output against reference."""
+    """Validation metrics comparing RTC output against reference.
 
-    rmse_db: float
-    correlation: float
-    bias_db: float
-    ssim_value: float
-    pass_criteria: dict[str, bool] = field(default_factory=dict)
+    Nested composite (D-06 / GATE-02): product_quality and reference_agreement
+    are distinct. No top-level .passed bool -- call
+    subsideo.validation.results.evaluate(...) at read time.
+    """
+
+    product_quality: ProductQualityResult
+    reference_agreement: ReferenceAgreementResult
 
 
 @dataclass
 class CSLCValidationResult:
-    """Validation metrics comparing CSLC output against reference."""
+    """Validation metrics comparing CSLC output against reference.
 
-    phase_rms_rad: float
-    coherence: float
-    amplitude_correlation: float = 0.0
-    amplitude_rmse_db: float = float("inf")
-    pass_criteria: dict[str, bool] = field(default_factory=dict)
+    Nested composite: product_quality carries self-consistency (Phase 3);
+    reference_agreement carries amplitude r / RMSE (v1.0 BINDING).
+    """
 
+    product_quality: ProductQualityResult
+    reference_agreement: ReferenceAgreementResult
 
 
 @dataclass
@@ -95,11 +104,15 @@ class DISPResult:
 
 @dataclass
 class DISPValidationResult:
-    """Validation metrics comparing DISP output against EGMS reference."""
+    """Validation metrics comparing DISP output against EGMS / OPERA DISP.
 
-    correlation: float
-    bias_mm_yr: float
-    pass_criteria: dict[str, bool] = field(default_factory=dict)
+    Nested composite: product_quality carries DISP self-consistency
+    (Phase 4); reference_agreement carries correlation / bias vs reference
+    after prepare_for_reference() multilook.
+    """
+
+    product_quality: ProductQualityResult
+    reference_agreement: ReferenceAgreementResult
 
 
 @dataclass
@@ -116,19 +129,13 @@ class DISTResult:
 class DISTValidationResult:
     """Validation metrics comparing DIST-S1 output against OPERA DIST-S1 reference.
 
-    All fields are binary-classification metrics over the disturbed/
-    not-disturbed label, computed on the intersection of valid pixels
-    between the product and the reference after reprojection to a
-    shared grid. ``pass_criteria`` is a dict of named threshold checks
-    that the caller's harness can iterate to produce a pass/fail verdict.
+    Nested composite: product_quality is currently empty (DIST has no
+    product-quality gate in v1.1); reference_agreement carries
+    F1 / precision / recall / accuracy / n_valid_pixels.
     """
 
-    f1: float
-    precision: float
-    recall: float
-    overall_accuracy: float
-    n_valid_pixels: int
-    pass_criteria: dict[str, bool] = field(default_factory=dict)
+    product_quality: ProductQualityResult
+    reference_agreement: ReferenceAgreementResult
 
 
 @dataclass
@@ -154,10 +161,11 @@ class DSWxResult:
 
 @dataclass
 class DSWxValidationResult:
-    """Validation metrics comparing DSWx output against JRC reference."""
+    """Validation metrics comparing DSWx output against JRC reference.
 
-    f1: float
-    precision: float
-    recall: float
-    overall_accuracy: float
-    pass_criteria: dict[str, bool] = field(default_factory=dict)
+    Nested composite: product_quality is currently empty; reference_agreement
+    carries F1 / precision / recall / accuracy.
+    """
+
+    product_quality: ProductQualityResult
+    reference_agreement: ReferenceAgreementResult

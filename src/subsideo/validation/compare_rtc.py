@@ -10,6 +10,7 @@ from rasterio.warp import Resampling, reproject
 
 from subsideo.products.types import RTCValidationResult
 from subsideo.validation.metrics import bias, rmse, spatial_correlation, ssim
+from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
 
 
 def compare_rtc(product_path: Path, reference_path: Path) -> RTCValidationResult:
@@ -61,12 +62,16 @@ def compare_rtc(product_path: Path, reference_path: Path) -> RTCValidationResult
     )
 
     return RTCValidationResult(
-        rmse_db=rmse_val,
-        correlation=corr_val,
-        bias_db=bias_val,
-        ssim_value=ssim_val,
-        pass_criteria={
-            "rmse_lt_0.5dB": rmse_val < 0.5,
-            "correlation_gt_0.99": corr_val > 0.99,
-        },
+        product_quality=ProductQualityResult(
+            measurements={"ssim": ssim_val},
+            criterion_ids=[],
+        ),
+        reference_agreement=ReferenceAgreementResult(
+            measurements={
+                "rmse_db": rmse_val,
+                "correlation": corr_val,
+                "bias_db": bias_val,
+            },
+            criterion_ids=["rtc.rmse_db_max", "rtc.correlation_min"],
+        ),
     )

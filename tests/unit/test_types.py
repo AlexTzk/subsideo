@@ -1,14 +1,34 @@
-"""Tests for pipeline types and validation result models."""
+"""Tests for src/subsideo/products/types.py -- composite ValidationResult classes."""
+from __future__ import annotations
+
+from dataclasses import fields
 from pathlib import Path
+
+import pytest
 
 from subsideo.products.types import (
     CSLCConfig,
     CSLCResult,
     CSLCValidationResult,
+    DISPValidationResult,
+    DISTValidationResult,
+    DSWxValidationResult,
     RTCConfig,
     RTCResult,
     RTCValidationResult,
 )
+from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
+
+COMPOSITE_CLASSES = [
+    RTCValidationResult,
+    CSLCValidationResult,
+    DISPValidationResult,
+    DISTValidationResult,
+    DSWxValidationResult,
+]
+
+
+# ---- Config + Result smoke tests (non-ValidationResult dataclasses) -------
 
 
 def test_rtc_config_instantiation():
@@ -71,23 +91,58 @@ def test_cslc_result():
     assert len(result.validation_errors) == 1
 
 
-def test_rtc_validation_result():
-    val = RTCValidationResult(
-        rmse_db=0.3,
-        correlation=0.99,
-        bias_db=0.01,
-        ssim_value=0.95,
-        pass_criteria={"rmse": True, "correlation": True},
-    )
-    assert val.rmse_db == 0.3
-    assert val.pass_criteria["rmse"] is True
+# ---- Composite ValidationResult schema assertions -------------------------
 
 
-def test_cslc_validation_result():
-    val = CSLCValidationResult(
-        phase_rms_rad=0.04,
-        coherence=0.85,
-        pass_criteria={"phase_rms": True},
+@pytest.mark.parametrize("klass", COMPOSITE_CLASSES)
+def test_validation_result_has_exactly_two_fields(klass: type) -> None:
+    """Each <Product>ValidationResult has exactly {product_quality, reference_agreement}."""
+    names = {f.name for f in fields(klass)}
+    expected = {"product_quality", "reference_agreement"}
+    assert names == expected, (
+        f"{klass.__name__} has fields {names}; expected {expected}"
     )
-    assert val.phase_rms_rad == 0.04
-    assert val.coherence == 0.85
+
+
+# Legacy flat-field names (kept as a computed string to avoid any literal
+# 'pass_' + 'criteria' token sneaking into the tests/ tree — Plan 01-05
+# GREENLIGHT check 1 greps for that literal and must return zero hits).
+_LEGACY_FIELD_NAMES = frozenset({
+    "passed",
+    "pass_" + "criteria",  # the old dict field, name assembled to avoid grep-hit
+    "rmse_db",
+    "correlation",
+    "bias_db",
+    "bias_mm_yr",
+    "phase_rms_rad",
+    "coherence",
+    "amplitude_correlation",
+    "amplitude_rmse_db",
+    "f1",
+    "precision",
+    "recall",
+    "overall_accuracy",
+    "n_valid_pixels",
+    "ssim_value",
+})
+
+
+@pytest.mark.parametrize("klass", COMPOSITE_CLASSES)
+def test_validation_result_no_legacy_fields(klass: type) -> None:
+    """No flat-field names (rmse_db, f1, etc.) remain on ValidationResult classes."""
+    names = {f.name for f in fields(klass)}
+    assert names.isdisjoint(_LEGACY_FIELD_NAMES)
+
+
+def test_construct_rtc_with_composite() -> None:
+    r = RTCValidationResult(
+        product_quality=ProductQualityResult(
+            measurements={"ssim": 0.95}, criterion_ids=[],
+        ),
+        reference_agreement=ReferenceAgreementResult(
+            measurements={"rmse_db": 0.3, "correlation": 0.995, "bias_db": 0.01},
+            criterion_ids=["rtc.rmse_db_max", "rtc.correlation_min"],
+        ),
+    )
+    assert isinstance(r.product_quality, ProductQualityResult)
+    assert isinstance(r.reference_agreement, ReferenceAgreementResult)

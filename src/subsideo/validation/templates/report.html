@@ -28,7 +28,11 @@
       <td>{{ row.metric }}</td>
       <td>{{ row.value }}</td>
       <td>{{ row.criterion }}</td>
+      {% if row.passed is none %}
+      <td>--</td>
+      {% else %}
       <td class="{{ 'pass' if row.passed else 'fail' }}">{{ "PASS" if row.passed else "FAIL" }}</td>
+      {% endif %}
     </tr>
     {% endfor %}
   </table>

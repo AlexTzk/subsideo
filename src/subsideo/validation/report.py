@@ -1,35 +1,61 @@
-"""Validation report generation (HTML + Markdown) for all product types."""
+"""Validation report generation (HTML + Markdown) for all product types.
+
+Updated Plan 01-05 (D-09 big-bang): reads the nested-composite
+ValidationResult shape (product_quality + reference_agreement) and
+derives pass/fail via :func:`subsideo.validation.results.evaluate`.
+"""
 from __future__ import annotations
 
 import io
-from dataclasses import fields
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 from loguru import logger
 
+from subsideo.validation.criteria import CRITERIA
+from subsideo.validation.results import (
+    ProductQualityResult,
+    ReferenceAgreementResult,
+    evaluate,
+    measurement_key,
+)
 
 # ---------------------------------------------------------------------------
-# Criteria mapping: metric field name -> (human label, pass_criteria key)
+# Measurement-key mapping: measurement dict key -> human-readable label
 # ---------------------------------------------------------------------------
-_CRITERIA_MAP: dict[str, tuple[str, str]] = {
+# Used when rendering the metrics table row labels. The criterion column text
+# is built from CRITERIA thresholds at read time.
+_MEASUREMENT_LABELS: dict[str, str] = {
     # RTC
-    "rmse_db": ("RMSE < 0.5 dB", "rmse_lt_0.5dB"),
-    "correlation": ("r > threshold", "correlation_gt_0.99"),
-    "bias_db": ("--", ""),
-    "ssim_value": ("--", ""),
+    "rmse_db": "RMSE (dB)",
+    "correlation": "Correlation (r)",
+    "bias_db": "Bias (dB)",
+    "ssim": "SSIM",
     # DISP
-    "bias_mm_yr": ("bias < 3 mm/yr", "bias_lt_3mm_yr"),
-    # DSWx
-    "f1": ("F1 > 0.90", "f1_gt_0.90"),
-    "precision": ("--", ""),
-    "recall": ("--", ""),
-    "overall_accuracy": ("--", ""),
+    "bias_mm_yr": "Bias (mm/yr)",
     # CSLC
-    "phase_rms_rad": ("phase RMS < 0.05 rad", "phase_rms_lt_0.05rad"),
-    "coherence": ("--", ""),
+    "phase_rms_rad": "Phase RMS (rad)",
+    "coherence": "Coherence",
+    "amplitude_r": "Amplitude r",
+    "amplitude_rmse_db": "Amplitude RMSE (dB)",
+    # DSWx / DIST classification
+    "f1": "F1",
+    "precision": "Precision",
+    "recall": "Recall",
+    "accuracy": "Accuracy",
+    "n_valid_pixels": "Valid pixels",
+    # DISP/CSLC self-consistency
+    "residual_mm_yr": "Residual mean velocity (mm/yr)",
 }
+
+
+def _criterion_label(criterion_id: str) -> str:
+    """Render a human-readable criterion label from the CRITERIA registry."""
+    crit = CRITERIA.get(criterion_id)
+    if crit is None:
+        return criterion_id
+    return f"{crit.name} {crit.comparator} {crit.threshold}"
 
 
 def _fig_to_svg(fig) -> str:  # noqa: ANN001
@@ -137,42 +163,71 @@ def _make_scatter_plot(
     return fig
 
 
+def _render_sub_result(
+    sub_result: ProductQualityResult | ReferenceAgreementResult,
+) -> list[dict]:
+    """Render one sub-result (product_quality OR reference_agreement) as rows.
+
+    Returns a list of dicts with keys: metric, value, criterion, passed.
+    Measurements that have NO corresponding criterion_id on the sub-result
+    appear with criterion='--' and passed=None (informational only).
+    """
+    rows: list[dict] = []
+
+    # Compute pass/fail for each criterion_id listed on this sub-result.
+    pass_map: dict[str, bool] = {}
+    if sub_result.criterion_ids:
+        try:
+            pass_map = evaluate(sub_result)
+        except KeyError as exc:
+            # Missing measurement: surface a warning row and continue.
+            logger.warning("evaluate() raised on sub-result: {}", exc)
+
+    # Build a reverse map: measurement_key -> list[criterion_id]
+    mkey_to_cids: dict[str, list[str]] = {}
+    for cid in sub_result.criterion_ids:
+        mkey_to_cids.setdefault(measurement_key(cid), []).append(cid)
+
+    for mkey, mval in sub_result.measurements.items():
+        label = _MEASUREMENT_LABELS.get(mkey, mkey)
+        cids = mkey_to_cids.get(mkey, [])
+        if cids:
+            # Emit one row per applicable criterion.
+            for cid in cids:
+                rows.append(
+                    {
+                        "metric": label,
+                        "value": f"{float(mval):.4f}",
+                        "criterion": _criterion_label(cid),
+                        "passed": pass_map.get(cid, True),
+                    }
+                )
+        else:
+            rows.append(
+                {
+                    "metric": label,
+                    "value": f"{float(mval):.4f}",
+                    "criterion": "--",
+                    "passed": None,
+                }
+            )
+    return rows
+
+
 def _metrics_table_from_result(validation_result) -> list[dict]:  # noqa: ANN001
-    """Build a metrics table from any ValidationResult dataclass.
+    """Build a metrics table from any (composite) ValidationResult dataclass.
 
     Each entry is a dict with keys: metric, value, criterion, passed.
+    Reads the nested product_quality + reference_agreement sub-results (no
+    flat fields; no collapsed pass-dict).
     """
     table: list[dict] = []
-    pass_criteria = getattr(validation_result, "pass_criteria", {})
-
-    for f in fields(validation_result):
-        if f.name == "pass_criteria":
-            continue
-        val = getattr(validation_result, f.name)
-        if not isinstance(val, (int, float)):
-            continue
-
-        criterion_label, criterion_key = _CRITERIA_MAP.get(f.name, ("--", ""))
-        passed = pass_criteria.get(criterion_key) if criterion_key else None
-
-        # Fallback: if static map key not found, search pass_criteria for
-        # a key starting with the field name (handles correlation ambiguity
-        # between RTC correlation_gt_0.99 and DISP correlation_gt_0.92)
-        if passed is None and criterion_key:
-            for pc_key, pc_val in pass_criteria.items():
-                if pc_key.startswith(f.name):
-                    passed = pc_val
-                    criterion_label = pc_key  # show actual criterion
-                    break
-
-        table.append(
-            {
-                "metric": f.name,
-                "value": f"{val:.4f}",
-                "criterion": criterion_label,
-                "passed": passed if passed is not None else True,
-            }
-        )
+    pq = getattr(validation_result, "product_quality", None)
+    ra = getattr(validation_result, "reference_agreement", None)
+    if isinstance(pq, ProductQualityResult):
+        table.extend(_render_sub_result(pq))
+    if isinstance(ra, ReferenceAgreementResult):
+        table.extend(_render_sub_result(ra))
     return table
 
 
@@ -252,7 +307,11 @@ def generate_report(
         "|--------|-------|-----------|--------|",
     ]
     for row in metrics_table:
-        status = "PASS" if row["passed"] else "FAIL"
+        status = (
+            "--" if row["passed"] is None
+            else "PASS" if row["passed"]
+            else "FAIL"
+        )
         md_lines.append(f"| {row['metric']} | {row['value']} | {row['criterion']} | {status} |")
 
     md_lines.extend(

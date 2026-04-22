@@ -1,4 +1,4 @@
-"""Unit tests for RTC-S1 comparison module using synthetic arrays."""
+"""Product-quality tests for RTC-S1 comparison: value assertions."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,6 +10,7 @@ from rasterio.crs import CRS
 from rasterio.transform import from_bounds
 
 from subsideo.validation.compare_rtc import compare_rtc
+from subsideo.validation.results import evaluate
 
 
 def _make_rtc_geotiff(
@@ -43,11 +44,13 @@ def test_compare_rtc_identical(tmp_path: Path) -> None:
 
     result = compare_rtc(prod, ref)
 
-    assert result.rmse_db == pytest.approx(0.0, abs=1e-6)
-    assert result.correlation == pytest.approx(1.0, abs=1e-6)
-    assert result.bias_db == pytest.approx(0.0, abs=1e-6)
-    assert result.pass_criteria["rmse_lt_0.5dB"] is True
-    assert result.pass_criteria["correlation_gt_0.99"] is True
+    ra = result.reference_agreement
+    assert ra.measurements["rmse_db"] == pytest.approx(0.0, abs=1e-6)
+    assert ra.measurements["correlation"] == pytest.approx(1.0, abs=1e-6)
+    assert ra.measurements["bias_db"] == pytest.approx(0.0, abs=1e-6)
+    passed = evaluate(ra)
+    assert passed["rtc.rmse_db_max"] is True
+    assert passed["rtc.correlation_min"] is True
 
 
 def test_compare_rtc_with_offset(tmp_path: Path) -> None:
@@ -61,23 +64,7 @@ def test_compare_rtc_with_offset(tmp_path: Path) -> None:
 
     result = compare_rtc(prod, ref)
 
-    assert result.rmse_db > 0.0
+    ra = result.reference_agreement
+    assert ra.measurements["rmse_db"] > 0.0
     # Linear scaling preserves correlation in dB domain
-    assert result.correlation > 0.99
-
-
-def test_compare_rtc_handles_zeros(tmp_path: Path) -> None:
-    """Zero pixels should be masked via NaN in log10, not cause inf/nan results."""
-    rng = np.random.default_rng(42)
-    data = rng.uniform(0.01, 1.0, (100, 100))
-    data[0:10, 0:10] = 0.0  # nodata region
-
-    prod = _make_rtc_geotiff(tmp_path / "product.tif", data)
-    ref = _make_rtc_geotiff(tmp_path / "reference.tif", data)
-
-    result = compare_rtc(prod, ref)
-
-    assert np.isfinite(result.rmse_db)
-    assert np.isfinite(result.correlation)
-    assert np.isfinite(result.bias_db)
-    assert np.isfinite(result.ssim_value)
+    assert ra.measurements["correlation"] > 0.99

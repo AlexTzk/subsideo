@@ -488,11 +488,26 @@ def validate_cmd(
     )
     typer.echo(f"[OK] Reports generated: {html_path}, {md_path}")
 
-    # Print pass/fail summary
-    if hasattr(result, "pass_criteria"):
-        all_pass = all(result.pass_criteria.values())
-        for criterion, passed in result.pass_criteria.items():
+    # Print pass/fail summary using the composite ValidationResult shape
+    # (Plan 01-05 D-09 big-bang migration).
+    from subsideo.validation.results import (
+        ProductQualityResult,
+        ReferenceAgreementResult,
+        evaluate,
+    )
+
+    import contextlib
+
+    pass_map: dict[str, bool] = {}
+    for sub_attr in ("product_quality", "reference_agreement"):
+        sub = getattr(result, sub_attr, None)
+        if isinstance(sub, (ProductQualityResult, ReferenceAgreementResult)):
+            with contextlib.suppress(KeyError):
+                pass_map.update(evaluate(sub))
+    if pass_map:
+        all_pass = all(pass_map.values())
+        for criterion_id, passed in pass_map.items():
             status = "PASS" if passed else "FAIL"
-            typer.echo(f"  [{status}] {criterion}")
+            typer.echo(f"  [{status}] {criterion_id}")
         if not all_pass:
             raise typer.Exit(code=1)

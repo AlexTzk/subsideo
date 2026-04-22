@@ -53,8 +53,13 @@ class TestASFAutoFetch:
         mock_asf_instance.search.return_value = [{"url": "https://example.com/ref.zip"}]
         mock_asf_instance.download.return_value = [ref_file]
 
+        # Plan 01-05 big-bang: MagicMock here simulates the composite shape.
+        # cli.py now evaluates via the isinstance(ProductQualityResult, ...)
+        # guard; a MagicMock will not match those types, so the pass/fail
+        # summary section is skipped -- which is the intended fallback for
+        # non-composite objects.
         mock_compare = MagicMock()
-        mock_compare.return_value = MagicMock(pass_criteria={"rmse": True})
+        mock_compare.return_value = MagicMock()
 
         mock_report = MagicMock(return_value=(Path("r.html"), Path("r.md")))
 

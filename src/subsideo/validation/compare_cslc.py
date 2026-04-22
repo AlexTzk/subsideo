@@ -14,6 +14,7 @@ import numpy as np
 from loguru import logger
 
 from subsideo.products.types import CSLCValidationResult
+from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
 
 
 def _load_cslc_complex(hdf5_path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -126,14 +127,17 @@ def compare_cslc(
     if not np.any(mask):
         logger.warning("No valid pixels for CSLC comparison")
         return CSLCValidationResult(
-            phase_rms_rad=float("inf"),
-            coherence=0.0,
-            amplitude_correlation=0.0,
-            amplitude_rmse_db=float("inf"),
-            pass_criteria={
-                "amplitude_correlation_gt_0.6": False,
-                "amplitude_rmse_lt_2dB": False,
-            },
+            product_quality=ProductQualityResult(
+                measurements={"phase_rms_rad": float("nan"), "coherence": float("nan")},
+                criterion_ids=[],
+            ),
+            reference_agreement=ReferenceAgreementResult(
+                measurements={
+                    "amplitude_r": float("nan"),
+                    "amplitude_rmse_db": float("nan"),
+                },
+                criterion_ids=["cslc.amplitude_r_min", "cslc.amplitude_rmse_db_max"],
+            ),
         )
 
     prod_masked = prod_complex[mask]
@@ -172,12 +176,15 @@ def compare_cslc(
     )
 
     return CSLCValidationResult(
-        phase_rms_rad=phase_rms,
-        coherence=coherence,
-        amplitude_correlation=amp_corr,
-        amplitude_rmse_db=amp_rmse_db,
-        pass_criteria={
-            "amplitude_correlation_gt_0.6": amp_corr > 0.6,
-            "amplitude_rmse_lt_4dB": amp_rmse_db < 4.0,
-        },
+        product_quality=ProductQualityResult(
+            measurements={"phase_rms_rad": phase_rms, "coherence": coherence},
+            criterion_ids=[],
+        ),
+        reference_agreement=ReferenceAgreementResult(
+            measurements={
+                "amplitude_r": amp_corr,
+                "amplitude_rmse_db": amp_rmse_db,
+            },
+            criterion_ids=["cslc.amplitude_r_min", "cslc.amplitude_rmse_db_max"],
+        ),
     )

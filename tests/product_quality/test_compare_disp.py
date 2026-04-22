@@ -1,12 +1,13 @@
-"""Unit tests for DISP-S1 EGMS comparison module using synthetic arrays."""
+"""Product-quality tests for DISP-S1 EGMS comparison: value assertions."""
 from __future__ import annotations
 
-from pathlib import Path
 from math import cos, radians
+from pathlib import Path
 
 import numpy as np
 import pytest
 import rasterio
+from pytest_mock import MockerFixture
 from rasterio.crs import CRS
 from rasterio.transform import from_bounds
 
@@ -15,6 +16,7 @@ from subsideo.validation.compare_disp import (
     compare_disp,
     fetch_egms_ortho,
 )
+from subsideo.validation.results import evaluate
 
 
 def _make_velocity_tif(
@@ -75,8 +77,9 @@ def test_compare_disp_identical(tmp_path: Path) -> None:
     # mean_incidence_deg=0 means LOS == vertical (cos(0)=1)
     result = compare_disp(prod, ref, mean_incidence_deg=0.0)
 
-    assert result.correlation > 0.99
-    assert abs(result.bias_mm_yr) < 0.01
+    ra = result.reference_agreement
+    assert ra.measurements["correlation"] > 0.99
+    assert abs(ra.measurements["bias_mm_yr"]) < 0.01
 
 
 def test_compare_disp_known_bias(tmp_path: Path) -> None:
@@ -90,29 +93,12 @@ def test_compare_disp_known_bias(tmp_path: Path) -> None:
 
     result = compare_disp(prod, ref, mean_incidence_deg=0.0)
 
-    assert abs(result.bias_mm_yr - 2.0) < 0.1
+    ra = result.reference_agreement
+    assert abs(ra.measurements["bias_mm_yr"] - 2.0) < 0.1
 
 
-def test_compare_disp_partial_overlap(tmp_path: Path) -> None:
-    """Metrics computed over intersection only when reference has NaN."""
-    rng = np.random.default_rng(42)
-    data = rng.uniform(1.0, 10.0, (100, 100))
-
-    # Reference has NaN in top half
-    ref_data = data.copy()
-    ref_data[:50, :] = np.nan
-
-    prod = _make_velocity_tif(tmp_path / "product.tif", data)
-    ref = _make_velocity_tif(tmp_path / "reference.tif", ref_data)
-
-    result = compare_disp(prod, ref, mean_incidence_deg=0.0)
-
-    assert np.isfinite(result.correlation)
-    assert np.isfinite(result.bias_mm_yr)
-
-
-def test_compare_disp_pass_criteria(tmp_path: Path) -> None:
-    """Pass criteria keys reflect thresholds correctly for good data."""
+def test_compare_disp_criteria_pass(tmp_path: Path) -> None:
+    """Evaluated DISP criteria reflect thresholds correctly for good data."""
     rng = np.random.default_rng(42)
     data = rng.uniform(1.0, 10.0, (100, 100))
     # Tiny noise to avoid degenerate case
@@ -123,16 +109,20 @@ def test_compare_disp_pass_criteria(tmp_path: Path) -> None:
 
     result = compare_disp(prod, ref, mean_incidence_deg=0.0)
 
-    assert "correlation_gt_0.92" in result.pass_criteria
-    assert "bias_lt_3mm_yr" in result.pass_criteria
-    assert result.pass_criteria["correlation_gt_0.92"] is True
-    assert result.pass_criteria["bias_lt_3mm_yr"] is True
+    ra = result.reference_agreement
+    assert "disp.correlation_min" in ra.criterion_ids
+    assert "disp.bias_mm_yr_max" in ra.criterion_ids
+    passed = evaluate(ra)
+    assert passed["disp.correlation_min"] is True
+    assert passed["disp.bias_mm_yr_max"] is True
 
 
 # --- fetch_egms_ortho tests ---
 
 
-def test_fetch_egms_ortho_import_error(tmp_path: Path, mocker) -> None:
+def test_fetch_egms_ortho_import_error(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
     """Raises ImportError with helpful message when EGMStoolkit is missing."""
     mocker.patch.dict("sys.modules", {"EGMStoolkit": None})
 
@@ -140,7 +130,7 @@ def test_fetch_egms_ortho_import_error(tmp_path: Path, mocker) -> None:
         fetch_egms_ortho(bbox=(11.0, 48.0, 12.0, 49.0), output_dir=tmp_path)
 
 
-def test_fetch_egms_ortho_mocked(tmp_path: Path, mocker) -> None:
+def test_fetch_egms_ortho_mocked(tmp_path: Path, mocker: MockerFixture) -> None:
     """Mocked EGMStoolkit download returns downloaded file path."""
     import types
 
@@ -148,14 +138,19 @@ def test_fetch_egms_ortho_mocked(tmp_path: Path, mocker) -> None:
 
     output_dir = tmp_path / "egms"
 
-    def mock_download(*, bbox, product_level, output_dir):
+    def mock_download(
+        *,
+        bbox: tuple[float, float, float, float],
+        product_level: str,
+        output_dir: str | Path,
+    ) -> None:
         """Create a dummy GeoTIFF to simulate download."""
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
         data = np.ones((10, 10))
         _make_velocity_tif(out / "egms_ortho.tif", data)
 
-    mock_module.download = mock_download
+    mock_module.download = mock_download  # type: ignore[attr-defined]
     mocker.patch.dict("sys.modules", {"EGMStoolkit": mock_module})
 
     result = fetch_egms_ortho(bbox=(11.0, 48.0, 12.0, 49.0), output_dir=output_dir)

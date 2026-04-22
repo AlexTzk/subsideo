@@ -1,4 +1,4 @@
-"""Unit tests for CSLC-S1 comparison module using synthetic arrays."""
+"""Product-quality tests for CSLC-S1 comparison: value + criterion-pass assertions."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from subsideo.validation.compare_cslc import compare_cslc
+from subsideo.validation.results import evaluate
 
 
 def _make_cslc_hdf5(
@@ -40,11 +41,14 @@ def test_compare_cslc_identical(tmp_path: Path) -> None:
 
     result = compare_cslc(prod, ref)
 
-    assert result.phase_rms_rad == pytest.approx(0.0, abs=1e-6)
-    assert result.coherence == pytest.approx(1.0, abs=1e-6)
-    assert result.amplitude_correlation == pytest.approx(1.0, abs=1e-6)
-    assert result.pass_criteria["amplitude_correlation_gt_0.6"] is True
-    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is True
+    pq = result.product_quality
+    ra = result.reference_agreement
+    assert pq.measurements["phase_rms_rad"] == pytest.approx(0.0, abs=1e-6)
+    assert pq.measurements["coherence"] == pytest.approx(1.0, abs=1e-6)
+    assert ra.measurements["amplitude_r"] == pytest.approx(1.0, abs=1e-6)
+    passed = evaluate(ra)
+    assert passed["cslc.amplitude_r_min"] is True
+    assert passed["cslc.amplitude_rmse_db_max"] is True
 
 
 def test_compare_cslc_with_phase_shift(tmp_path: Path) -> None:
@@ -60,9 +64,12 @@ def test_compare_cslc_with_phase_shift(tmp_path: Path) -> None:
 
     result = compare_cslc(prod, ref)
 
-    assert result.phase_rms_rad == pytest.approx(0.01, abs=0.001)
-    assert result.pass_criteria["amplitude_correlation_gt_0.6"] is True
-    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is True
+    pq = result.product_quality
+    ra = result.reference_agreement
+    assert pq.measurements["phase_rms_rad"] == pytest.approx(0.01, abs=0.001)
+    passed = evaluate(ra)
+    assert passed["cslc.amplitude_r_min"] is True
+    assert passed["cslc.amplitude_rmse_db_max"] is True
 
 
 def test_compare_cslc_large_phase_shift(tmp_path: Path) -> None:
@@ -78,10 +85,13 @@ def test_compare_cslc_large_phase_shift(tmp_path: Path) -> None:
 
     result = compare_cslc(prod, ref)
 
-    assert result.phase_rms_rad > 0.05
+    pq = result.product_quality
+    ra = result.reference_agreement
+    assert pq.measurements["phase_rms_rad"] > 0.05
     # Amplitudes are identical so amplitude criteria still pass
-    assert result.pass_criteria["amplitude_correlation_gt_0.6"] is True
-    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is True
+    passed = evaluate(ra)
+    assert passed["cslc.amplitude_r_min"] is True
+    assert passed["cslc.amplitude_rmse_db_max"] is True
 
 
 def test_compare_cslc_zero_amplitude(tmp_path: Path) -> None:
@@ -97,13 +107,15 @@ def test_compare_cslc_zero_amplitude(tmp_path: Path) -> None:
 
     result = compare_cslc(prod, ref)
 
-    assert np.isfinite(result.phase_rms_rad)
-    assert np.isfinite(result.coherence)
-    assert np.isfinite(result.amplitude_correlation)
+    pq = result.product_quality
+    ra = result.reference_agreement
+    assert np.isfinite(pq.measurements["phase_rms_rad"])
+    assert np.isfinite(pq.measurements["coherence"])
+    assert np.isfinite(ra.measurements["amplitude_r"])
 
 
 def test_compare_cslc_amplitude_mismatch(tmp_path: Path) -> None:
-    """Large amplitude scaling should fail amplitude_rmse_lt_4dB."""
+    """Large amplitude scaling should fail amplitude_rmse criterion."""
     rng = np.random.default_rng(42)
     amp = rng.uniform(10.0, 100.0, (50, 50))
     phase = rng.uniform(-np.pi, np.pi, (50, 50))
@@ -116,10 +128,12 @@ def test_compare_cslc_amplitude_mismatch(tmp_path: Path) -> None:
 
     result = compare_cslc(prod, ref)
 
-    assert result.amplitude_rmse_db > 4.0
-    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is False
+    ra = result.reference_agreement
+    assert ra.measurements["amplitude_rmse_db"] > 4.0
+    passed = evaluate(ra)
+    assert passed["cslc.amplitude_rmse_db_max"] is False
     # Correlation should still be high (linear scaling preserves correlation)
-    assert result.amplitude_correlation > 0.99
+    assert ra.measurements["amplitude_r"] > 0.99
 
 
 def test_compare_cslc_coordinate_alignment(tmp_path: Path) -> None:
@@ -132,7 +146,7 @@ def test_compare_cslc_coordinate_alignment(tmp_path: Path) -> None:
     ref_x = np.arange(100, 500, 5.0)  # 80 pixels
     ref_y = np.arange(1000, 200, -10.0)  # 80 pixels
 
-    # Product: 60x60, x=[200..495], y=[800..210] — smaller, overlapping
+    # Product: 60x60, x=[200..495], y=[800..210] -- smaller, overlapping
     prod_data = ref_data[20:80, 20:80].copy()  # exact subset
     prod_x = ref_x[20:80]
     prod_y = ref_y[20:80]
@@ -148,8 +162,11 @@ def test_compare_cslc_coordinate_alignment(tmp_path: Path) -> None:
 
     result = compare_cslc(prod, ref)
 
-    # Should align perfectly — same data in the overlap region
-    assert result.amplitude_correlation == pytest.approx(1.0, abs=1e-3)
-    assert result.phase_rms_rad == pytest.approx(0.0, abs=1e-3)
-    assert result.pass_criteria["amplitude_correlation_gt_0.6"] is True
-    assert result.pass_criteria["amplitude_rmse_lt_4dB"] is True
+    # Should align perfectly -- same data in the overlap region
+    pq = result.product_quality
+    ra = result.reference_agreement
+    assert ra.measurements["amplitude_r"] == pytest.approx(1.0, abs=1e-3)
+    assert pq.measurements["phase_rms_rad"] == pytest.approx(0.0, abs=1e-3)
+    passed = evaluate(ra)
+    assert passed["cslc.amplitude_r_min"] is True
+    assert passed["cslc.amplitude_rmse_db_max"] is True
