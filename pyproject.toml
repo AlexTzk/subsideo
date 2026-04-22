@@ -67,7 +67,7 @@ dependencies = [
     "shapely>=2.0,<3",
     "h5py>=3.12,<4",            # HDF5 for CSLC/DISP/RTC products
     "xarray>=2024.10",
-    "zarr>=2.18,<3",            # cloud-optimised intermediate storage
+    "zarr>=2.18",               # cloud-optimised intermediate storage; upper bound dropped for opera-utils[disp]>=0.22 (zarr>=3) — subsideo has no direct zarr API use
     "fsspec>=2024.10",
     "s3fs>=2024.10",
 
