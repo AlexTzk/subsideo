@@ -28,3 +28,22 @@ issues that should be fixed by the plan most-directly responsible.
 - **Verified pre-existing:** Present verbatim at commit `a0b9590` before any 01-02 edits.
 - **Not fixed here:** Out of 01-02 scope (rio_cogeo centralisation); the surrounding function signature is untouched by this plan.
 - **Candidate owner:** A strict-typing pass (likely part of the broader v1.1 mypy-strict cleanup, or a Phase 7 audit).
+
+### Other pre-existing unit-test failures on the full suite
+
+Running `pytest tests/unit/ --no-cov -q` shows these pre-existing failures
+(all untouched by 01-02 and none overlapping with the 8 files 01-02 modified):
+
+- `test_compare_dswx.py::TestJrcTileUrl::test_url_format`
+- `test_compare_dswx.py::TestBinarizeDswx::test_class_mapping`
+- `test_disp_pipeline.py::test_run_disp_mocked`
+- `test_disp_pipeline.py::test_run_disp_qc_warning`
+- `test_orbits.py::TestFetchOrbit::test_fallback_to_s1_orbits`
+
+Scope check: `git diff a0b9590 HEAD --name-only` shows 01-02 only touches
+`_cog.py`, `_metadata.py`, `products/{rtc,dist,dswx}.py`,
+`tests/unit/test_{cog_helper,rtc_pipeline}.py`, + `deferred-items.md`;
+none of the failing tests exercise those files.
+
+Candidate owner: Phase-specific plans for each area (DISP → Phase 4,
+DSWx → Phase 5, orbits → targeted fix).
