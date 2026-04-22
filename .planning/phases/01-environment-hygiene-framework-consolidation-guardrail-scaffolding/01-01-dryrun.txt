@@ -1,0 +1,51 @@
+conda-forge/noarch                                          Using cache
+conda-forge/osx-arm64                                       Using cache
+
+error    libmamba Could not solve for environment specs
+    The following packages are incompatible
+    ├─ compass =0.5.6 * is installable and it requires
+    │  └─ scipy >=1.0,<1.13 * with the potential options
+    │     ├─ scipy [1.10.0|1.10.1|...|1.9.3] would require
+    │     │  └─ python >=3.10,<3.11.0a0 *, which requires
+    │     │     └─ python_abi =3.10 *_cp310, which can be installed;
+    │     ├─ scipy [1.10.0|1.10.1|...|1.9.3] would require
+    │     │  └─ python >=3.11,<3.12.0a0 *, which requires
+    │     │     └─ python_abi =3.11 *_cp311, which can be installed;
+    │     ├─ scipy [1.10.0|1.10.1|...|1.9.3] would require
+    │     │  └─ python >=3.8,<3.9.0a0 *, which requires
+    │     │     └─ python_abi =3.8 *_cp38, which can be installed;
+    │     ├─ scipy [1.10.0|1.10.1|...|1.9.3] would require
+    │     │  └─ python >=3.9,<3.10.0a0 *, which requires
+    │     │     └─ python_abi =3.9 *_cp39, which can be installed;
+    │     └─ scipy [1.11.3|1.11.4|1.12.0] would require
+    │        └─ python >=3.12,<3.13.0a0 *, which requires
+    │           └─ python_abi =3.12 *_cp312, which can be installed;
+    ├─ dem-stitcher >=2.5,<3 * does not exist (perhaps a typo or a missing channel);
+    ├─ isce3 =0.25.10 * does not exist (perhaps a typo or a missing channel);
+    ├─ numpy >=1.26,<2.0 * is requested and can be installed;
+    ├─ python =3.11 *, which can be installed (as previously explained);
+    ├─ rasterio >=1.5,<2 * is installable with the potential options
+    │  ├─ rasterio 1.5.0 would require
+    │  │  └─ python >=3.12,<3.13.0a0 *, which can be installed (as previously explained);
+    │  ├─ rasterio 1.5.0 would require
+    │  │  └─ python >=3.13,<3.14.0a0 *_cp313, which can be installed;
+    │  └─ rasterio 1.5.0 would require
+    │     └─ python >=3.14,<3.15.0a0 *_cp314, which can be installed;
+    ├─ rioxarray >=0.22,<1 * is not installable because it requires
+    │  └─ numpy >=2 * but there are no viable options
+    │     ├─ numpy [2.0.0|2.0.1|...|2.4.3] conflicts with any installable versions previously reported;
+    │     ├─ numpy [2.3.2|2.3.3|...|2.4.3] would require
+    │     │  └─ python_abi =3.14 *_cp314t, which requires
+    │     │     └─ python =3.14 *_cp314t, which conflicts with any installable versions previously reported;
+    │     └─ numpy [2.3.2|2.3.3|...|2.4.3] would require
+    │        └─ python_abi =3.14 *_cp314, which conflicts with any installable versions previously reported;
+    ├─ scipy >=1.14,<2 * is not installable because there are no viable options
+    │  ├─ scipy [1.14.0|1.14.1|...|1.17.1] conflicts with any installable versions previously reported;
+    │  ├─ scipy [1.16.1|1.16.2|1.16.3|1.17.0|1.17.1] would require
+    │  │  └─ python_abi =3.14 *_cp314t, which cannot be installed (as previously explained);
+    │  └─ scipy [1.16.1|1.16.2|1.16.3|1.17.0|1.17.1] would require
+    │     └─ python_abi =3.14 *_cp314, which conflicts with any installable versions previously reported;
+    ├─ snaphu-py =0.4.1 * does not exist (perhaps a typo or a missing channel);
+    └─ tophu =0.2.1 * is not installable because it requires
+       └─ __linux =* *, which is missing on the system.
+critical libmamba Could not solve for environment specs
