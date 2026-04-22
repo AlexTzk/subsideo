@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
-status: Roadmap created — ready for phase planning
-stopped_at: Roadmap created (7 phases, 49 requirements mapped, 100% coverage)
-last_updated: "2026-04-20T00:00:00.000Z"
-last_activity: 2026-04-20
+status: Phase 1 context gathered — ready for /gsd-plan-phase 1
+stopped_at: Phase 1 context gathered (4 gray areas discussed; 19 decisions captured)
+last_updated: "2026-04-21T00:00:00.000Z"
+last_activity: 2026-04-21
 progress:
   total_phases: 7
   completed_phases: 0
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 ## Current Position
 
-Phase: Not started — roadmap created
+Phase: 1 — Environment Hygiene, Framework Consolidation & Guardrail Scaffolding (context gathered)
 Plan: —
-Status: Roadmap created, ready for `/gsd:plan-phase 1`
-Last activity: 2026-04-20 — ROADMAP.md written with 7 phases, 49 v1.1 requirements mapped (100% coverage)
+Status: CONTEXT.md committed, ready for `/gsd-plan-phase 1`
+Last activity: 2026-04-21 — Phase 1 discuss-phase (4 gray areas: criteria.py API, Split ValidationResult, Watchdog mechanics, Env & reproducibility); CONTEXT.md + DISCUSSION-LOG.md committed
 
 ## Performance Metrics
 
@@ -90,6 +90,11 @@ Recent decisions affecting current work (v1.1):
 - [v1.1 Roadmap]: Phase 6 internal ordering — AOI research (DSWX-02) precedes fit-set compute commit
 - [v1.1 Roadmap]: No `prepare_for_reference` default `method=` argument (DISP-01) — validation discipline, per PITFALLS P3.1 tension with FEATURES anti-feature
 - [v1.1 Roadmap]: `results/matrix.md` uses manifest + per-eval `metrics.json` sidecars (never glob-parse CONCLUSIONS markdown) — per PITFALLS R3/R5
+- [Phase 1 CONTEXT]: `criteria.py` is frozen-dataclass `Criterion` + flat `CRITERIA: dict[str, Criterion]` registry + typed accessor functions; immutability via `frozen=True` + matrix-writer echo + PR-ADR review (no CI hash-check)
+- [Phase 1 CONTEXT]: Split `ProductQualityResult` / `ReferenceAgreementResult` is a **nested composite** in new `validation/results.py`; no stored pass-bools (criterion IDs + measurements; pass/fail computed at read time); **big-bang migration in Phase 1** (single commit replaces all 5 compare_*.py returns + tests)
+- [Phase 1 CONTEXT]: Watchdog is **per-script subprocess wrap** via `python -m subsideo.validation.supervisor` invoked from Makefile; mtime staleness heuristic; caller-supplied `EXPECTED_WALL_S` per script; `os.killpg` + py-spy stack dump to `watchdog-stacks.txt` before SIGTERM→SIGKILL; exit 124
+- [Phase 1 CONTEXT]: **Two-layer `conda-env.yml`** (conda-forge heavies + trailing `pip: -e .[validation,viz]`); **per-platform explicit lockfiles** `env.lockfile.linux-64.txt` + `env.lockfile.osx-arm64.txt`; **Dockerfile primary** from `mambaorg/micromamba` + Apptainer.def derived; **both platforms validated in Phase 1** via M3 Max dev run + `docker build + docker run pytest` on arm64 Docker; Phase 7 TrueNAS cold-env audit remains separate
+- [Phase 1 CONTEXT]: Phase 1 populates `criteria.py` with v1.0 BINDING + Phase-3-needed CALIBRATING gates (CSLC/DISP self-consistency coherence>0.7, residual<5 mm/yr, `binding_after_milestone='v1.2'`); Phase 5 EFFIS and DSWx recalibration threshold additions **deferred to Phase 5**
 
 **v1.0 decisions (reference):** see PROJECT.md Key Decisions table + historical log below for ordering context.
 
@@ -122,7 +127,7 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 
 ## Session Continuity
 
-Last activity: 2026-04-20 — v1.1 roadmap written (7 phases, 49 requirements, 100% coverage)
-Last session: 2026-04-20
-Stopped at: Roadmap created; ready for `/gsd:plan-phase 1`
-Resume file: None
+Last activity: 2026-04-21 — Phase 1 context gathered (19 decisions across 4 gray areas)
+Last session: 2026-04-21
+Stopped at: Phase 1 CONTEXT.md committed; ready for `/gsd-plan-phase 1`
+Resume file: .planning/phases/01-environment-hygiene-framework-consolidation-guardrail-scaffolding/01-CONTEXT.md
