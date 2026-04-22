@@ -65,25 +65,18 @@ def _inject_geotiff(path: Path, metadata: dict[str, str]) -> None:
 
     Updating tags on an existing COG pushes the main IFD past the 300-byte
     header threshold and invalidates the COG layout. After writing tags we
-    re-translate the file in place via ``rio_cogeo.cogeo.cog_translate`` so
-    the output remains a valid COG.
+    re-translate the file in place via :func:`subsideo._cog.ensure_valid_cog`
+    (PITFALLS P0.3 heal path) so the output remains a valid COG.
     """
     import rasterio
-    from rio_cogeo.cogeo import cog_translate
-    from rio_cogeo.profiles import cog_profiles
+
+    from subsideo._cog import ensure_valid_cog
 
     with rasterio.open(path, "r+", IGNORE_COG_LAYOUT_BREAK="YES") as ds:
         ds.update_tags(**metadata)
 
-    tmp_path = path.with_suffix(path.suffix + ".cogtmp")
-    cog_translate(
-        str(path),
-        str(tmp_path),
-        cog_profiles.get("deflate"),
-        in_memory=False,
-        quiet=True,
-    )
-    tmp_path.replace(path)
+    # P0.3: re-translate if tag-write left an IFD-offset warning (silent COG degradation)
+    ensure_valid_cog(path)
     logger.debug("Injected OPERA metadata into GeoTIFF {}", path)
 
 

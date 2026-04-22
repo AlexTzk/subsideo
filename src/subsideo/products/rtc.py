@@ -99,11 +99,10 @@ def ensure_cog(input_tif: Path, output_cog: Path | None = None) -> Path:
     Path
         The COG file path.
     """
-    from rio_cogeo.cogeo import cog_translate
-    from rio_cogeo.profiles import cog_profiles
+    from subsideo._cog import cog_profiles, cog_translate, ensure_valid_cog
 
     output_cog = output_cog or input_tif.with_suffix(".cog.tif")
-    profile = cog_profiles.get("deflate")
+    profile = cog_profiles().get("deflate")
     cog_translate(
         str(input_tif),
         str(output_cog),
@@ -112,6 +111,8 @@ def ensure_cog(input_tif: Path, output_cog: Path | None = None) -> Path:
         overview_resampling="nearest",
         use_cog_driver=True,
     )
+    # P0.3: recertify COG layout after translate (handles subsequent tag writes)
+    ensure_valid_cog(output_cog)
     logger.debug("COG-converted {} -> {}", input_tif, output_cog)
     return output_cog
 
@@ -136,7 +137,8 @@ def validate_rtc_product(cog_paths: list[Path]) -> list[str]:
         Error descriptions.  Empty list means all products are valid.
     """
     import rasterio
-    from rio_cogeo import cog_validate
+
+    from subsideo._cog import cog_validate
 
     errors: list[str] = []
     for p in cog_paths:
@@ -144,7 +146,7 @@ def validate_rtc_product(cog_paths: list[Path]) -> list[str]:
             errors.append(f"{p}: file does not exist")
             continue
 
-        # COG structure
+        # COG structure (3-tuple: is_valid, errors, warnings)
         is_valid, _, _ = cog_validate(str(p))
         if not is_valid:
             errors.append(f"{p}: not a valid COG")

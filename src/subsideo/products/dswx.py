@@ -500,10 +500,9 @@ def _write_cog_30m(
         dst.write(dst_data, 1)
 
     # COG conversion
-    from rio_cogeo.cogeo import cog_translate
-    from rio_cogeo.profiles import cog_profiles
+    from subsideo._cog import cog_profiles, cog_translate, ensure_valid_cog
 
-    cog_profile = cog_profiles.get("deflate")
+    cog_profile = cog_profiles().get("deflate")
     cog_translate(
         str(tmp_path),
         str(output_path),
@@ -514,6 +513,9 @@ def _write_cog_30m(
         nodata=255,
     )
     tmp_path.unlink(missing_ok=True)
+
+    # P0.3: recertify COG layout; downstream metadata injection will re-heal as needed
+    ensure_valid_cog(output_path)
 
     logger.debug("Wrote DSWx COG at {}m: {}", output_posting_m, output_path)
     return output_path
@@ -530,7 +532,8 @@ def _validate_dswx_product(cog_path: Path) -> list[str]:
     Returns list of error strings (empty = valid).
     """
     import rasterio
-    from rio_cogeo.cogeo import cog_validate
+
+    from subsideo._cog import cog_validate
 
     errors: list[str] = []
 

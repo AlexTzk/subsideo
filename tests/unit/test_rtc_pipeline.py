@@ -43,21 +43,36 @@ def _make_test_geotiff(
 
 @pytest.fixture(autouse=True)
 def _mock_rio_cogeo(mocker):
-    """Ensure rio_cogeo modules are present in sys.modules for lazy imports."""
+    """Ensure rio_cogeo modules are present in sys.modules for lazy imports.
+
+    Since Plan 01-02 (ENV-03), validation + translation route through
+    ``subsideo._cog``, which imports from ``rio_cogeo.cogeo``.  Mock both
+    paths so either the legacy or the _cog-routed import resolves.
+    """
+    # subsideo._cog now imports cog_validate + cog_translate from rio_cogeo.cogeo
+    mock_cogeo_mod = MagicMock()
+    mock_cogeo_mod.cog_validate = MagicMock(return_value=(True, [], []))
+    mock_cogeo_mod.cog_translate = MagicMock(return_value=None)
+
+    # Legacy path kept for any stragglers
     mock_cog_validate_mod = MagicMock()
     mock_cog_validate_mod.cog_validate = MagicMock(return_value=(True, [], []))
 
-    mock_cogeo_mod = MagicMock()
     mock_profiles_mod = MagicMock()
 
+    # Make the top-level rio_cogeo import expose a __version__ attribute so
+    # subsideo._cog._get_version() can parse it without hitting the real pkg.
+    mock_rio_cogeo = MagicMock()
+    mock_rio_cogeo.__version__ = "6.0.0"
+
     modules = {
-        "rio_cogeo": MagicMock(),
+        "rio_cogeo": mock_rio_cogeo,
         "rio_cogeo.cog_validate": mock_cog_validate_mod,
         "rio_cogeo.cogeo": mock_cogeo_mod,
         "rio_cogeo.profiles": mock_profiles_mod,
     }
     mocker.patch.dict("sys.modules", modules)
-    return mock_cog_validate_mod
+    return mock_cogeo_mod
 
 
 class TestGenerateRtcRunconfig:
