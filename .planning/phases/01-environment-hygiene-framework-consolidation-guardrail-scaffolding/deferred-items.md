@@ -63,3 +63,43 @@ DSWx → Phase 5, orbits → targeted fix).
 - **Verified pre-existing:** `ionosphere.py` produces the identical error on clean checkout; `_mp.py` inherits the same typeshed-gap, unmitigated by `ignore_missing_imports = true` because `types-requests` is partially installed.
 - **Not fixed here:** Requires env change (add `types-requests` to dev deps) which is out of Plan 01-03 scope.
 - **Candidate owner:** a dedicated env-cleanup commit, or the mypy-strict cleanup sweep.
+# Deferred items from Plan 01-09
+
+## Pre-existing test failures (out of scope)
+
+Observed while running `pytest tests/unit -q` inside subsideo:dev container (amd64)
+AND on osx-arm64 host — failures reproduce on both platforms, so they are not
+caused by the Docker build in Plan 01-09. Documented for a future fix-up pass:
+
+- tests/unit/test_compare_dswx.py::TestJrcTileUrl::test_url_format
+  Expected URL tile order is `0000080000-0000120000.tif` but fixture returns
+  `0000120000-0000080000.tif`. Likely stale assertion against a different JRC
+  tile-ID convention; fix in whichever plan owns `compare_dswx.py`.
+
+- tests/unit/test_compare_dswx.py::TestBinarizeDswx::test_class_mapping
+  `np.float32(1.0) == 0.0` assertion — binarize_dswx default classes changed.
+
+- tests/unit/test_disp_pipeline.py::test_run_disp_mocked
+  tests/unit/test_disp_pipeline.py::test_run_disp_qc_warning
+  Assertion on DISPResult.valid = True after mocked run; the mocks don't
+  provide the conda-forge `dolphin.workflows.config._unwrap_options` stub.
+
+- tests/unit/test_metadata_wiring.py::TestMetadataInjectionInCSLC::test_run_cslc_calls_inject_opera_metadata
+  tests/unit/test_metadata_wiring.py::TestMetadataInjectionInDISP::test_run_disp_calls_inject_opera_metadata
+  Mock-call assertion failure post-01-05 DISP pipeline refactor.
+
+- tests/unit/test_orbits.py::TestFetchOrbit::test_fallback_to_s1_orbits
+  Test raises ConnectionError in fallback path before reaching assertion.
+
+Total: 7 pre-existing failures / 291 collected / 283 passing / 1 skipped.
+Coverage 63% (below 80% gate) — consequence of 7 FAILs not of Docker build.
+
+Verification that these are pre-existing:
+- `pytest tests/unit/test_compare_dswx.py::TestJrcTileUrl::test_url_format` on
+  osx-arm64 host => FAIL with same assertion text.
+- `pytest tests/unit/test_orbits.py::TestFetchOrbit::test_fallback_to_s1_orbits`
+  on osx-arm64 host => FAIL with same ConnectionError.
+
+Plan 01-09 scope is env-create / Docker build / lockfile generation. These
+test failures indicate bugs in product/test code that should be addressed by
+whichever plan owns the failing test file.

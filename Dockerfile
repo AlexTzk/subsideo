@@ -23,13 +23,17 @@ FROM mambaorg/micromamba:latest AS builder
 
 USER $MAMBA_USER
 
-COPY --chown=$MAMBA_USER:$MAMBA_USER conda-env.yml /tmp/conda-env.yml
+# Stage the project files + conda-env.yml in /app so that the pip layer's
+# `-e .` entry resolves to the directory containing pyproject.toml.
+# (If conda-env.yml lives in /tmp, micromamba runs pip with CWD=/tmp and
+# pyproject.toml is not found. See Plan 01-09 Task 5 deviation note.)
+COPY --chown=$MAMBA_USER:$MAMBA_USER conda-env.yml /app/conda-env.yml
 COPY --chown=$MAMBA_USER:$MAMBA_USER pyproject.toml README.md LICENSE /app/
 COPY --chown=$MAMBA_USER:$MAMBA_USER src /app/src
 
 WORKDIR /app
 
-RUN micromamba install -y -n base -f /tmp/conda-env.yml && \
+RUN micromamba install -y -n base -f /app/conda-env.yml && \
     micromamba clean --all --yes
 
 # -- Stage 2: runtime ---------------------------------------------------
