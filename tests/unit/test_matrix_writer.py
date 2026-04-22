@@ -1,4 +1,5 @@
 """Unit tests for subsideo.validation.matrix_writer."""
+
 from __future__ import annotations
 
 import json
