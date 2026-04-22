@@ -32,10 +32,11 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Sequence
 from datetime import datetime
 from importlib.resources import files as _pkg_files
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Any, Literal
 
 import requests
 from loguru import logger
