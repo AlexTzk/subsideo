@@ -1,0 +1,45 @@
+# .dockerignore -- keep the Docker image thin
+# Phase 1 Plan 01-09 (ENV-10 / D-17): excludes planning, eval outputs,
+# caches, credentials, and editor metadata so the Docker build context
+# stays small. Explicit COPY lines in the Dockerfile bring in only the
+# source tree, pyproject.toml, README.md, LICENSE, and conda-env.yml.
+
+# -- Planning / milestone scratch -----------------------------------
+.planning/
+CONCLUSIONS_*.md
+
+# -- Eval outputs / validation scratch ------------------------------
+eval-*/
+results/matrix.md
+
+# -- Python cache / build artefacts ---------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# -- VCS / Git metadata ---------------------------------------------
+.git/
+.gitignore
+.gitattributes
+
+# -- Credentials (never bake into an image) -------------------------
+.env
+*.pem
+*.key
+key.json
+
+# -- Editor / IDE metadata ------------------------------------------
+.vscode/
+.idea/
+*.swp
+
+# -- OS cruft -------------------------------------------------------
+.DS_Store
+
+# -- Worktrees / agent scratch --------------------------------------
+.claude/
