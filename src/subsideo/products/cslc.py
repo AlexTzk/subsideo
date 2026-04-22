@@ -4,15 +4,9 @@ Generates compass YAML runconfigs, invokes the compass Python API
 (compass.s1_cslc.run), and validates HDF5 output compliance against
 the OPERA CSLC-S1 product specification.
 
-Compatibility notes (2026-04-11):
-    compass 0.5.6 / s1reader 0.2.5 / isce3 0.25.8 have multiple
-    incompatibilities with numpy >= 2.0.  Four monkey-patches are applied
-    before compass invocation — see ``_patch_compass_burst_db_none_guard``,
-    ``_patch_s1reader_numpy2_compat``, ``_patch_burst_az_carrier_poly``,
-    and the ``np.string_ = np.bytes_`` shim in ``run_cslc()``.
-    These can be removed once upstream releases fix the issues.
-    Full details in .planning/research/PITFALLS.md (Pitfalls 13-16)
-    and CONCLUSIONS_CSLC_N_AM.md.
+Compatibility note: the numpy<2 pin in conda-env.yml obviates the
+previous compass/s1reader/isce3 pybind11 monkey-patches. Sunset
+condition documented at the top of conda-env.yml.
 """
 from __future__ import annotations
 
@@ -153,171 +147,6 @@ def validate_cslc_product(hdf5_paths: list[Path]) -> list[str]:
     return errors
 
 
-def _patch_compass_burst_db_none_guard():
-    """Monkey-patch compass to tolerate burst_database_file=None.
-
-    compass.utils.geo_runconfig.GeoRunConfig.load_from_yaml has a bug:
-    it calls os.path.isfile(burst_database_file) and raises FileNotFoundError
-    *before* checking ``if burst_database_file is None`` (which would use
-    generate_geogrids without a DB).  We patch os.path.isfile within the
-    module to return False for None, and suppress the subsequent
-    FileNotFoundError so the None code-path is reached.
-    """
-    import compass.utils.geo_runconfig as _geocfg
-
-    if getattr(_geocfg, '_subsideo_patched', False):
-        return
-
-    _orig_load = _geocfg.GeoRunConfig.load_from_yaml.__func__
-
-    @classmethod
-    def _patched_load(cls, yaml_runconfig, workflow_name):
-        from compass.utils.runconfig import load_validate_yaml
-        from compass.utils.geo_grid import generate_geogrids, generate_geogrids_from_db
-        from compass.utils.runconfig import create_output_paths, runconfig_to_bursts
-        from compass.utils.wrap_namespace import wrap_namespace
-        import yaml as _yaml
-
-        cfg = load_validate_yaml(yaml_runconfig, workflow_name)
-        groups_cfg = cfg['runconfig']['groups']
-
-        burst_database_file = groups_cfg['static_ancillary_file_group']['burst_database_file']
-
-        # --- patched: skip isfile check when None ---
-        if burst_database_file is not None:
-            if not _geocfg.os.path.isfile(burst_database_file):
-                raise FileNotFoundError(f'{burst_database_file} not found')
-
-        geocoding_dict = groups_cfg['processing']['geocoding']
-        _geocfg.check_geocode_dict(geocoding_dict)
-
-        tec_file_path = groups_cfg['dynamic_ancillary_file_group']['tec_file']
-        if tec_file_path is not None:
-            from compass.utils.helpers import check_file_path
-            check_file_path(tec_file_path)
-
-        weather_model_path = groups_cfg['dynamic_ancillary_file_group']['weather_model_file']
-        if weather_model_path is not None:
-            from compass.utils.helpers import check_file_path
-            check_file_path(weather_model_path)
-
-        sns = wrap_namespace(groups_cfg)
-        bursts = runconfig_to_bursts(sns)
-
-        dem_file = groups_cfg['dynamic_ancillary_file_group']['dem_file']
-        if burst_database_file is None:
-            geogrids = generate_geogrids(bursts, geocoding_dict, dem_file)
-        else:
-            geogrids = generate_geogrids_from_db(
-                bursts, geocoding_dict, dem_file, burst_database_file
-            )
-
-        empty_ref_dict = {}
-        user_plus_default_yaml_str = _yaml.dump(cfg)
-        output_paths = create_output_paths(sns, bursts)
-
-        return cls(cfg['runconfig']['name'], sns, bursts, empty_ref_dict,
-                   user_plus_default_yaml_str, output_paths, geogrids)
-
-    _geocfg.GeoRunConfig.load_from_yaml = _patched_load
-    _geocfg._subsideo_patched = True
-
-
-def _patch_s1reader_numpy2_compat():
-    """Monkey-patch s1reader.s1_burst_slc.polyfit for numpy 2.x.
-
-    s1reader 0.2.5 uses ``%f`` string formatting on the residual array
-    returned by np.linalg.lstsq, which numpy >= 2.0 rejects with
-    ``TypeError: only 0-dimensional arrays can be converted to Python
-    scalars``.  We replace the polyfit function with a version that
-    calls ``.item()`` on the residual before formatting.
-    """
-    import s1reader.s1_burst_slc as _burst_mod
-
-    if getattr(_burst_mod, '_subsideo_numpy2_patched', False):
-        return
-
-    import numpy as np
-
-    # Re-implement polyfit with the single-line fix at the print statement.
-    # This is a copy of s1reader.s1_burst_slc.polyfit with line 97 fixed.
-    def _polyfit_fixed(x, y, z, azimuth_order, range_order,
-                       sig=None, snr=None, cond=1.0e-12, max_order=False):
-        big_order = max(azimuth_order, range_order)
-        arr_list = []
-        for ii in range(azimuth_order + 1):
-            for jj in range(range_order + 1):
-                xfact = np.power(x, ii) * np.power(y, jj)
-                if max_order:
-                    if (ii + jj) <= big_order:
-                        arr_list.append(xfact.reshape((x.size, 1)))
-                else:
-                    arr_list.append(xfact.reshape((x.size, 1)))
-
-        A = np.hstack(arr_list)
-        if sig is not None and snr is not None:
-            raise Exception("Only one of sig / snr can be provided")
-        if sig is not None:
-            snr = 1.0 + 1.0 / sig
-        if snr is not None:
-            A = A / snr[:, None]
-            z = z / snr
-
-        val, res, _, _ = np.linalg.lstsq(A, z, rcond=cond)
-        if len(res) > 0:
-            chi_sq = float(np.sqrt(res / (1.0 * len(z))).item())
-            print("Chi squared: %f" % chi_sq)
-        else:
-            print("No chi squared value....")
-            print("Try reducing rank of polynomial.")
-
-        coeffs = []
-        count = 0
-        for ii in range(azimuth_order + 1):
-            row = []
-            for jj in range(range_order + 1):
-                if max_order:
-                    if (ii + jj) <= big_order:
-                        row.append(val[count])
-                        count += 1
-                    else:
-                        row.append(0.0)
-                else:
-                    row.append(val[count])
-                    count += 1
-            coeffs.append(row)
-
-        return coeffs
-
-    _burst_mod.polyfit = _polyfit_fixed
-    _burst_mod._subsideo_numpy2_patched = True
-
-
-def _patch_burst_az_carrier_poly():
-    """Patch s1reader burst's get_az_carrier_poly to return isce3.core.Poly2d.
-
-    With numpy 2.x, pybind11 can no longer auto-convert list-of-lists to
-    isce3.core.Poly2d.  Wrap the return value explicitly.
-    """
-    import s1reader.s1_burst_slc as _burst_mod
-
-    if getattr(_burst_mod, '_subsideo_poly2d_patched', False):
-        return
-
-    _orig_method = _burst_mod.Sentinel1BurstSlc.get_az_carrier_poly
-
-    def _patched_get_az_carrier_poly(self, *args, **kwargs):
-        import numpy as np
-        import isce3
-        result = _orig_method(self, *args, **kwargs)
-        if isinstance(result, list):
-            return isce3.core.Poly2d(np.array(result, dtype=np.float64))
-        return result
-
-    _burst_mod.Sentinel1BurstSlc.get_az_carrier_poly = _patched_get_az_carrier_poly
-    _burst_mod._subsideo_poly2d_patched = True
-
-
 def run_cslc(
     safe_paths: list[Path],
     orbit_path: Path,
@@ -388,28 +217,6 @@ def run_cslc(
     # Invoke compass Python API (lazy import — conda-forge only)
     try:
         from compass.s1_cslc import run as compass_run
-
-        # Workaround for compass bug: GeoRunConfig.load_from_yaml calls
-        # os.path.isfile(burst_database_file) unconditionally, then raises
-        # FileNotFoundError — before the None check at line 101 that would
-        # use generate_geogrids() without a DB.  Monkey-patch load_from_yaml
-        # to skip the burst DB file check when it is None.
-        _patch_compass_burst_db_none_guard()
-
-        # Workaround for s1reader numpy 2.x incompatibility: polyfit uses
-        # ``%f`` formatting on a numpy array (res from lstsq), which numpy
-        # 2.0+ rejects.  Patch the print to use .item().
-        _patch_s1reader_numpy2_compat()
-
-        # Workaround for numpy 2.x: np.string_ was removed, use np.bytes_
-        import numpy as _np
-        if not hasattr(_np, 'string_'):
-            _np.string_ = _np.bytes_
-
-        # Workaround for numpy 2.x / isce3 pybind11 incompatibility:
-        # burst.get_az_carrier_poly() returns a list-of-lists that pybind11
-        # can no longer auto-convert to Poly2d.  Patch it to return Poly2d.
-        _patch_burst_az_carrier_poly()
 
         compass_run(run_config_path=str(runconfig_yaml), grid_type="geo")
         logger.info("compass CSLC processing complete")

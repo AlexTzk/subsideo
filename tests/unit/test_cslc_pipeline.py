@@ -123,11 +123,6 @@ def test_run_cslc_mocked(tmp_path: Path, mocker: MockerFixture) -> None:
     mock_module.run = _fake_compass_run
     mocker.patch.dict("sys.modules", {"compass": MagicMock(), "compass.s1_cslc": mock_module})
 
-    # Mock the numpy 2.x compatibility patches (they import real compass/s1reader)
-    mocker.patch("subsideo.products.cslc._patch_compass_burst_db_none_guard")
-    mocker.patch("subsideo.products.cslc._patch_s1reader_numpy2_compat")
-    mocker.patch("subsideo.products.cslc._patch_burst_az_carrier_poly")
-
     result = run_cslc(
         safe_paths=[tmp_path / "S1A.zip"],
         orbit_path=tmp_path / "orbit.EOF",
