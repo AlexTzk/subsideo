@@ -14,6 +14,7 @@ from pathlib import Path
 
 import geopandas as gpd
 from loguru import logger
+from shapely import wkt as _shapely_wkt
 from shapely.geometry import box
 
 from subsideo.utils.projections import utm_epsg_from_lon
@@ -170,3 +171,60 @@ def _find_column(columns: set[str], candidates: list[str]) -> str:
     raise KeyError(
         f"Could not find any of {candidates} in GeoJSON columns: {sorted(columns)}"
     )
+
+
+def query_bounds(
+    burst_id: str,
+    cache_dir: Path | None = None,
+) -> tuple[float, float, float, float]:
+    """Return ``(west, south, east, north)`` in degrees for a burst_id.
+
+    Used as the fallback path by
+    :func:`subsideo.validation.harness.bounds_for_burst` when
+    ``opera_utils.burst_frame_db`` does not recognise ``burst_id`` (EU
+    bursts are not in opera-utils' N.Am.-only DB).
+
+    The EU burst DB schema stores footprints as WKT in the
+    ``geometry_wkt`` column (no separate west/south/east/north columns —
+    see :data:`_CREATE_TABLE_SQL`); this helper re-parses the WKT via
+    shapely and returns the envelope.
+
+    Parameters
+    ----------
+    burst_id : str
+        JPL-format burst ID (e.g. ``"t117_249422_iw2"`` for an EU burst).
+    cache_dir : Path | None, default None
+        Override cache directory. Defaults to ``~/.subsideo``.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        ``(west, south, east, north)`` in WGS 84 degrees.
+
+    Raises
+    ------
+    ValueError
+        If the EU burst DB does not exist yet, or the burst_id is absent.
+    """
+    db_path = get_burst_db_path(cache_dir)
+    if not db_path.exists():
+        raise ValueError(
+            f"EU burst DB not built yet at {db_path}; run "
+            f"`subsideo.burst.db.build_burst_db(...)` first."
+        )
+
+    with sqlite3.connect(str(db_path)) as conn:
+        row = conn.execute(
+            "SELECT geometry_wkt FROM burst_id_map WHERE burst_id_jpl = ?",
+            (burst_id,),
+        ).fetchone()
+
+    if row is None:
+        raise ValueError(
+            f"Burst {burst_id!r} not in EU burst DB at {db_path}"
+        )
+
+    (geom_wkt,) = row
+    geom = _shapely_wkt.loads(geom_wkt)
+    west, south, east, north = geom.bounds
+    return float(west), float(south), float(east), float(north)
