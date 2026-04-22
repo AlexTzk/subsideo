@@ -5,9 +5,22 @@
 # pyproject.toml; no second pip install is required after env create.
 #
 # Sunset conditions (re-evaluate at each milestone):
-#   numpy<2.0           -> isce3 >= 0.26 + compass numpy-2 + s1reader numpy-2 all on conda-forge (ENV-02 sunset)
-#   rio-cogeo==6.0.0    -> subsideo baseline Python bumps to >=3.11 (v1.2 scope)
-#   tophu (conda-forge) -> dolphin >=0.43 makes tophu optional AND tophu ships to PyPI
+#   numpy<2.0            -> isce3 >= 0.26 + compass numpy-2 + s1reader numpy-2 all on conda-forge (ENV-02 sunset)
+#   rio-cogeo==6.0.0     -> subsideo baseline Python bumps to >=3.11 (v1.2 scope)
+#   scipy<1.13           -> compass >0.5.6 relaxes its scipy<1.13 metadata constraint upstream
+#   rioxarray<0.20       -> lifted together with numpy<2.0 (rioxarray 0.20+ requires numpy>=2)
+#   tophu (platform)     -> conda-forge publishes an osx-arm64 build (currently Linux-only on conda-forge)
+#
+# Tophu installation path (Phase 1 v1.1 decision, 2026-04-22):
+#   Linux (TrueNAS amd64 Ubuntu VM): conda-forge tophu=0.2.1 is installed alongside
+#     the rest of this env via `micromamba env create -f conda-env.yml`, THEN
+#     `micromamba install -n subsideo -c conda-forge tophu=0.2.1` as a follow-up.
+#     (Kept out of this manifest so macOS solves cleanly; see sunset condition above.)
+#   macOS (dev): tophu is pip-installed from GitHub upstream:
+#     `pip install git+https://github.com/isce-framework/tophu.git`
+#     (This matches current macOS dev env state — tophu 0.2.0 via pip.)
+#   Plan 01-02 tophu regression test MUST use `pytest.importorskip("tophu")` so
+#   the fresh-macOS install path passes; TrueNAS VM install path asserts the import.
 #
 name: subsideo
 channels:
@@ -22,25 +35,26 @@ dependencies:
   # identical; only the name differs. See Plan 01-09 Task 2 for details.
   #
   # -- Runtime ------------------------------------------------
-  - python=3.11
+  - python=3.12             # dist-s1 (every version) requires python>=3.12; rio-cogeo 6.0.0 supports >=3.10
   - numpy>=1.26,<2.0        # Phase 1 ENV-01/02 pin (removes 4 cslc.py monkey-patches)
-  - scipy>=1.14,<2
+  - scipy>=1.11,<1.13       # compass 0.5.6 declares scipy<1.13 — see sunset header
   - pip
 
   # -- SAR / InSAR core (conda-forge only; NEVER pip) ---------
-  - isce3=0.25.10
+  - isce3=0.25.8            # 0.25.10 not yet on conda-forge (latest available)
   - compass=0.5.6
   - s1reader=0.2.5
   - dolphin=0.42.5
-  - tophu=0.2.1             # research STACK §2 correction: conda-forge only (PyPI 404)
-  - snaphu-py=0.4.1
+  # tophu intentionally absent on this manifest line — see "Tophu installation path"
+  # in the header block above. Re-add here when conda-forge publishes osx-arm64.
+  - snaphu=0.4.1            # conda-forge package name is `snaphu` (not `snaphu-py`)
   - mintpy=1.6.3
   - dist-s1=2.0.14          # bump from 2.0.13 (per STATE.md Phase 1 corrections)
 
   # -- Raster / vector I/O ------------------------------------
   - gdal>=3.8
   - rasterio>=1.5,<2
-  - rioxarray>=0.22,<1
+  - rioxarray>=0.17,<0.20   # pre-0.20 supports numpy<2 — see sunset header
   - geopandas>=1.0,<2
   - shapely>=2.0,<3
   - pyproj>=3.7,<4
@@ -49,7 +63,7 @@ dependencies:
   - scikit-image>=0.24
 
   # -- DEM + orbits -------------------------------------------
-  - dem-stitcher>=2.5,<3
+  # dem-stitcher is PyPI-only — installed via the pip: layer below
   - sentineleof>=0.11,<1
 
   # -- Tropospheric correction --------------------------------
@@ -70,4 +84,5 @@ dependencies:
   # -- Pip layer (pure Python on top of conda) ----------------
   - pip:
       - -e .[validation,viz]
-      - rio-cogeo==6.0.0    # Phase 1 ENV-03 pin; 7.x drops Python 3.10
+      - rio-cogeo==6.0.0          # Phase 1 ENV-03 pin; 7.x drops Python 3.10
+      - "dem-stitcher>=2.5,<3"    # PyPI-only package (no conda-forge build)
