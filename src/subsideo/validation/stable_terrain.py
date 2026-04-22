@@ -32,7 +32,7 @@ module without the conda stack present.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeAlias
 
 import numpy as np
 from loguru import logger
@@ -44,8 +44,8 @@ if TYPE_CHECKING:
     from rasterio.crs import CRS as RasterioCRS  # noqa: N811
     from shapely.geometry.base import BaseGeometry
 
-    GeometryLike = BaseGeometry | GeoSeries
-    CRSLike = RasterioCRS | PyprojCRS | str | int
+    GeometryLike: TypeAlias = BaseGeometry | GeoSeries
+    CRSLike: TypeAlias = RasterioCRS | PyprojCRS | str | int
 
 WORLDCOVER_BARE_SPARSE_CLASS: int = 60  # ESA WorldCover v2 class code
 DEFAULT_SLOPE_MAX_DEG: float = 10.0
@@ -151,7 +151,7 @@ def build_stable_mask(
         )
         mask &= ~exclude
 
-    mask_bool = mask.astype(bool)
+    mask_bool: np.ndarray = np.asarray(mask, dtype=bool)
     n_valid = int(mask_bool.sum())
     logger.debug(
         "build_stable_mask: {} stable px (class_60={}, slope_ok={}, final={})",
@@ -204,4 +204,5 @@ def _buffered_geometry_mask(
         default_value=1,
         dtype="uint8",
     )
-    return raster.astype(bool)
+    result: np.ndarray = np.asarray(raster, dtype=bool)
+    return result
