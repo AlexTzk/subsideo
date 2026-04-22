@@ -32,10 +32,20 @@ module without the conda stack present.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 from loguru import logger
+
+if TYPE_CHECKING:
+    from affine import Affine
+    from geopandas import GeoSeries
+    from pyproj import CRS as PyprojCRS  # noqa: N811
+    from rasterio.crs import CRS as RasterioCRS  # noqa: N811
+    from shapely.geometry.base import BaseGeometry
+
+    GeometryLike = BaseGeometry | GeoSeries
+    CRSLike = RasterioCRS | PyprojCRS | str | int
 
 WORLDCOVER_BARE_SPARSE_CLASS: int = 60  # ESA WorldCover v2 class code
 DEFAULT_SLOPE_MAX_DEG: float = 10.0
@@ -46,11 +56,11 @@ DEFAULT_WATER_BUFFER_M: float = 500.0
 def build_stable_mask(
     worldcover: np.ndarray,
     slope_deg: np.ndarray,
-    coastline: Any | None = None,
-    waterbodies: Any | None = None,
+    coastline: GeometryLike | None = None,
+    waterbodies: GeometryLike | None = None,
     *,
-    transform: Any | None = None,
-    crs: Any | None = None,
+    transform: Affine | None = None,
+    crs: CRSLike | None = None,
     coast_buffer_m: float = DEFAULT_COAST_BUFFER_M,
     water_buffer_m: float = DEFAULT_WATER_BUFFER_M,
     slope_max_deg: float = DEFAULT_SLOPE_MAX_DEG,
@@ -154,10 +164,10 @@ def build_stable_mask(
 
 
 def _buffered_geometry_mask(
-    geometry: Any,
+    geometry: GeometryLike,
     *,
-    transform: Any,
-    crs: Any,
+    transform: Affine,
+    crs: CRSLike,
     shape: tuple[int, int],
     buffer_m: float,
 ) -> np.ndarray:
@@ -174,7 +184,7 @@ def _buffered_geometry_mask(
     from shapely.geometry.base import BaseGeometry
 
     if isinstance(geometry, BaseGeometry):
-        gs: Any = gpd.GeoSeries([geometry], crs=crs)
+        gs = gpd.GeoSeries([geometry], crs=crs)
     elif isinstance(geometry, gpd.GeoSeries):
         gs = geometry
     else:

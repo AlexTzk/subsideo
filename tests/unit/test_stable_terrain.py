@@ -84,7 +84,7 @@ def test_module_constants_match_cslc01_spec() -> None:
 
 def test_coast_buffer_excludes_ring() -> None:
     """Coastline through the raster center should exclude a band around it."""
-    gpd = pytest.importorskip("geopandas", reason="geopandas needed for coast buffer test")
+    pytest.importorskip("geopandas", reason="geopandas needed for coast buffer test")
     affine_mod = pytest.importorskip("affine", reason="affine needed for coast buffer test")
     pytest.importorskip("shapely", reason="shapely needed for coast buffer test")
     pytest.importorskip("rasterio", reason="rasterio needed for coast buffer test")
@@ -116,7 +116,7 @@ def test_coast_buffer_excludes_ring() -> None:
 
 def test_waterbody_buffer_excludes_ring() -> None:
     """A water polygon at the raster center should produce an exclusion ring."""
-    gpd = pytest.importorskip("geopandas", reason="geopandas needed for water buffer test")
+    pytest.importorskip("geopandas", reason="geopandas needed for water buffer test")
     affine_mod = pytest.importorskip("affine", reason="affine needed for water buffer test")
     pytest.importorskip("shapely", reason="shapely needed for water buffer test")
     pytest.importorskip("rasterio", reason="rasterio needed for water buffer test")
