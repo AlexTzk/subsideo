@@ -24,6 +24,8 @@
 # Resume-safe: each stage skips work if outputs already exist.
 import warnings; warnings.filterwarnings("ignore")
 
+EXPECTED_WALL_S = 5400   # Plan 01-07 supervisor AST-parses this constant (D-11)
+
 if __name__ == "__main__":
     import os
     import sqlite3
@@ -40,8 +42,22 @@ if __name__ == "__main__":
     from subsideo.data.orbits import fetch_orbit
     from subsideo.products.cslc import run_cslc
     from subsideo.products.disp import run_disp
+    from subsideo.validation.harness import (
+        bounds_for_burst,
+        bounds_for_mgrs_tile,
+        credential_preflight,
+        download_reference_with_retry,
+        ensure_resume_safe,
+        select_opera_frame_by_utc_hour,
+    )
 
     load_dotenv()
+
+    credential_preflight([
+        "CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET",
+        "EARTHDATA_USERNAME", "EARTHDATA_PASSWORD",
+        "EGMS_TOKEN",
+    ])
 
     # ── Configuration ────────────────────────────────────────────────────────
     BURST_ID = "t117_249422_iw2"
@@ -55,10 +71,10 @@ if __name__ == "__main__":
     DATE_START = "2021-01-01"
     DATE_END   = "2021-06-30"
 
-    # Burst footprint from opera-utils burst DB (Bologna city centre):
-    #   t117_249422_iw2 extent: lon [11.227, 12.402], lat [44.457, 44.785]
-    BURST_BBOX = (11.227, 44.457, 12.402, 44.785)
-    DEM_BBOX   = [11.05, 44.30, 12.55, 44.92]  # wider for DEM coverage
+    # Burst footprint via harness.bounds_for_burst (ENV-08 — no hand-coded
+    # numeric bounds literal). BURST_BBOX is unbuffered for STAC / ROI
+    # queries; DEM fetch (Stage 4) uses a wider buffered tuple.
+    BURST_BBOX = bounds_for_burst(BURST_ID, buffer_deg=0.0)
     EPSG = 32632  # UTM 32N (Bologna)
 
     OUT = Path("./eval-disp-egms")
@@ -74,9 +90,7 @@ if __name__ == "__main__":
     print(f"  Output dir : {OUT}")
 
     # ── Pre-flight checks ────────────────────────────────────────────────────
-    for key in ("CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET", "EGMS_TOKEN"):
-        if not os.environ.get(key):
-            raise SystemExit(f"{key} not set in environment or .env")
+    # Credentials already validated above via harness.credential_preflight.
     cdsapirc = Path.home() / ".cdsapirc"
     if not cdsapirc.exists():
         print("  WARN: ~/.cdsapirc not found -- ERA5 correction paths in MintPy will fail.")
@@ -302,7 +316,11 @@ if __name__ == "__main__":
         dem_path = existing_dem[0]
         print(f"  Already present: {dem_path.name}")
     else:
-        dem_path, _ = fetch_dem(bounds=DEM_BBOX, output_epsg=EPSG, output_dir=dem_dir)
+        dem_path, _ = fetch_dem(
+            bounds=list(bounds_for_burst(BURST_ID, buffer_deg=0.2)),
+            output_epsg=EPSG,
+            output_dir=dem_dir,
+        )
         print(f"  DEM: {dem_path.name}")
 
     # ── Stage 5: Burst database ──────────────────────────────────────────────
