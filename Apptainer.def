@@ -1,0 +1,27 @@
+# Apptainer.def -- subsideo v1.1 Singularity definition (Phase 1 ENV-10 / D-17)
+# Derives from the Docker image built via `docker build . -t subsideo:dev`.
+# Bootstrap fetches it from the local Docker daemon, so no registry push
+# is required to generate a .sif for HPC / Apptainer runtimes.
+#
+# Build:
+#     docker build . -t subsideo:dev
+#     apptainer build subsideo.sif Apptainer.def
+#
+# Run:
+#     apptainer run subsideo.sif pytest tests/unit -q
+Bootstrap: docker-daemon
+From: subsideo:dev
+
+%labels
+    maintainer subsideo-team
+    subsideo-milestone v1.1-phase1
+
+%environment
+    export LC_ALL=C.UTF-8
+    export MAMBA_DOCKERFILE_ACTIVATE=1
+
+%runscript
+    exec micromamba run -n base "$@"
+
+%test
+    micromamba run -n base pytest tests/unit -q
