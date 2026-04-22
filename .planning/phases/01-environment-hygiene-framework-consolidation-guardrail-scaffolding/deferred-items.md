@@ -47,3 +47,19 @@ none of the failing tests exercise those files.
 
 Candidate owner: Phase-specific plans for each area (DISP → Phase 4,
 DSWx → Phase 5, orbits → targeted fix).
+
+## Discovered in Plan 01-03
+
+### Pre-existing ruff violations in products/*.py
+
+- **Files:** `src/subsideo/products/{rtc,cslc,disp,dist,dswx}.py` — 31 ruff errors (mostly import-organisation I001, a few BLE001).
+- **Verified pre-existing:** `git stash && ruff check <files>` reports the same 31 errors before any 01-03 edits.
+- **Not fixed here:** 01-03 scope is `_mp.py` + configure_multiprocessing insertion + cslc.py patch removal. Touching unrelated imports would broaden the diff.
+- **Candidate owner:** a dedicated lint-sweep commit, or Phase 7 pre-release audit.
+
+### Pre-existing mypy missing-stub error for `requests`
+
+- **File:** `src/subsideo/_mp.py:75` and `src/subsideo/data/ionosphere.py:7` — `Library stubs not installed for "requests"`.
+- **Verified pre-existing:** `ionosphere.py` produces the identical error on clean checkout; `_mp.py` inherits the same typeshed-gap, unmitigated by `ignore_missing_imports = true` because `types-requests` is partially installed.
+- **Not fixed here:** Requires env change (add `types-requests` to dev deps) which is out of Plan 01-03 scope.
+- **Candidate owner:** a dedicated env-cleanup commit, or the mypy-strict cleanup sweep.

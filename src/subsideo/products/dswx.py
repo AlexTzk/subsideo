@@ -586,6 +586,11 @@ def run_dswx(cfg: DSWxConfig) -> DSWxResult:
     DSWxResult
         Processing result with output path and validation status.
     """
+    # ENV-04: configure multiprocessing BEFORE any subprocess or matplotlib import
+    from subsideo._mp import configure_multiprocessing
+
+    configure_multiprocessing()
+
     cfg.output_dir.mkdir(parents=True, exist_ok=True)
 
     try:

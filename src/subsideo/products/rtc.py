@@ -204,6 +204,11 @@ def run_rtc(
     RTCResult
         Processing result with output paths and validation status.
     """
+    # ENV-04: configure multiprocessing BEFORE any subprocess or matplotlib import
+    from subsideo._mp import configure_multiprocessing
+
+    configure_multiprocessing()
+
     cfg = RTCConfig(
         safe_file_paths=safe_paths,
         orbit_file_path=orbit_path,

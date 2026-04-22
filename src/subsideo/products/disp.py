@@ -444,6 +444,11 @@ def run_disp(
     DISPResult
         Pipeline result with velocity path, time-series paths, and QC info.
     """
+    # ENV-04: configure multiprocessing BEFORE any subprocess or matplotlib import
+    from subsideo._mp import configure_multiprocessing
+
+    configure_multiprocessing()
+
     if cdsapirc_path is None:
         cdsapirc_path = Path.home() / ".cdsapirc"
 

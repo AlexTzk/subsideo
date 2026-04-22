@@ -361,6 +361,11 @@ def run_cslc(
     CSLCResult
         Pipeline result with output paths, validation status, and errors.
     """
+    # ENV-04: configure multiprocessing BEFORE any subprocess or matplotlib import
+    from subsideo._mp import configure_multiprocessing
+
+    configure_multiprocessing()
+
     cfg = CSLCConfig(
         safe_file_paths=safe_paths,
         orbit_file_path=orbit_path,
