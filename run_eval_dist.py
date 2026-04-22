@@ -61,6 +61,8 @@
 # ---------------------------------------------------------------------------
 import warnings; warnings.filterwarnings("ignore")
 
+EXPECTED_WALL_S = 1800   # Plan 01-07 supervisor AST-parses this constant (D-11)
+
 if __name__ == "__main__":
     import json as _json
     import os
@@ -78,8 +80,18 @@ if __name__ == "__main__":
     from subsideo.products.dist import run_dist, validate_dist_product
     from subsideo._metadata import get_software_version, inject_opera_metadata
     from subsideo.validation.compare_dist import compare_dist
+    from subsideo.validation.harness import (
+        bounds_for_burst,
+        bounds_for_mgrs_tile,
+        credential_preflight,
+        download_reference_with_retry,
+        ensure_resume_safe,
+        select_opera_frame_by_utc_hour,
+    )
 
     load_dotenv()
+
+    credential_preflight(["EARTHDATA_USERNAME", "EARTHDATA_PASSWORD"])
 
     # -- Stage 0: Configuration & pre-flight ---------------------------------
     AOI_NAME = "Park Fire, California (2024)"
@@ -89,6 +101,9 @@ if __name__ == "__main__":
     # 10TFK sits directly over the Tehama/Butte burn scar centroid (-121.7, 40.0).
     # Track 115 (ascending, UTC ~14:15) has 88 RTC-S1 products in the lookup
     # (80 pre / 8 post) for post_date=2024-08-05 with buffer=5 days.
+    # ENV-08: dist_s1 auto-derives bounds from mgrs_tile_id (no hand-coded
+    # bounds literal here); harness.bounds_for_mgrs_tile is imported at
+    # module top for future phase-agnostic use.
     MGRS_TILE = "10TFK"
     TRACK_NUMBER = 115
     POST_DATE = "2024-08-05"       # ~12 days after July 24 ignition, allows DIST alert confirmation
@@ -119,10 +134,7 @@ if __name__ == "__main__":
     print(f"  Period     : {DATE_START} -> {DATE_END}")
     print(f"  Output dir : {OUT}")
 
-    # Pre-flight: credential checks
-    for key in ("EARTHDATA_USERNAME", "EARTHDATA_PASSWORD"):
-        if not os.environ.get(key):
-            raise SystemExit(f"{key} not set in environment or .env")
+    # Pre-flight credentials already validated above via harness.credential_preflight.
     print()
 
     # -- Stage 1: ASF DAAC + earthaccess auth --------------------------------

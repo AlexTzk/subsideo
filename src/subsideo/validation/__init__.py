@@ -3,6 +3,7 @@
 Re-exports the shared modules consumed by Phase 3 CSLC, Phase 4 DISP,
 and Plan 01-07 harness + supervisor + matrix_writer.
 """
+
 from __future__ import annotations
 
 from subsideo.validation.criteria import CRITERIA, Criterion
@@ -16,6 +17,13 @@ from subsideo.validation.harness import (
     ensure_resume_safe,
     select_opera_frame_by_utc_hour,
 )
+from subsideo.validation.matrix_schema import (
+    MetaJson,
+    MetricsJson,
+    ProductQualityResultJson,
+    ReferenceAgreementResultJson,
+)
+from subsideo.validation.matrix_writer import write_matrix
 from subsideo.validation.results import (
     ProductQualityResult,
     ReferenceAgreementResult,
@@ -31,9 +39,13 @@ from subsideo.validation.stable_terrain import build_stable_mask
 __all__ = [
     "CRITERIA",
     "Criterion",
+    "MetaJson",
+    "MetricsJson",
     "ProductQualityResult",
+    "ProductQualityResultJson",
     "RETRY_POLICY",
     "ReferenceAgreementResult",
+    "ReferenceAgreementResultJson",
     "ReferenceDownloadError",
     "bounds_for_burst",
     "bounds_for_mgrs_tile",
@@ -46,4 +58,5 @@ __all__ = [
     "measurement_key",
     "residual_mean_velocity",
     "select_opera_frame_by_utc_hour",
+    "write_matrix",
 ]

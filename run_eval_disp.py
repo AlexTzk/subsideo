@@ -16,6 +16,8 @@
 # Resume-safe: each stage skips work if outputs already exist.
 import warnings; warnings.filterwarnings("ignore")
 
+EXPECTED_WALL_S = 5400   # Plan 01-07 supervisor AST-parses this constant (D-11)
+
 if __name__ == "__main__":
     import os
     import sys
@@ -34,8 +36,21 @@ if __name__ == "__main__":
     from subsideo.products.disp import run_disp
     from subsideo.data.dem import fetch_dem
     from subsideo.data.orbits import fetch_orbit
+    from subsideo.validation.harness import (
+        bounds_for_burst,
+        bounds_for_mgrs_tile,
+        credential_preflight,
+        download_reference_with_retry,
+        ensure_resume_safe,
+        select_opera_frame_by_utc_hour,
+    )
 
     load_dotenv()
+
+    credential_preflight([
+        "CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET",
+        "EARTHDATA_USERNAME", "EARTHDATA_PASSWORD",
+    ])
 
     # ── Configuration ────────────────────────────────────────────────────────
     BURST_ID = "t144_308029_iw1"
@@ -45,10 +60,10 @@ if __name__ == "__main__":
     DATE_START = "2024-01-01"
     DATE_END   = "2024-06-30"
 
-    # Burst footprint from opera-utils burst DB (SoCal, Ventura/LA area)
-    # WGS84: (-119.48, 33.42) to (-118.52, 33.79)
-    BURST_BBOX = (-119.5, 33.4, -118.5, 33.8)
-    DEM_BBOX   = [-119.7, 33.2, -118.3, 34.0]  # wider for DEM coverage
+    # Burst footprint via harness.bounds_for_burst (ENV-08 — no hand-coded
+    # numeric bounds literal). BURST_BBOX is derived unbuffered for STAC /
+    # asf-search WKT queries; DEM fetch uses a wider buffered tuple.
+    BURST_BBOX = bounds_for_burst(BURST_ID, buffer_deg=0.0)
     EPSG = 32611  # UTM 11N
 
     OUT = Path("./eval-disp")
@@ -221,7 +236,7 @@ if __name__ == "__main__":
         print(f"  Already present: {dem_path.name}")
     else:
         dem_path, _ = fetch_dem(
-            bounds=DEM_BBOX,
+            bounds=list(bounds_for_burst(BURST_ID, buffer_deg=0.2)),
             output_epsg=EPSG,
             output_dir=dem_dir,
         )

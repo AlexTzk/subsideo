@@ -24,6 +24,8 @@
 # Resume-safe: each stage skips work if outputs already exist.
 import warnings; warnings.filterwarnings("ignore")
 
+EXPECTED_WALL_S = 900   # Plan 01-07 supervisor AST-parses this constant (D-11)
+
 if __name__ == "__main__":
     import json as _json
     import os
@@ -39,12 +41,30 @@ if __name__ == "__main__":
     from subsideo.products.dswx import run_dswx
     from subsideo.products.types import DSWxConfig
     from subsideo.validation.compare_dswx import compare_dswx
+    from subsideo.validation.harness import (
+        bounds_for_burst,
+        bounds_for_mgrs_tile,
+        credential_preflight,
+        download_reference_with_retry,
+        ensure_resume_safe,
+        select_opera_frame_by_utc_hour,
+    )
 
     load_dotenv()
 
+    credential_preflight([
+        "CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET",
+        "CDSE_S3_ACCESS_KEY", "CDSE_S3_SECRET_KEY",
+    ])
+
     # -- Configuration --------------------------------------------------------
+    # ENV-08: Lake Balaton sits inside MGRS-100km tile 33TXP (UTM 33N). The
+    # harness seed GeoJSON ships this tile; bounds_for_mgrs_tile returns a
+    # buffered (west, south, east, north) tuple suitable for the CDSE STAC
+    # search below -- no hand-coded AOI_BBOX literal here.
     AOI_NAME = "Lake Balaton, Hungary"
-    AOI_BBOX = (17.25, 46.70, 18.20, 47.00)  # lon_min, lat_min, lon_max, lat_max
+    MGRS_TILE = "33TXP"
+    AOI_BBOX = bounds_for_mgrs_tile(MGRS_TILE, buffer_deg=0.1)
     EPSG = 32633  # UTM 33N
 
     # JRC Monthly History LATEST only publishes through 2021, so the S2
@@ -68,6 +88,7 @@ if __name__ == "__main__":
     print("DSWx-S2 Validation: subsideo vs JRC Global Surface Water")
     print("=" * 70)
     print(f"  AOI        : {AOI_NAME}")
+    print(f"  MGRS tile  : {MGRS_TILE}")
     print(f"  BBox       : {AOI_BBOX}")
     print(f"  EPSG       : {EPSG}")
     print(f"  Period     : {DATE_START} -> {DATE_END}")
@@ -75,10 +96,7 @@ if __name__ == "__main__":
     print(f"  Output dir : {OUT}")
 
     # -- Pre-flight checks ----------------------------------------------------
-    for key in ("CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET",
-                "CDSE_S3_ACCESS_KEY", "CDSE_S3_SECRET_KEY"):
-        if not os.environ.get(key):
-            raise SystemExit(f"{key} not set in environment or .env")
+    # Credentials already validated above via harness.credential_preflight.
     print()
 
     # -- Stage 1: CDSE client -------------------------------------------------

@@ -4,6 +4,8 @@
 # ASF DAAC and runs the subsideo compass pipeline on burst t144_308029_iw1.
 import warnings; warnings.filterwarnings("ignore")
 
+EXPECTED_WALL_S = 2700   # Plan 01-07 supervisor AST-parses this constant (D-11)
+
 if __name__ == "__main__":
     import earthaccess
     from pathlib import Path
@@ -12,8 +14,18 @@ if __name__ == "__main__":
 
     from subsideo.products.cslc import run_cslc
     from subsideo.validation.compare_cslc import compare_cslc
+    from subsideo.validation.harness import (
+        bounds_for_burst,
+        bounds_for_mgrs_tile,
+        credential_preflight,
+        download_reference_with_retry,
+        ensure_resume_safe,
+        select_opera_frame_by_utc_hour,
+    )
 
     load_dotenv()
+
+    credential_preflight(["EARTHDATA_USERNAME", "EARTHDATA_PASSWORD"])
 
     # ── Shared inputs (already present from RTC eval) ─────────────────────────
     RTC_EVAL = Path("./eval-rtc")
