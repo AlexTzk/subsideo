@@ -1,0 +1,73 @@
+# conda-env.yml — subsideo v1.1 environment (Phase 1 ENV-01 / D-15)
+#
+# Install: `micromamba env create -f conda-env.yml`
+# The pip: layer installs subsideo editable + the validation/viz extras from
+# pyproject.toml; no second pip install is required after env create.
+#
+# Sunset conditions (re-evaluate at each milestone):
+#   numpy<2.0           -> isce3 >= 0.26 + compass numpy-2 + s1reader numpy-2 all on conda-forge (ENV-02 sunset)
+#   rio-cogeo==6.0.0    -> subsideo baseline Python bumps to >=3.11 (v1.2 scope)
+#   tophu (conda-forge) -> dolphin >=0.43 makes tophu optional AND tophu ships to PyPI
+#
+name: subsideo
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  # Env-name note: on the host (macOS dev / Linux TrueNAS), `micromamba env create
+  # -f conda-env.yml` creates an env literally named `subsideo` per the `name:`
+  # field above. Inside the Docker image built in Plan 01-09, `micromamba install
+  # -y -n base -f conda-env.yml` installs the same package set into the pre-
+  # existing `base` env supplied by mambaorg/micromamba — both envs are package-
+  # identical; only the name differs. See Plan 01-09 Task 2 for details.
+  #
+  # -- Runtime ------------------------------------------------
+  - python=3.11
+  - numpy>=1.26,<2.0        # Phase 1 ENV-01/02 pin (removes 4 cslc.py monkey-patches)
+  - scipy>=1.14,<2
+  - pip
+
+  # -- SAR / InSAR core (conda-forge only; NEVER pip) ---------
+  - isce3=0.25.10
+  - compass=0.5.6
+  - s1reader=0.2.5
+  - dolphin=0.42.5
+  - tophu=0.2.1             # research STACK §2 correction: conda-forge only (PyPI 404)
+  - snaphu-py=0.4.1
+  - mintpy=1.6.3
+  - dist-s1=2.0.14          # bump from 2.0.13 (per STATE.md Phase 1 corrections)
+
+  # -- Raster / vector I/O ------------------------------------
+  - gdal>=3.8
+  - rasterio>=1.5,<2
+  - rioxarray>=0.22,<1
+  - geopandas>=1.0,<2
+  - shapely>=2.0,<3
+  - pyproj>=3.7,<4
+  - xarray>=2024.11
+  - h5py>=3.12,<4
+  - scikit-image>=0.24
+
+  # -- DEM + orbits -------------------------------------------
+  - dem-stitcher>=2.5,<3
+  - sentineleof>=0.11,<1
+
+  # -- Tropospheric correction --------------------------------
+  - pyaps3>=0.3.6
+  - cdsapi
+
+  # -- Dev + test --------------------------------------------
+  - pytest>=8
+  - pytest-cov
+  - pytest-mock
+  - ruff
+  - mypy
+  - pre-commit
+
+  # -- Ops (Phase 1 watchdog stack dumps; D-13) ---------------
+  - py-spy=0.4.1
+
+  # -- Pip layer (pure Python on top of conda) ----------------
+  - pip:
+      - -e .[validation,viz]
+      - rio-cogeo==6.0.0    # Phase 1 ENV-03 pin; 7.x drops Python 3.10
