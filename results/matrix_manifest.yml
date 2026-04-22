@@ -1,0 +1,97 @@
+# results/matrix_manifest.yml -- subsideo v1.1 results matrix registry.
+#
+# Hand-edited list of 10 cells (5 products x 2 regions). The matrix writer
+# (src/subsideo/validation/matrix_writer.py) reads this manifest + the
+# per-cell metrics.json + meta.json sidecars and NEVER globs CONCLUSIONS_*.md
+# (PITFALLS R3 / R5). `conclusions_doc` fields are informational only --
+# they point the human reader at the narrative document but are not parsed.
+#
+# Schema version: 1. Bump if adding required fields.
+#
+# Scripts referenced but not yet present at repo root (created by later phases):
+#   run_eval_rtc_eu.py      -- Phase 2
+#   run_eval_cslc_eu.py     -- Phase 3
+#   run_eval_dswx_nam.py    -- Phase 6
+# Missing sidecars render as RUN_FAILED in matrix.md (ENV-09 per-cell isolation).
+
+schema_version: 1
+cells:
+  # --- RTC ---
+  - product: rtc
+    region: nam
+    eval_script: run_eval.py
+    cache_dir: eval-rtc
+    metrics_file: eval-rtc/metrics.json
+    meta_file: eval-rtc/meta.json
+    conclusions_doc: CONCLUSIONS_N_AM.md
+  - product: rtc
+    region: eu
+    eval_script: run_eval_rtc_eu.py
+    cache_dir: eval-rtc-eu
+    metrics_file: eval-rtc-eu/metrics.json
+    meta_file: eval-rtc-eu/meta.json
+    conclusions_doc: CONCLUSIONS_RTC_EU.md
+
+  # --- CSLC ---
+  - product: cslc
+    region: nam
+    eval_script: run_eval_cslc.py
+    cache_dir: eval-cslc
+    metrics_file: eval-cslc/metrics.json
+    meta_file: eval-cslc/meta.json
+    conclusions_doc: CONCLUSIONS_CSLC_N_AM.md
+  - product: cslc
+    region: eu
+    eval_script: run_eval_cslc_eu.py
+    cache_dir: eval-cslc-eu
+    metrics_file: eval-cslc-eu/metrics.json
+    meta_file: eval-cslc-eu/meta.json
+    conclusions_doc: CONCLUSIONS_CSLC_EU.md
+
+  # --- DISP ---
+  - product: disp
+    region: nam
+    eval_script: run_eval_disp.py
+    cache_dir: eval-disp
+    metrics_file: eval-disp/metrics.json
+    meta_file: eval-disp/meta.json
+    conclusions_doc: CONCLUSIONS_DISP_N_AM.md
+  - product: disp
+    region: eu
+    eval_script: run_eval_disp_egms.py
+    cache_dir: eval-disp_egms
+    metrics_file: eval-disp_egms/metrics.json
+    meta_file: eval-disp_egms/meta.json
+    conclusions_doc: CONCLUSIONS_DISP_EU.md
+
+  # --- DIST ---
+  - product: dist
+    region: nam
+    eval_script: run_eval_dist.py
+    cache_dir: eval-dist
+    metrics_file: eval-dist/metrics.json
+    meta_file: eval-dist/meta.json
+    conclusions_doc: CONCLUSIONS_DIST_N_AM.md
+  - product: dist
+    region: eu
+    eval_script: run_eval_dist_eu.py
+    cache_dir: eval-dist_eu
+    metrics_file: eval-dist_eu/metrics.json
+    meta_file: eval-dist_eu/meta.json
+    conclusions_doc: CONCLUSIONS_DIST_EU.md
+
+  # --- DSWx ---
+  - product: dswx
+    region: nam
+    eval_script: run_eval_dswx_nam.py
+    cache_dir: eval-dswx_nam
+    metrics_file: eval-dswx_nam/metrics.json
+    meta_file: eval-dswx_nam/meta.json
+    conclusions_doc: CONCLUSIONS_DSWX_N_AM.md
+  - product: dswx
+    region: eu
+    eval_script: run_eval_dswx.py
+    cache_dir: eval-dswx
+    metrics_file: eval-dswx/metrics.json
+    meta_file: eval-dswx/meta.json
+    conclusions_doc: CONCLUSIONS_DSWX.md
