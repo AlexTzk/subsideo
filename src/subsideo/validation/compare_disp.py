@@ -283,6 +283,9 @@ def compare_disp_egms_l2a(
 
     with rasterio.open(velocity_path) as src:
         raster_crs = src.crs
+        # Capture nodata while the dataset is still open; accessing src.nodata
+        # after the ``with`` block exits raises RasterioIOError (CR-01).
+        nodata = src.nodata
         points_proj = points.to_crs(raster_crs)
 
         # Clip to raster bounds before sampling to avoid wasted I/O
@@ -316,7 +319,6 @@ def compare_disp_egms_l2a(
         xy = list(zip(points_in.geometry.x, points_in.geometry.y, strict=True))
         sampled = np.array([v[0] for v in src.sample(xy)], dtype=np.float64)
 
-    nodata = src.nodata if src.nodata is not None else None
     if nodata is not None:
         sampled = np.where(sampled == nodata, np.nan, sampled)
 
