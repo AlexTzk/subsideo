@@ -297,11 +297,6 @@ class TestMetadataInjectionInCSLC:
             "compass.s1_cslc": mock_module,
         })
 
-        # Mock numpy 2.x compatibility patches (they import real compass/s1reader)
-        mocker.patch("subsideo.products.cslc._patch_compass_burst_db_none_guard")
-        mocker.patch("subsideo.products.cslc._patch_s1reader_numpy2_compat")
-        mocker.patch("subsideo.products.cslc._patch_burst_az_carrier_poly")
-
         mock_inject = mocker.patch("subsideo._metadata.inject_opera_metadata")
 
         from subsideo.products.cslc import run_cslc
