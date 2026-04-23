@@ -5,6 +5,14 @@
 **Phase:** 2 (RTC-S1 EU Validation)
 **Decision:** D-01 (probe artifact) + D-03 (5-regime fixed list) + D-04 (Claude drafts; user reviews).
 
+## User Approval
+
+- **Status:** `approved-as-drafted`
+- **Approved on:** 2026-04-23T05:58:39Z
+- **Approved by:** user (via `/gsd-execute-phase` 2 checkpoint)
+- **Scope:** 5 AOI rows approved for Plan 02-04 consumption; concrete `burst_id` values derived downstream via `opera_utils.get_burst_id` (fresh-download regimes) or SAFE inspection of cached Phase 1 inputs (TemperateFlat / Fire).
+- **Auditable provenance:** This approval line is the canonical record that Plan 02-04 consumed user-greenlit bursts. No AOI edits, no probe re-run, no rework required.
+
 ## Regime Coverage (Claude-drafted; requires user review per D-04)
 
 | # | regime | label | centroid_lat | expected_max_relief_m | opera_rtc_granules_2024_2025 | best_match_sensing_utc | best_match_granule | cached_safe | burst_id (fill-in) |
