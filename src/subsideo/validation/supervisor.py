@@ -214,6 +214,27 @@ def run(script_path: Path, cache_dir: Path | None = None) -> int:
         Child process's return code on clean exit, or
         :data:`TIMEOUT_EXIT_CODE` (124) on watchdog abort.
     """
+    # WR-10: validate script path before spawning a subprocess so a caller
+    # cannot trick the supervisor into executing arbitrary files via
+    # ``python -m subsideo.validation.supervisor /tmp/evil.py`` (T-07-01). The
+    # naming-convention check is a warning rather than a hard stop so that
+    # test fixtures and ad-hoc diagnostic scripts still work, but the
+    # file-exists / not-a-symlink checks refuse to execute anything that
+    # would let a share-dir attacker substitute a symlinked payload.
+    if not script_path.is_file():
+        raise SystemExit(
+            f"supervisor: {script_path} is not a regular file"
+        )
+    if script_path.is_symlink():
+        raise SystemExit(
+            f"supervisor: {script_path} is a symlink; refusing to execute"
+        )
+    if not script_path.name.startswith("run_eval"):
+        logger.warning(
+            "supervisor: {} does not match run_eval_*.py naming convention",
+            script_path,
+        )
+
     expected_wall = _parse_expected_wall_s(script_path)
     cache_dir = cache_dir if cache_dir is not None else _cache_dir_from_script(script_path)
     logger.info(
