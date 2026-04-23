@@ -6,7 +6,7 @@ tags:
   - research-artifact
   - burst-selection
   - conclusions-template
-  - checkpoint-pending
+  - checkpoint-resolved
 dependency_graph:
   requires:
     - Phase 1 harness (bounds_for_burst, select_opera_frame_by_utc_hour, credential_preflight)
@@ -17,7 +17,7 @@ dependency_graph:
     - Committed probe script (scripts/probe_rtc_eu_candidates.py)
     - Committed probe artifact (.planning/milestones/v1.1-research/rtc_eu_burst_candidates.md)
     - Committed CONCLUSIONS_RTC_EU.md template shell
-    - 5-regime Claude-drafted burst candidate list awaiting user review (D-04)
+    - 5-regime Claude-drafted burst candidate list, user-approved as-drafted (D-04 resolved 2026-04-23)
   affects:
     - Plan 02-04 (run_eval_rtc_eu.py) consumes the probe artifact's BURSTS list
     - Plan 02-05 populates CONCLUSIONS_RTC_EU.md placeholders post-eval
@@ -36,24 +36,25 @@ key-files:
     - CONCLUSIONS_RTC_EU.md
   modified: []
 decisions:
-  - "Claude drafted five regime AOI bboxes (Alpine Valtellina / Scandinavian Norrbotten / Iberian Meseta / Bologna Po plain / Portugal Aveiro-Viseu) per D-04; user review pending at checkpoint."
+  - "Claude drafted five regime AOI bboxes (Alpine Valtellina / Scandinavian Norrbotten / Iberian Meseta / Bologna Po plain / Portugal Aveiro-Viseu) per D-04; user approved as-drafted at 2026-04-23T05:58:39Z."
   - "Probe script committed with static fallback artifact so plan is complete even without live Earthdata credentials; re-running populates live ASF counts."
   - "CONCLUSIONS §2.1 Target Bursts uses uniform placeholder convention across all 5 rows -- no hardcoded burst_id (row 4 WARNING fix)."
+  - "User checkpoint resolved 2026-04-23 via approve-as-drafted; 5 AOI rows locked for Plan 02-04 consumption; unblocks downstream run_eval_rtc_eu.py BURSTS list."
 metrics:
-  duration_minutes: 6
+  duration_minutes: 7
   completed_date: "2026-04-23"
-  tasks_completed: 2
+  tasks_completed: 3
   tasks_total: 3
   files_created: 3
-  commits: 2
-status: checkpoint-pending-user-review
+  commits: 3
+status: complete
 ---
 
 # Phase 2 Plan 02: RTC-EU Burst Probe + CONCLUSIONS Template Summary
 
-**Status:** Checkpoint pending. Probe artifact + CONCLUSIONS template shell committed; awaiting user approve/approve-with-edits/needs-rework signal on the 5-regime Claude-drafted burst candidate list before Plan 02-04 writes `run_eval_rtc_eu.py::BURSTS`.
+**Status:** Complete. Checkpoint resolved 2026-04-23 via `approve-as-drafted`; unblocks Plan 02-04. Probe artifact, CONCLUSIONS template shell, and user approval record all committed; 5-regime burst candidate list is locked for downstream `run_eval_rtc_eu.py::BURSTS` consumption.
 
-**One-liner:** Committed a re-runnable ASF + earthaccess probe script, a git-auditable Claude-drafted 5-regime candidate artifact (Alpine / Scandinavian / Iberian / TemperateFlat / Fire), and the CONCLUSIONS_RTC_EU.md shell mirroring v1.0 RTC structure + §5a Terrain-Regime Coverage + §5b Investigation Findings sections.
+**One-liner:** Committed a re-runnable ASF + earthaccess probe script, a git-auditable Claude-drafted 5-regime candidate artifact (Alpine / Scandinavian / Iberian / TemperateFlat / Fire), the CONCLUSIONS_RTC_EU.md shell mirroring v1.0 RTC structure + §5a Terrain-Regime Coverage + §5b Investigation Findings sections, and a user-approval provenance line in the candidates artifact.
 
 ## Commits
 
@@ -61,14 +62,15 @@ status: checkpoint-pending-user-review
 |---|------|--------|-------|
 | 1 | Probe script + Claude-drafted candidates markdown | `56505d9` | `scripts/probe_rtc_eu_candidates.py`, `.planning/milestones/v1.1-research/rtc_eu_burst_candidates.md` |
 | 3 | CONCLUSIONS_RTC_EU.md template shell | `b2a4cb6` | `CONCLUSIONS_RTC_EU.md` |
+| 2 | User approval record (checkpoint resolution) | `da7f7a7` | `.planning/milestones/v1.1-research/rtc_eu_burst_candidates.md` |
 
-(Task 2 is the human-verify checkpoint -- no commit; awaiting user signal.)
+Task ordering note: Task 3 committed ahead of Task 2 per the orchestrator's pre-checkpoint `<checkpoint_guidance>` (see "Execution Order Note" below). Task 2's commit captures the `approve-as-drafted` user signal returned after the checkpoint paused the original agent.
 
 ## Execution Order Note
 
 The plan's task order (1 auto, 2 checkpoint, 3 auto) had an internal inconsistency: Task 2's `what-built` section lists CONCLUSIONS_RTC_EU.md as committed at checkpoint time, but the CONCLUSIONS file is created by Task 3 (after the checkpoint in source-code ordering). The orchestrator's per-worktree `<checkpoint_guidance>` explicitly called for both artifacts to land before the checkpoint. We resolved this by running tasks 1 → 3 → checkpoint so the user has all three artifacts (probe script, probe artifact, CONCLUSIONS shell) available for review when the checkpoint returns.
 
-## Candidate Bursts (D-04 draft; user reviews at checkpoint)
+## Candidate Bursts (D-04, user-approved as-drafted 2026-04-23)
 
 | # | regime | label | centroid_lat | expected_max_relief_m | cached? | cached_source |
 |---|--------|-------|--------------|-----------------------|---------|---------------|
@@ -112,14 +114,15 @@ No other deviations. Plan executed as written with the two blocking-issue auto-f
 
 None hit. Task 1's probe script detects missing EARTHDATA credentials gracefully (`main()` returns exit 1 with a clear error message) but is not invoked as part of plan execution; the plan explicitly commits a static initial probe artifact so plan completion does not depend on live credentials. Users can run `micromamba run -n subsideo python scripts/probe_rtc_eu_candidates.py` after `.env` configuration to overwrite the artifact with live counts.
 
-## Checkpoint Return
+## Checkpoint Resolution
 
-**Type:** decision (despite the plan's `checkpoint:human-verify` label, the orchestrator's per-worktree prompt classifies this as a `decision` checkpoint -- the user must approve/edit/rework the Claude-drafted 5-burst list before Plan 02-04 consumes it).
+**Type:** decision (despite the plan's `checkpoint:human-verify` label, the orchestrator's per-worktree prompt classified this as a `decision` checkpoint -- user approval of the Claude-drafted 5-burst list was required before Plan 02-04 could consume it).
 
-**Awaiting:** user signal from one of:
-- `approve-as-drafted` -- Claude's 5 regime AOI drafts acceptable; Plan 02-04 derives concrete burst_ids from the probe (live) or SAFE inspection.
-- `approve-with-edits` -- user makes inline edits to `.planning/milestones/v1.1-research/rtc_eu_burst_candidates.md`; Plan 02-04 reads the edited file.
-- `needs-rework` -- a regime has no OPERA coverage or fails terrain diversity; revise probe CANDIDATES table and re-commit.
+**Resolved on:** 2026-04-23T05:58:39Z
+
+**User signal:** `approve-as-drafted` -- Claude's 5 regime AOI drafts accepted as-is; no AOI edits, no probe re-run, no rework. Plan 02-04 derives concrete burst_ids from the probe (live) or SAFE inspection at execution time.
+
+**Provenance record:** `.planning/milestones/v1.1-research/rtc_eu_burst_candidates.md` §User Approval (committed as `da7f7a7`) is the canonical audit line for downstream plans referencing this decision.
 
 ## Hand-off to Plan 02-04
 
@@ -130,15 +133,16 @@ None hit. Task 1's probe script detects missing EARTHDATA credentials gracefully
 
 ## Self-Check
 
-Files claimed to be created:
+Files claimed to be created/modified:
 - `scripts/probe_rtc_eu_candidates.py` -- FOUND
-- `.planning/milestones/v1.1-research/rtc_eu_burst_candidates.md` -- FOUND
+- `.planning/milestones/v1.1-research/rtc_eu_burst_candidates.md` -- FOUND (approval section appended in commit `da7f7a7`)
 - `CONCLUSIONS_RTC_EU.md` -- FOUND
-- `.planning/phases/02-rtc-s1-eu-validation/02-02-SUMMARY.md` -- this file (to be committed next)
+- `.planning/phases/02-rtc-s1-eu-validation/02-02-SUMMARY.md` -- FOUND (finalized in this session)
 
 Commits claimed:
-- `56505d9` -- FOUND (Task 1)
-- `b2a4cb6` -- FOUND (Task 3)
+- `56505d9` -- FOUND (Task 1: probe script + Claude-drafted candidates)
+- `b2a4cb6` -- FOUND (Task 3: CONCLUSIONS_RTC_EU.md shell)
+- `da7f7a7` -- FOUND (Task 2: user approval record, checkpoint resolution)
 
 Plan-level verification:
 - `test -f` for all 3 artifacts: PASS
@@ -146,5 +150,8 @@ Plan-level verification:
 - Probe ruff: PASS
 - 5 regime rows in probe artifact: PASS
 - §5a + §5b sections in CONCLUSIONS: PASS
+- User Approval section present in candidates artifact: PASS
+- tasks_completed = tasks_total = 3: PASS
+- status: complete: PASS
 
 ## Self-Check: PASSED
