@@ -16,7 +16,8 @@ own entries when it lands (EFFIS precision/recall, DSWx recalibration F1).
 Coverage:
   9 v1.0 BINDING (RTC x2, CSLC amplitude x2, DISP x2, DIST x2, DSWx x1)
   4 v1.1 CALIBRATING (CSLC self-consistency x2, DISP self-consistency x2)
- = 13 total.
+  2 v1.1 INVESTIGATION_TRIGGER (RTC-EU Phase 2 D-13: RMSE, r -- NOT gates)
+ = 15 total.
 """
 from __future__ import annotations
 
@@ -31,7 +32,7 @@ class Criterion:
     name: str
     threshold: float
     comparator: Literal[">", ">=", "<", "<="]
-    type: Literal["BINDING", "CALIBRATING"]
+    type: Literal["BINDING", "CALIBRATING", "INVESTIGATION_TRIGGER"]
     binding_after_milestone: str | None
     rationale: str
 
@@ -53,6 +54,35 @@ CRITERIA: dict[str, Criterion] = {
         rationale=(
             "OPERA RTC-S1 cross-version correlation, hardcoded v1.0 "
             "compare_rtc.py:70; inherited unchanged."
+        ),
+    ),
+    # -- RTC-EU INVESTIGATION triggers (Phase 2 D-13) --
+    # NOT gates. Non-gate markers flagging per-burst deviations that warrant
+    # a structured CONCLUSIONS_RTC_EU.md investigation sub-section (D-14).
+    # MUST NOT be used to tighten BINDING rtc.rmse_db_max/rtc.correlation_min
+    # (RTC-02 explicit).
+    "rtc.eu.investigation_rmse_db_min": Criterion(
+        name="rtc.eu.investigation_rmse_db_min", threshold=0.15, comparator=">=",
+        type="INVESTIGATION_TRIGGER", binding_after_milestone=None,
+        rationale=(
+            "EU RTC per-burst investigation trigger (~3x N.Am. baseline "
+            "0.045 dB); still well below BINDING rtc.rmse_db_max (0.5 dB). "
+            "NOT a gate -- triggers a CONCLUSIONS_RTC_EU.md investigation "
+            "sub-section per D-14 when a burst meets or exceeds this RMSE. "
+            "RTC-02: reference-agreement gates never tighten based on per-"
+            "burst scores (PITFALLS M1 target-creep prevention)."
+        ),
+    ),
+    "rtc.eu.investigation_r_max": Criterion(
+        name="rtc.eu.investigation_r_max", threshold=0.999, comparator="<",
+        type="INVESTIGATION_TRIGGER", binding_after_milestone=None,
+        rationale=(
+            "EU RTC per-burst investigation trigger (1 order of magnitude "
+            "below N.Am. baseline r = 0.9999); still above BINDING "
+            "rtc.correlation_min (0.99). Catches structural disagreement "
+            "(geometric shift, mis-registration) that RMSE may miss. "
+            "NOT a gate -- D-14 CONCLUSIONS investigation trigger. "
+            "RTC-02: criteria never tighten."
         ),
     ),
     # -- CSLC amplitude BINDING (v1.0 compare_cslc.py:174-183) --
@@ -211,3 +241,11 @@ def dist_accuracy_min() -> Criterion:
 
 def dswx_f1_min() -> Criterion:
     return CRITERIA["dswx.f1_min"]
+
+
+def rtc_eu_investigation_rmse_db_min() -> Criterion:
+    return CRITERIA["rtc.eu.investigation_rmse_db_min"]
+
+
+def rtc_eu_investigation_r_max() -> Criterion:
+    return CRITERIA["rtc.eu.investigation_r_max"]
