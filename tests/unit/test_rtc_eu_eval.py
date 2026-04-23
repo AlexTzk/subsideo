@@ -44,9 +44,12 @@ def test_bursts_literal_exists(script_ast: ast.Module) -> None:
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id == "BURSTS":
                     bursts_list = node.value
-        if isinstance(node, ast.AnnAssign):
-            if isinstance(node.target, ast.Name) and node.target.id == "BURSTS":
-                bursts_list = node.value
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "BURSTS"
+        ):
+            bursts_list = node.value
     assert bursts_list is not None, "BURSTS not assigned at module level"
     assert isinstance(bursts_list, (ast.List, ast.Tuple)), (
         f"BURSTS must be a list/tuple literal, got {type(bursts_list).__name__}"
@@ -162,19 +165,46 @@ def test_no_hand_coded_bounds_outside_bursts(script_src: str) -> None:
 
     Bounds come from ``bounds_for_burst(cfg.burst_id, ...)``. The test
     checks the script does NOT contain a ``BBOX = (...)`` assignment at
-    module level with float literals, which was the v1.0 anti-pattern.
+    module level or inside the main guard's top-level body with float
+    literals, which was the v1.0 anti-pattern. Nested assignments inside
+    helper functions (``bounds = bounds_for_burst(...)`` inside
+    ``process_burst``) are fine -- they derive from the harness.
     """
     tree = ast.parse(script_src)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id.upper() in (
-                    "BBOX", "AOI", "BOUNDS", "AOI_BBOX"
+    # Collect candidate "outer" bodies: module-level + `if __name__ == '__main__':`
+    # top-level body (which houses BURSTS and the main loop). Do NOT descend
+    # into FunctionDef/AsyncFunctionDef/ClassDef scopes -- nested assignments
+    # derived from harness calls are valid.
+    outer_bodies: list[list[ast.stmt]] = [tree.body]
+    for node in tree.body:
+        if isinstance(node, ast.If):
+            outer_bodies.append(node.body)
+            outer_bodies.append(node.orelse)
+
+    for body in outer_bodies:
+        for stmt in body:
+            if not isinstance(stmt, ast.Assign):
+                continue
+            for target in stmt.targets:
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id.upper() in ("BBOX", "AOI", "BOUNDS", "AOI_BBOX")
+                    and _is_literal_tuple_of_floats(stmt.value)
                 ):
                     pytest.fail(
                         f"Found hand-coded bounds {target.id} = ... at module level; "
                         f"ENV-08 requires bounds_for_burst()"
                     )
+
+
+def _is_literal_tuple_of_floats(node: ast.expr) -> bool:
+    """True iff ``node`` is a tuple/list literal of numeric constants."""
+    if not isinstance(node, (ast.Tuple, ast.List)):
+        return False
+    return all(
+        isinstance(e, ast.Constant) and isinstance(e.value, (int, float))
+        for e in node.elts
+    )
 
 
 def test_script_syntax_valid(script_src: str) -> None:
