@@ -158,6 +158,117 @@ the OPERA reference-fetch stage. Two root causes surfaced:
 Cross-Cell Cache Status below). That cell also expects a cold download. No change in plan
 footprint — D-02 was already known to be a best-effort optimisation.
 
+## Task 2 Debug: SAFE-Selection Fix (2026-04-23T11:20-11:30Z)
+
+Third live-eval attempt (2026-04-23T11:06Z) failed on all bursts with
+opera-rtc's `ValueError: Could not find any of the burst IDs in the provided
+safe files` at `rtc/runconfig.py:311`. First two bursts (Alpine, Scandinavian)
+both hit `run_rtc → RunConfig.load_from_yaml → runconfig_to_bursts` and
+re-raised. Iberian was mid-download when orchestrator killed the job.
+
+### Deviation 3 (Rule 1 - Bug): ASF SAFE-selection heuristic picks wrong slice
+
+**Root cause:** The `process_burst` Stage-2 code selected the ASF SAFE whose
+`startTime` was closest (by absolute delta) to `cfg.sensing_time`. S1 IW SLC
+slices are ~28 s long and adjacent slices overlap by ~2 s at their boundaries,
+so burst-to-slice membership is NOT a function of start-time proximity — it
+depends on the burst's internal `sensingTime` annotation against the slice's
+[start, stop] window, and for bursts at boundaries the "closest start" can be
+the *next* slice rather than the containing one.
+
+**Evidence (Alpine, t066_140413_iw1, cfg.sensing_time=2024-05-02T05:35:47Z):**
+
+| SAFE | start | stop | closest-start delta | contains sensing? | source? |
+|------|-------|------|---------------------|-------------------|---------|
+| ..._053815_053842_9D79 (picked by buggy heuristic) | 05:38:15 | 05:38:42 | 2m28s | NO | NO |
+| ..._053545_053612_5B4B (correct: OPERA InputGranules) | 05:35:45 | 05:36:12 | 2s | YES | YES |
+| ..._053520_053547_100B | 05:35:20 | 05:35:47 | 27s | boundary | NO |
+
+Three candidate SAFEs bracket the sensing time; only InputGranules
+disambiguates unambiguously.
+
+**Probe of all 5 bursts** (`/tmp/probe_asf_all.py` + `/tmp/probe_opera_source_all.py`)
+shows the heuristic also misfires for Scandinavian and Iberian, and
+accidentally picks correctly only for TemperateFlat and Fire.
+
+**Fix:** In `process_burst`, always call the OPERA CMR search (even on warm
+re-runs where the .tif is already cached), then extract the canonical source
+SAFE from `chosen.umm.InputGranules[0]`. Resolve the ASF product via
+`asf.search(granule_list=[source_granule], processingLevel="SLC")`. A
+containment-based fallback (plus midpoint tie-break) remains in place for the
+unlikely case where `InputGranules` does not carry an `S1*_SLC_*` entry.
+
+The OPERA CMR query is ~150 ms — negligible relative to the 5-burst pipeline
+runtime. The .tif download logic is untouched; only the SAFE resolution path
+changed. Per-run cost: one extra CMR lookup per burst.
+
+**Mapping verified via `/tmp/probe_opera_source_all.py`:**
+
+| # | regime | burst_id | OPERA.InputGranules[0] |
+|---|--------|----------|------------------------|
+| 1 | Alpine | t066_140413_iw1 | ..._20240502T053545_...T053612_...5B4B |
+| 2 | Scandinavian | t058_122828_iw3 | ..._20240501T160706_...T160734_...706A |
+| 3 | Iberian | t103_219329_iw1 | ..._20240504T180321_...T180348_...DC12 |
+| 4 | TemperateFlat | t117_249422_iw2 | ..._20240505T170658_...T170725_...0A8A |
+| 5 | Fire | t045_094744_iw3 | ..._20240512T183613_...T183640_...AE7B |
+
+All five bursts resolve unambiguously.
+
+**Files modified:** `run_eval_rtc_eu.py` (lines 264-418; 136 insertions, 76 deletions)
+**Commit:** `a2a80b5`
+
+### Smoke Test
+
+One-burst dry-run for Alpine (`/tmp/smoke_alpine.py`, log `/tmp/smoke_alpine.log`):
+
+```
+[SMOKE] InputGranules: ['S1A_IW_SLC__1SDV_20240502T053545_20240502T053612_053688_06856B_5B4B']
+[SMOKE] source_granule: 'S1A_IW_SLC__1SDV_20240502T053545_20240502T053612_053688_06856B_5B4B'
+[SMOKE] ASF resolved: S1A_IW_SLC__1SDV_20240502T053545_20240502T053612_053688_06856B_5B4B-SLC
+[SMOKE] Downloading SAFE from ASF (~4 GB): ...
+[SMOKE] SAFE ready: eval-rtc-eu/input/..._5B4B.zip (8.26 GB)
+[SMOKE] Stage 5: calling run_rtc — checking opera-rtc RunConfig load...
+Loading RTC-S1 runconfig default
+[SMOKE] *** RunConfig.load_from_yaml SUCCEEDED — patch works ***
+[SMOKE] === SUCCESS: runconfig load succeeded ===
+```
+
+Interception sentinel `_LoadSucceeded(BaseException)` wraps
+`RunConfig.load_from_yaml` and raises AFTER a successful load. The sentinel
+escapes `run_rtc`'s `except Exception` and confirms the runconfig loader
+accepts this SAFE for this burst_id. Exit code 0.
+
+### Stale Cache Entries
+
+The eval-rtc-eu/input/ directory now holds:
+
+| SAFE | provenance |
+|------|------------|
+| ..._9D79.zip (8.26 GB) | orphan (buggy pick for Alpine; pre-patch) |
+| ..._B44E.zip (8.32 GB) | orphan (buggy pick for Scandinavian; pre-patch) |
+| ..._47B7.zip (3.96 GB, partial) | orphan (buggy pick for Iberian; killed) |
+| ..._5B4B.zip (8.26 GB) | **correct SAFE for Alpine; post-patch smoke** |
+
+Orphans remain harmless because `find_cached_safe` matches by substring of
+the canonical source granule_id, not a glob over the directory. They can be
+reaped via `make clean-eval-rtc-eu` without affecting correctness. Free
+disk remains 760 GB — headroom not at risk.
+
+### Static Test Re-Run (Post-Patch)
+
+```
+$ /Users/alex/.local/share/mamba/envs/subsideo/bin/python -m pytest tests/unit/test_rtc_eu_eval.py --no-cov -q
+.................                                                        [100%]
+17 passed in 0.14s
+```
+
+All structural invariants (5 BURSTS, 5 regimes, RTC-01 constraints, credential
+preflight, main-guard, per-burst try/except) preserved.
+
+### Ruff
+
+`ruff check run_eval_rtc_eu.py` → All checks passed.
+
 ## Task 2 Background Launch (after fixes)
 
 ```
