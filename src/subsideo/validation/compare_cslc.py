@@ -90,6 +90,20 @@ def compare_cslc(
 
     # 2. Align grids if shapes differ (find overlapping region by coordinates)
     if prod_complex.shape != ref_complex.shape:
+        # WR-02: if coordinates are unavailable, fail loudly rather than
+        # silently falling through to the mask step (which would either raise
+        # an opaque broadcast error or, worse, broadcast incorrectly).
+        if not (
+            prod_x is not None
+            and ref_x is not None
+            and prod_y is not None
+            and ref_y is not None
+        ):
+            raise ValueError(
+                f"CSLC shape mismatch ({prod_complex.shape} vs "
+                f"{ref_complex.shape}) but coordinates unavailable for "
+                f"alignment in {product_path} / {reference_path}"
+            )
         if prod_x is not None and ref_x is not None and prod_y is not None and ref_y is not None:
             logger.info(
                 "Product shape {} != reference shape {}; aligning by coordinates",
