@@ -97,15 +97,28 @@ def _render_cell_column(
     """Render one side of a cell (product-quality or reference-agreement column).
 
     Returns an em-dash when there are no criteria to evaluate (empty side,
-    matching CONTEXT.md §Claude's Discretion -- no-gate cells show '—').
+    matching CONTEXT.md Claude's Discretion -- no-gate cells show em-dash).
     Cells with ANY CALIBRATING criterion are italicised as a whole (GATE-03).
+
+    INVESTIGATION_TRIGGER criteria (Phase 2 D-13) are silently filtered out:
+    they are non-gate markers and must NOT render a PASS/FAIL verdict in
+    the default PQ/RA columns. In practice, eval scripts should never add
+    them to a ReferenceAgreementResult.criterion_ids list, but this filter
+    provides defence-in-depth (an accidental inclusion renders as if the
+    criterion wasn't there, rather than producing a misleading verdict).
     """
     if result is None or not result.criterion_ids:
         return "—"
-    rendered = [_render_measurement(cid, result.measurements) for cid in result.criterion_ids]
+    gate_cids = [
+        cid for cid in result.criterion_ids
+        if CRITERIA.get(cid) is not None
+        and CRITERIA[cid].type != "INVESTIGATION_TRIGGER"
+    ]
+    if not gate_cids:
+        return "—"
+    rendered = [_render_measurement(cid, result.measurements) for cid in gate_cids]
     any_calibrating = any(
-        CRITERIA.get(cid) is not None and CRITERIA[cid].type == "CALIBRATING"
-        for cid in result.criterion_ids
+        CRITERIA[cid].type == "CALIBRATING" for cid in gate_cids
     )
     body = " / ".join(rendered)
     return f"*{body}*" if any_calibrating else body
@@ -144,6 +157,79 @@ def _validate_metrics_path(
     )
 
 
+# --- RTC-EU multi-burst aggregate rendering (Phase 2 D-11, D-15) ---
+
+
+def _is_rtc_eu_shape(metrics_path: Path) -> bool:
+    """Return True when the metrics.json has a top-level ``per_burst`` key.
+
+    Cheap schema-discrimination check (D-11 marker). Inspects the raw JSON
+    rather than relying on Pydantic validation so that ``_load_metrics``
+    (which parses against the base ``MetricsJson`` with ``extra="forbid"``)
+    is never asked to validate RTCEUCellMetrics-only fields. Returns False
+    on any I/O or JSON error -- the caller falls through to the default
+    cell-render path, which then surfaces RUN_FAILED if the file is
+    genuinely malformed.
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.debug("_is_rtc_eu_shape: cannot read {}: {}", metrics_path, e)
+        return False
+    return isinstance(raw, dict) and "per_burst" in raw
+
+
+def _render_rtc_eu_cell(
+    metrics_path: Path,
+) -> tuple[str, str] | None:
+    """Render RTC-EU multi-burst aggregate as ``(pq_col, ra_col)``.
+
+    Returns None if the metrics.json cannot be parsed as RTCEUCellMetrics
+    (the caller should fall through to RUN_FAILED rendering). Returns a
+    tuple of pre-escape column strings when successful; the caller applies
+    ``_escape_table_cell`` to each column before emitting the Markdown row.
+
+    pq_col is always the em-dash literal because RTC has no product-quality
+    gate in v1.1 (Phase 1 D-04; Phase 2 specifics "No product-quality gate
+    for RTC in v1.1").
+
+    ra_col format: ``{pass_count}/{total} PASS`` (or ``... PASS`` + warning
+    glyph when ``any_investigation_required`` is True, per D-15). When
+    ``pass_count < total``, format is ``X/N PASS (Y FAIL)`` so the matrix
+    reader sees at a glance there are failing rows without having to open
+    the CONCLUSIONS document.
+    """
+    from subsideo.validation.matrix_schema import RTCEUCellMetrics
+
+    try:
+        metrics = RTCEUCellMetrics.model_validate_json(metrics_path.read_text())
+    except Exception as e:  # pydantic.ValidationError or JSON decode error
+        logger.warning(
+            "Failed to parse RTCEUCellMetrics from {}: {}", metrics_path, e
+        )
+        return None
+
+    fail_count = metrics.total - metrics.pass_count
+    if fail_count > 0:
+        base = f"{metrics.pass_count}/{metrics.total} PASS ({fail_count} FAIL)"
+    else:
+        base = f"{metrics.pass_count}/{metrics.total} PASS"
+
+    # Use Python unicode escape form (U+26A0 WARNING SIGN) so the source
+    # byte-level payload is ASCII-only and deterministic across editors,
+    # terminals, and git diff. The cross-file convention is: matrix_writer.py
+    # uses the escape form (grep-anchorable, ASCII source bytes);
+    # run_eval_rtc_eu.py (Plan 02-04) may use the literal glyph inline where
+    # readable log tails benefit. Both forms compile to the same ``str``
+    # object at runtime and render identically in the rendered matrix cell.
+    warn = " \u26a0" if metrics.any_investigation_required else ""
+    ra_col = f"{base}{warn}"
+    pq_col = "—"
+    return pq_col, ra_col
+
+
 def write_matrix(manifest_path: Path, out_path: Path) -> None:
     """Read manifest + sidecars; write a two-column-per-cell Markdown table.
 
@@ -179,6 +265,31 @@ def write_matrix(manifest_path: Path, out_path: Path) -> None:
         metrics_path = _validate_metrics_path(
             str(cell["metrics_file"]), manifest_path
         )
+
+        # Phase 2 D-11 branch: metrics.json with a ``per_burst`` key is the
+        # RTCEUCellMetrics shape -- render as ``X/N PASS`` aggregate plus a
+        # warning glyph when any_investigation_required (D-15). Cell schema
+        # discriminator lives in the JSON itself (not the manifest) so that
+        # adding a per-burst shape to other cells in a future phase only
+        # requires a per-cell metrics.json edit. Check BEFORE ``_load_metrics``
+        # because the base ``MetricsJson`` uses ``extra="forbid"`` and would
+        # reject the RTCEUCellMetrics-specific fields; ``_render_rtc_eu_cell``
+        # validates against the correct subclass.
+        if metrics_path.exists() and _is_rtc_eu_shape(metrics_path):
+            cols = _render_rtc_eu_cell(metrics_path)
+            if cols is not None:
+                pq_col, ra_col = cols
+                lines.append(
+                    f"| {product} | {region} | {_escape_table_cell(pq_col)} | "
+                    f"{_escape_table_cell(ra_col)} |"
+                )
+                continue
+            # Fall through to default rendering as a best-effort if the
+            # RTCEUCellMetrics validation failed (``_render_rtc_eu_cell``
+            # already logged the reason via ``logger.warning``). The default
+            # path below will surface a RUN_FAILED cell since base
+            # ``MetricsJson`` will also reject the mis-shaped payload.
+
         metrics, err_reason = _load_metrics(metrics_path)
         if metrics is None:
             pq_col = f"RUN_FAILED ({err_reason})"
