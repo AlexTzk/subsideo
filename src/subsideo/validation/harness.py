@@ -350,10 +350,19 @@ def select_opera_frame_by_utc_hour(
             continue
         if isinstance(ft, str):
             ft = datetime.fromisoformat(ft.replace("Z", "+00:00"))
-        # Strip tz to compare against naive target_hour if needed.
+        # Normalise tz symmetrically so subtraction never raises
+        # TypeError "can't subtract offset-naive and offset-aware datetimes"
+        # regardless of which side carries a tzinfo (WR-01).
         if ft.tzinfo is not None and target_hour.tzinfo is None:
-            ft = ft.replace(tzinfo=None)
-        delta = abs((ft - target_hour).total_seconds())
+            ft_cmp = ft.replace(tzinfo=None)
+            target_cmp = target_hour
+        elif target_hour.tzinfo is not None and ft.tzinfo is None:
+            ft_cmp = ft
+            target_cmp = target_hour.replace(tzinfo=None)
+        else:
+            ft_cmp = ft
+            target_cmp = target_hour
+        delta = abs((ft_cmp - target_cmp).total_seconds())
         if delta <= tolerance_hours * 3600:
             matches.append(frame)
 
