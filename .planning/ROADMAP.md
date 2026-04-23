@@ -64,15 +64,15 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 **Plans**: 9 plans across 4 waves
 
 Plans:
-- [ ] 01-01-PLAN.md — Env bootstrap: write conda-env.yml (numpy<2, tophu 0.2.1 conda-forge, dist-s1 2.0.14, py-spy, rio-cogeo==6.0.0 pip layer, -e .[validation,viz]) [Wave 1] [ENV-01, ENV-02, ENV-09, ENV-10]
-- [ ] 01-02-PLAN.md — Private utility `_cog.py` + rewrite all rio_cogeo import sites + ensure_valid_cog IFD heal [Wave 2] [ENV-03]
-- [ ] 01-03-PLAN.md — Private utility `_mp.py` full fork bundle + insert configure_multiprocessing at top of 5 run_*() + delete 4 monkey-patches from cslc.py [Wave 2] [ENV-02, ENV-04]
-- [ ] 01-04-PLAN.md — Shared validation modules: `stable_terrain.py` (WorldCover + slope + coast + water) + `selfconsistency.py` (5-key coherence + reference-frame aligned residual) [Wave 1] [CSLC-01, CSLC-02]
-- [ ] 01-05-PLAN.md — D-09 BIG-BANG: criteria.py (13 entries) + results.py + 5 composite ValidationResult classes + 5 compare_*.py returns + tests/product_quality + tests/reference_agreement + AST linter + reference_agreement marker — ONE COMMIT [Wave 1] [GATE-01, GATE-02, GATE-04, GATE-05]
-- [ ] 01-06-PLAN.md — `validation/harness.py` with 5 helpers + RETRY_POLICY + ReferenceDownloadError + pilot run_eval.py migration [Wave 2] [ENV-06, ENV-07, ENV-08]
-- [ ] 01-07-PLAN.md — `validation/supervisor.py` subprocess watchdog + Makefile (10 cells) + batch-migrate 7 remaining eval scripts [Wave 3] [ENV-05, ENV-07, ENV-08, ENV-09]
-- [ ] 01-08-PLAN.md — `matrix_schema.py` Pydantic v2 + `results/matrix_manifest.yml` (10 cells) + `matrix_writer.py` with threshold echo + CALIBRATING italicisation [Wave 3] [ENV-09, GATE-03]
-- [ ] 01-09-PLAN.md — Reproducibility recipe: Dockerfile (mambaorg/micromamba) + Apptainer.def + env.lockfile.{osx-arm64,linux-64}.txt + two-platform D-18 acceptance [Wave 4] [ENV-10, GATE-03]
+- [x] 01-01-PLAN.md — Env bootstrap: write conda-env.yml (numpy<2, tophu 0.2.1 conda-forge, dist-s1 2.0.14, py-spy, rio-cogeo==6.0.0 pip layer, -e .[validation,viz]) [Wave 1] [ENV-01, ENV-02, ENV-09, ENV-10]
+- [x] 01-02-PLAN.md — Private utility `_cog.py` + rewrite all rio_cogeo import sites + ensure_valid_cog IFD heal [Wave 2] [ENV-03]
+- [x] 01-03-PLAN.md — Private utility `_mp.py` full fork bundle + insert configure_multiprocessing at top of 5 run_*() + delete 4 monkey-patches from cslc.py [Wave 2] [ENV-02, ENV-04]
+- [x] 01-04-PLAN.md — Shared validation modules: `stable_terrain.py` (WorldCover + slope + coast + water) + `selfconsistency.py` (5-key coherence + reference-frame aligned residual) [Wave 1] [CSLC-01, CSLC-02]
+- [x] 01-05-PLAN.md — D-09 BIG-BANG: criteria.py (13 entries) + results.py + 5 composite ValidationResult classes + 5 compare_*.py returns + tests/product_quality + tests/reference_agreement + AST linter + reference_agreement marker — ONE COMMIT [Wave 1] [GATE-01, GATE-02, GATE-04, GATE-05]
+- [x] 01-06-PLAN.md — `validation/harness.py` with 5 helpers + RETRY_POLICY + ReferenceDownloadError + pilot run_eval.py migration [Wave 2] [ENV-06, ENV-07, ENV-08]
+- [x] 01-07-PLAN.md — `validation/supervisor.py` subprocess watchdog + Makefile (10 cells) + batch-migrate 7 remaining eval scripts [Wave 3] [ENV-05, ENV-07, ENV-08, ENV-09]
+- [x] 01-08-PLAN.md — `matrix_schema.py` Pydantic v2 + `results/matrix_manifest.yml` (10 cells) + `matrix_writer.py` with threshold echo + CALIBRATING italicisation [Wave 3] [ENV-09, GATE-03]
+- [x] 01-09-PLAN.md — Reproducibility recipe: Dockerfile (mambaorg/micromamba) + Apptainer.def + env.lockfile.{osx-arm64,linux-64}.txt + two-platform D-18 acceptance [Wave 4] [ENV-10, GATE-03]
 
 **Requirements coverage audit** (all 17 Phase 1 requirement IDs):
 ENV-01 (01), ENV-02 (01, 03), ENV-03 (02), ENV-04 (03), ENV-05 (07), ENV-06 (06), ENV-07 (06, 07), ENV-08 (06, 07), ENV-09 (01, 07, 08), ENV-10 (01, 09), GATE-01 (05), GATE-02 (05), GATE-03 (08, 09), GATE-04 (05), GATE-05 (05), CSLC-01 (04), CSLC-02 (04). Every requirement appears in at least one plan.
