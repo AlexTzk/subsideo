@@ -261,49 +261,53 @@ if __name__ == "__main__":
         bounds = bounds_for_burst(cfg.burst_id, buffer_deg=0.2)
         logger.info("Bounds for {}: {}", cfg.burst_id, bounds)
 
-        # Stage 1: OPERA reference
+        # Stage 1: OPERA reference lookup (always via CMR; even on cache hit we
+        # need the granule metadata to extract the canonical source SAFE in Stage 2)
+        logger.info("Querying OPERA catalog for {}", cfg.burst_id)
+        # Narrow window: +/- 1 day around sensing_time.
+        temporal_start = cfg.sensing_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Convert JPL-lowercase burst_id to OPERA uppercase format for
+        # granule filter: t144_308029_iw1 -> T144-308029-IW1.
+        parts = cfg.burst_id.split("_")
+        opera_burst_upper = f"T{parts[0][1:]}-{parts[1]}-{parts[2].upper()}"
+        ref_results = earthaccess.search_data(
+            short_name="OPERA_L2_RTC-S1_V1",
+            temporal=(
+                (cfg.sensing_time - timedelta(days=1)).strftime("%Y-%m-%d"),
+                (cfg.sensing_time + timedelta(days=1)).strftime("%Y-%m-%d"),
+            ),
+            granule_name=f"OPERA_L2_RTC-S1_{opera_burst_upper}*",
+        )
+        if not ref_results:
+            raise RuntimeError(
+                f"No OPERA RTC granule found for {cfg.burst_id} "
+                f"near {temporal_start}"
+            )
+        # earthaccess DataGranule objects are dict-like but nest the sensing
+        # time under ``umm.TemporalExtent.RangeDateTime.BeginningDateTime``.
+        # select_opera_frame_by_utc_hour expects a flat ``sensing_datetime``
+        # key, so enrich each entry in-place before passing it through.
+        for _g in ref_results:
+            if "sensing_datetime" in _g:
+                continue
+            _umm = _g.get("umm", {}) if isinstance(_g, dict) else {}
+            _rdt = _umm.get("TemporalExtent", {}).get("RangeDateTime", {})
+            _beg = _rdt.get("BeginningDateTime")
+            if _beg:
+                _g["sensing_datetime"] = _beg
+            # Give the frame an id that select_opera_frame_by_utc_hour
+            # echoes back in "Multiple ..." errors for debuggability.
+            if "id" not in _g and isinstance(_umm.get("GranuleUR"), str):
+                _g["id"] = _umm["GranuleUR"]
+        # select_opera_frame_by_utc_hour picks +/-1h; ensures unambiguous match.
+        chosen = select_opera_frame_by_utc_hour(
+            cfg.sensing_time, ref_results, tolerance_hours=1.0
+        )
+
+        # Download OPERA reference .tif if not already cached.
         opera_tifs = sorted(burst_opera_ref.glob("*.tif"))
         if not opera_tifs:
-            logger.info("Fetching OPERA reference for {}", cfg.burst_id)
-            # Narrow window: +/- 1 day around sensing_time.
-            temporal_start = cfg.sensing_time.strftime("%Y-%m-%dT%H:%M:%SZ")
-            # Convert JPL-lowercase burst_id to OPERA uppercase format for
-            # granule filter: t144_308029_iw1 -> T144-308029-IW1.
-            parts = cfg.burst_id.split("_")
-            opera_burst_upper = f"T{parts[0][1:]}-{parts[1]}-{parts[2].upper()}"
-            ref_results = earthaccess.search_data(
-                short_name="OPERA_L2_RTC-S1_V1",
-                temporal=(
-                    (cfg.sensing_time - timedelta(days=1)).strftime("%Y-%m-%d"),
-                    (cfg.sensing_time + timedelta(days=1)).strftime("%Y-%m-%d"),
-                ),
-                granule_name=f"OPERA_L2_RTC-S1_{opera_burst_upper}*",
-            )
-            if not ref_results:
-                raise RuntimeError(
-                    f"No OPERA RTC granule found for {cfg.burst_id} "
-                    f"near {temporal_start}"
-                )
-            # earthaccess DataGranule objects are dict-like but nest the sensing
-            # time under ``umm.TemporalExtent.RangeDateTime.BeginningDateTime``.
-            # select_opera_frame_by_utc_hour expects a flat ``sensing_datetime``
-            # key, so enrich each entry in-place before passing it through.
-            for _g in ref_results:
-                if "sensing_datetime" in _g:
-                    continue
-                _umm = _g.get("umm", {}) if isinstance(_g, dict) else {}
-                _rdt = _umm.get("TemporalExtent", {}).get("RangeDateTime", {})
-                _beg = _rdt.get("BeginningDateTime")
-                if _beg:
-                    _g["sensing_datetime"] = _beg
-                # Give the frame an id that select_opera_frame_by_utc_hour
-                # echoes back in "Multiple ..." errors for debuggability.
-                if "id" not in _g and isinstance(_umm.get("GranuleUR"), str):
-                    _g["id"] = _umm["GranuleUR"]
-            # select_opera_frame_by_utc_hour picks +/-1h; ensures unambiguous match.
-            chosen = select_opera_frame_by_utc_hour(
-                cfg.sensing_time, ref_results, tolerance_hours=1.0
-            )
+            logger.info("Downloading OPERA reference for {}", cfg.burst_id)
             earthaccess.download([chosen], str(burst_opera_ref))
             opera_tifs = sorted(burst_opera_ref.glob("*.tif"))
             if not opera_tifs:
@@ -317,44 +321,100 @@ if __name__ == "__main__":
             )
         opera_vv = next((p for p in opera_tifs if "VV" in p.name), opera_tifs[0])
 
-        # Stage 2: S1 SAFE (find_cached_safe first; fall back to ASF download)
-        # Build granule_id from sensing_time + relative_orbit for the search key.
-        # ASF SAFEs use names like
-        # S1A_IW_SLC__1SDV_<START>_<STOP>_<ORB>_<MISSION>_<HASH>.zip
-        # We search ASF for an SLC window containing the burst sensing_time.
-        slc_search_start = (cfg.sensing_time - timedelta(minutes=5)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
-        slc_search_end = (cfg.sensing_time + timedelta(minutes=5)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
-        kwargs: dict[str, object] = dict(
-            platform=asf.PLATFORM.SENTINEL1,
-            processingLevel="SLC",
-            beamMode="IW",
-            start=slc_search_start,
-            end=slc_search_end,
-            maxResults=5,
-        )
-        if cfg.relative_orbit is not None:
-            kwargs["relativeOrbit"] = cfg.relative_orbit
-        slc_results = asf.search(**kwargs)  # type: ignore[arg-type]
-        if not slc_results:
-            raise RuntimeError(
-                f"No S1 SLC found on ASF for {cfg.burst_id} "
-                f"around {cfg.sensing_time}"
+        # Stage 2: S1 SAFE -- canonical source from OPERA CMR metadata
+        # (find_cached_safe first; fall back to ASF download).
+        #
+        # OPERA RTC granule CMR records expose a ``umm.InputGranules`` list
+        # naming the exact Sentinel-1 SLC slice used as input. That slice is
+        # the only SAFE guaranteed to contain the burst for opera-rtc's
+        # ``runconfig_to_bursts`` step (S1 IW slices are ~28 s long and
+        # overlap by ~2 s, so burst-to-slice membership is NOT reliably
+        # inferred from start/stop-time heuristics -- see commit history for
+        # run_eval_rtc_eu.py debug notes).
+        chosen_umm = chosen.get("umm", {}) if isinstance(chosen, dict) else {}
+        input_granules = chosen_umm.get("InputGranules") or []
+        source_granule = None
+        for _ig in input_granules:
+            ig_str = str(_ig)
+            if ig_str.startswith("S1") and "_SLC_" in ig_str:
+                source_granule = ig_str
+                break
+        if not source_granule:
+            # Defensive fallback: if OPERA metadata does not carry an S1 SLC
+            # reference (unexpected for operational products), fall back to
+            # a containment-based ASF search.
+            logger.warning(
+                "OPERA granule for {} has no S1 SLC in InputGranules ({!r}); "
+                "falling back to ASF containment search",
+                cfg.burst_id, input_granules,
             )
-        scene = min(
-            slc_results,
-            key=lambda r: abs(
-                datetime.fromisoformat(
+            slc_search_start = (cfg.sensing_time - timedelta(minutes=5)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            slc_search_end = (cfg.sensing_time + timedelta(minutes=5)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            kwargs: dict[str, object] = dict(
+                platform=asf.PLATFORM.SENTINEL1,
+                processingLevel="SLC",
+                beamMode="IW",
+                start=slc_search_start,
+                end=slc_search_end,
+                maxResults=10,
+            )
+            if cfg.relative_orbit is not None:
+                kwargs["relativeOrbit"] = cfg.relative_orbit
+            slc_results = asf.search(**kwargs)  # type: ignore[arg-type]
+            if not slc_results:
+                raise RuntimeError(
+                    f"No S1 SLC found on ASF for {cfg.burst_id} "
+                    f"around {cfg.sensing_time}"
+                )
+            containing = [
+                r for r in slc_results
+                if datetime.fromisoformat(
                     str(r.properties["startTime"]).rstrip("Z")
-                ) - cfg.sensing_time
-            ),
-        )
-        granule_id = str(scene.properties["fileID"]).removesuffix("-SLC")
+                ) <= cfg.sensing_time <= datetime.fromisoformat(
+                    str(r.properties["stopTime"]).rstrip("Z")
+                )
+            ]
+            if not containing:
+                raise RuntimeError(
+                    f"No SAFE contains sensing_time={cfg.sensing_time} "
+                    f"for {cfg.burst_id} (fallback path; InputGranules was "
+                    f"{input_granules!r})"
+                )
+            # If multiple SAFEs contain sensing_time (slice-edge overlap),
+            # prefer the one whose midpoint is closest to sensing_time.
+            scene = min(
+                containing,
+                key=lambda r: abs(
+                    (
+                        datetime.fromisoformat(str(r.properties["startTime"]).rstrip("Z"))
+                        + (
+                            datetime.fromisoformat(str(r.properties["stopTime"]).rstrip("Z"))
+                            - datetime.fromisoformat(str(r.properties["startTime"]).rstrip("Z"))
+                        ) / 2
+                    ) - cfg.sensing_time
+                ),
+            )
+            granule_id = str(scene.properties["fileID"]).removesuffix("-SLC")
+        else:
+            granule_id = source_granule
+            # Resolve the ASF product for the exact SAFE named in InputGranules.
+            slc_results = asf.search(
+                granule_list=[source_granule], processingLevel="SLC"
+            )
+            if not slc_results:
+                raise RuntimeError(
+                    f"ASF cannot resolve OPERA source SAFE {source_granule!r} "
+                    f"for {cfg.burst_id}"
+                )
+            scene = slc_results[0]
+        _src_tag = "InputGranules" if source_granule else "fallback"
         logger.info(
-            "ASF chose {} (start={})", granule_id, scene.properties["startTime"]
+            "ASF chose {} (start={}, source={})",
+            granule_id, scene.properties["startTime"], _src_tag,
         )
 
         cached_safe = find_cached_safe(
