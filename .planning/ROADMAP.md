@@ -96,7 +96,7 @@ Plans:
 - [x] 02-01-PLAN.md — Framework extensions: matrix_schema (RTCEUCellMetrics + BurstResult), criteria.py (INVESTIGATION_TRIGGER entries), harness.find_cached_safe [Wave 1] [RTC-01, RTC-02, RTC-03]
 - [x] 02-02-PLAN.md — Probe script + candidate-burst artifact + CONCLUSIONS_RTC_EU.md template shell [Wave 1] [RTC-01, RTC-03]
 - [x] 02-03-PLAN.md — matrix_writer RTC-EU render branch + INVESTIGATION_TRIGGER filter [Wave 2] [RTC-01, RTC-03]
-- [ ] 02-04-PLAN.md — run_eval_rtc_eu.py declarative 5-burst eval script + static-invariant tests [Wave 3] [RTC-01, RTC-03]
+- [x] 02-04-PLAN.md — run_eval_rtc_eu.py declarative 5-burst eval script + static-invariant tests [Wave 3] [RTC-01, RTC-03]
 - [ ] 02-05-PLAN.md — Execute `make eval-rtc-eu` + populate CONCLUSIONS_RTC_EU.md + render matrix row [Wave 4] [RTC-01, RTC-02, RTC-03]
 
 **Requirements coverage audit** (all 3 Phase 2 requirement IDs):
