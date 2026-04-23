@@ -152,10 +152,14 @@ if __name__ == "__main__":
             ),
         ),
         # 4. Temperate flat (Bologna, Po plain) -- SAFE cached from DISP-EGMS (D-02).
+        #    burst_id preserved from probe-draft (Bologna pattern from Phase 1
+        #    DISP-EGMS). sensing_time lifted to 2024-05-05T17:07:05Z (first OPERA
+        #    RTC granule for this burst in the archive). 2021-03-14 predates OPERA
+        #    operational archive, so no reference is available for that epoch.
         BurstConfig(
             burst_id="t117_249422_iw2",
             regime="TemperateFlat",
-            sensing_time=datetime(2021, 3, 14, 17, 5, 0),
+            sensing_time=datetime(2024, 5, 5, 17, 7, 5),
             output_epsg=32632,            # UTM 32N
             centroid_lat=44.50,
             relative_orbit=117,
@@ -280,6 +284,22 @@ if __name__ == "__main__":
                     f"No OPERA RTC granule found for {cfg.burst_id} "
                     f"near {temporal_start}"
                 )
+            # earthaccess DataGranule objects are dict-like but nest the sensing
+            # time under ``umm.TemporalExtent.RangeDateTime.BeginningDateTime``.
+            # select_opera_frame_by_utc_hour expects a flat ``sensing_datetime``
+            # key, so enrich each entry in-place before passing it through.
+            for _g in ref_results:
+                if "sensing_datetime" in _g:
+                    continue
+                _umm = _g.get("umm", {}) if isinstance(_g, dict) else {}
+                _rdt = _umm.get("TemporalExtent", {}).get("RangeDateTime", {})
+                _beg = _rdt.get("BeginningDateTime")
+                if _beg:
+                    _g["sensing_datetime"] = _beg
+                # Give the frame an id that select_opera_frame_by_utc_hour
+                # echoes back in "Multiple ..." errors for debuggability.
+                if "id" not in _g and isinstance(_umm.get("GranuleUR"), str):
+                    _g["id"] = _umm["GranuleUR"]
             # select_opera_frame_by_utc_hour picks +/-1h; ensures unambiguous match.
             chosen = select_opera_frame_by_utc_hour(
                 cfg.sensing_time, ref_results, tolerance_hours=1.0
