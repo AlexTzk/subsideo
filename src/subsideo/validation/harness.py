@@ -422,6 +422,66 @@ def ensure_resume_safe(
 
 
 # ----------------------------------------------------------------------------
+# Cross-cell SAFE cache reuse (D-02)
+# ----------------------------------------------------------------------------
+
+
+def find_cached_safe(
+    granule_id: str,
+    search_dirs: Sequence[Path],
+) -> Path | None:
+    """Return the first S1 SAFE path matching ``granule_id`` across ``search_dirs``.
+
+    Phase 2 D-02 mechanism for cross-cell SAFE cache reuse. Scans each
+    directory in order and returns the first path whose filename stem
+    contains ``granule_id`` as a substring. This tolerates both
+    ``*.zip`` and ``*.SAFE`` directory variants because ``Path.stem``
+    strips only a single trailing suffix.
+
+    No symlinks are created; no copies are made. The caller passes the
+    returned path to ``run_rtc(safe_paths=[path])`` wherever it lives
+    (typically another ``eval-*/input/`` directory owned by a sibling
+    matrix cell). Cache partitioning stays per-cell for DEM / orbit /
+    OPERA reference products -- only the large SAFE zips are shared.
+
+    Parameters
+    ----------
+    granule_id : str
+        S1 granule identifier fragment (typically the
+        ``S1A_IW_SLC__1SDV_<START>_<STOP>_<ORBIT>_<MISSION>_<CHECKSUM>``
+        form), without trailing ``.zip`` or ``.SAFE``. Substring-match
+        semantics on ``path.stem`` so callers can pass either the full
+        granule name or a distinguishing prefix.
+    search_dirs : Sequence[Path]
+        Directories to probe, in priority order. The typical order is
+        ``[eval-rtc-eu/input, eval-disp-egms/input, eval-dist-eu/input,
+        eval-dist-eu-nov15/input]``. Missing or unreadable directories
+        are silently skipped (warn-logged, never raised).
+
+    Returns
+    -------
+    Path | None
+        First matching path in the first search_dir that contains one;
+        ``None`` when no search_dir contains a match.
+    """
+    for d in search_dirs:
+        d = Path(d)
+        if not d.exists() or not d.is_dir():
+            continue
+        try:
+            for p in sorted(d.iterdir()):
+                if granule_id in p.stem:
+                    logger.debug(
+                        "find_cached_safe hit: granule_id={} path={}", granule_id, p
+                    )
+                    return p
+        except (OSError, PermissionError) as e:
+            logger.warning("find_cached_safe: cannot read {}: {}", d, e)
+            continue
+    return None
+
+
+# ----------------------------------------------------------------------------
 # Download with per-source retry (ENV-06, PITFALLS P0.4)
 # ----------------------------------------------------------------------------
 

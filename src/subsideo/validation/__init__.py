@@ -15,6 +15,7 @@ from subsideo.validation.harness import (
     credential_preflight,
     download_reference_with_retry,
     ensure_resume_safe,
+    find_cached_safe,
     select_opera_frame_by_utc_hour,
 )
 from subsideo.validation.matrix_schema import (
@@ -55,6 +56,7 @@ __all__ = [
     "download_reference_with_retry",
     "ensure_resume_safe",
     "evaluate",
+    "find_cached_safe",
     "measurement_key",
     "residual_mean_velocity",
     "select_opera_frame_by_utc_hour",

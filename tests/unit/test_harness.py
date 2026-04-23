@@ -275,3 +275,101 @@ def test_bounds_for_burst_buffer_symmetric() -> None:
     assert all(isinstance(v, float) for v in loose)
     assert loose[0] < loose[2]
     assert loose[1] < loose[3]
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 additions: find_cached_safe (D-02) cross-cell SAFE cache reuse
+# ---------------------------------------------------------------------------
+
+
+def test_find_cached_safe_returns_none_when_no_hit(tmp_path: Path) -> None:
+    from subsideo.validation.harness import find_cached_safe
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    missing = tmp_path / "does-not-exist"
+    result = find_cached_safe("S1A_IW_SLC__1SDV_20240624", [empty, missing])
+    assert result is None
+
+
+def test_find_cached_safe_returns_first_match(tmp_path: Path) -> None:
+    from subsideo.validation.harness import find_cached_safe
+
+    d1 = tmp_path / "dir1"
+    d2 = tmp_path / "dir2"
+    d1.mkdir()
+    d2.mkdir()
+    granule = "S1A_IW_SLC__1SDV_20240624T140113"
+    file1 = d1 / f"{granule}_20240624T140140_054466_06A0BA_20E5.zip"
+    file2 = d2 / f"{granule}_20240624T140140_054466_06A0BA_20E5.zip"
+    file1.write_bytes(b"")
+    file2.write_bytes(b"")
+    result = find_cached_safe(granule, [d1, d2])
+    assert result == file1
+
+
+def test_find_cached_safe_substring_match_on_stem(tmp_path: Path) -> None:
+    from subsideo.validation.harness import find_cached_safe
+
+    d = tmp_path / "input"
+    d.mkdir()
+    full_name = "S1A_IW_SLC__1SDV_20240624T140113_20240624T140140_054466_06A0BA_20E5.zip"
+    (d / full_name).write_bytes(b"")
+    # Match on distinguishing prefix (not the full filename):
+    result = find_cached_safe("S1A_IW_SLC__1SDV_20240624T140113", [d])
+    assert result is not None
+    assert result.name == full_name
+
+
+def test_find_cached_safe_skips_nonexistent_dir(tmp_path: Path) -> None:
+    from subsideo.validation.harness import find_cached_safe
+
+    missing = tmp_path / "nope"
+    real = tmp_path / "real"
+    real.mkdir()
+    granule = "S1A_IW_SLC__1SDV_20240624T140113"
+    hit = real / f"{granule}_20240624T140140_054466_06A0BA_20E5.zip"
+    hit.write_bytes(b"")
+    result = find_cached_safe(granule, [missing, real])
+    assert result == hit
+
+
+def test_find_cached_safe_skips_non_directory(tmp_path: Path) -> None:
+    from subsideo.validation.harness import find_cached_safe
+
+    not_a_dir = tmp_path / "regular_file.txt"
+    not_a_dir.write_text("hello")
+    real = tmp_path / "real"
+    real.mkdir()
+    granule = "S1A_IW_SLC__1SDV_20240624"
+    hit = real / f"{granule}_XYZ.zip"
+    hit.write_bytes(b"")
+    result = find_cached_safe(granule, [not_a_dir, real])
+    assert result == hit
+
+
+def test_find_cached_safe_exported_from_package() -> None:
+    # Both import paths must work (harness module + package re-export).
+    from subsideo.validation import find_cached_safe as pkg_fn
+    from subsideo.validation.harness import find_cached_safe as mod_fn
+    assert pkg_fn is mod_fn
+
+
+def test_find_cached_safe_oserror_returns_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from pathlib import Path as _Path
+
+    from subsideo.validation.harness import find_cached_safe
+
+    d = tmp_path / "restricted"
+    d.mkdir()
+    granule = "S1A_IW_SLC__1SDV_20240624"
+
+    def _raise(self: _Path) -> None:  # pragma: no cover - replaced via monkeypatch
+        raise PermissionError("simulated EACCES")
+
+    monkeypatch.setattr(_Path, "iterdir", _raise)
+    # Must return None (not raise) on PermissionError during iterdir.
+    result = find_cached_safe(granule, [d])
+    assert result is None
