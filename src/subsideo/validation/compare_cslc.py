@@ -180,8 +180,16 @@ def compare_cslc(
     phase_diff = np.angle(ifg)
     phase_rms = float(np.sqrt(np.mean(phase_diff ** 2)))
 
-    ifg_norm = ifg / np.abs(ifg)
-    coherence = float(np.abs(np.mean(ifg_norm)))
+    # WR-05: pre-mask against |ifg|==0 before normalising. The outer ``mask``
+    # in step 3 requires ``|prod|>0`` and ``|ref|>0``, but neither guarantees
+    # ``|prod * conj(ref)|>0``; division by zero pixels would produce NaN and
+    # silently fail the coherence gate downstream.
+    ifg_nonzero = np.abs(ifg) > 1e-12
+    if np.any(ifg_nonzero):
+        ifg_norm = ifg[ifg_nonzero] / np.abs(ifg[ifg_nonzero])
+        coherence = float(np.abs(np.mean(ifg_norm)))
+    else:
+        coherence = 0.0
 
     logger.info(
         "CSLC validation: amp_corr={:.4f}, amp_RMSE={:.2f} dB, "
