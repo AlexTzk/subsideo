@@ -109,3 +109,144 @@ def test_product_quality_result_json_extra_forbidden() -> None:
         ProductQualityResultJson.model_validate_json(
             json.dumps({"measurements": {}, "criterion_ids": [], "bogus": 1})
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 additions: BurstResult + RTCEUCellMetrics (D-09, D-10)
+# ---------------------------------------------------------------------------
+
+
+def test_burst_result_round_trip() -> None:
+    from subsideo.validation.matrix_schema import (
+        BurstResult,
+        ReferenceAgreementResultJson,
+    )
+
+    obj = BurstResult(
+        burst_id="t088_186752_iw2",
+        regime="Alpine",
+        lat=46.52,
+        max_relief_m=2800.0,
+        cached=False,
+        status="PASS",
+        product_quality=None,
+        reference_agreement=ReferenceAgreementResultJson(
+            measurements={"rmse_db": 0.08, "correlation": 0.9995, "bias_db": 0.0},
+            criterion_ids=["rtc.rmse_db_max", "rtc.correlation_min"],
+        ),
+        investigation_required=False,
+        investigation_reason=None,
+        error=None,
+        traceback=None,
+    )
+    js = obj.model_dump_json()
+    loaded = BurstResult.model_validate_json(js)
+    assert loaded == obj
+
+
+def test_burst_result_forbids_extra() -> None:
+    from subsideo.validation.matrix_schema import BurstResult
+
+    with pytest.raises(ValidationError):
+        BurstResult(
+            burst_id="t088_186752_iw2",
+            regime="Alpine",
+            status="PASS",
+            some_extra_field=123,
+        )  # type: ignore[call-arg]
+
+
+def test_burst_result_status_literal() -> None:
+    from subsideo.validation.matrix_schema import BurstResult
+
+    with pytest.raises(ValidationError):
+        BurstResult(
+            burst_id="t088_186752_iw2",
+            regime="Alpine",
+            status="INVALID",  # type: ignore[arg-type]
+        )
+
+
+def test_burst_result_regime_literal() -> None:
+    from subsideo.validation.matrix_schema import BurstResult
+
+    with pytest.raises(ValidationError):
+        BurstResult(
+            burst_id="t088_186752_iw2",
+            regime="Martian",  # type: ignore[arg-type]
+            status="PASS",
+        )
+
+
+def test_rtc_eu_cell_metrics_round_trip() -> None:
+    from subsideo.validation.matrix_schema import (
+        BurstResult,
+        ReferenceAgreementResultJson,
+        RTCEUCellMetrics,
+    )
+
+    b1 = BurstResult(
+        burst_id="t088_186752_iw2",
+        regime="Alpine",
+        lat=46.52,
+        max_relief_m=2800.0,
+        cached=False,
+        status="PASS",
+        reference_agreement=ReferenceAgreementResultJson(
+            measurements={"rmse_db": 0.08, "correlation": 0.9995, "bias_db": 0.0},
+            criterion_ids=["rtc.rmse_db_max", "rtc.correlation_min"],
+        ),
+    )
+    b2 = BurstResult(
+        burst_id="t117_249422_iw2",
+        regime="TemperateFlat",
+        lat=44.50,
+        max_relief_m=80.0,
+        cached=True,
+        status="PASS",
+        reference_agreement=ReferenceAgreementResultJson(
+            measurements={"rmse_db": 0.05, "correlation": 0.9999, "bias_db": 0.0},
+            criterion_ids=["rtc.rmse_db_max", "rtc.correlation_min"],
+        ),
+    )
+    obj = RTCEUCellMetrics(
+        pass_count=2,
+        total=2,
+        all_pass=True,
+        any_investigation_required=False,
+        reference_agreement_aggregate={
+            "worst_rmse_db": 0.08,
+            "worst_r": 0.9995,
+            "worst_burst_id": "t088_186752_iw2",
+        },
+        per_burst=[b1, b2],
+    )
+    js = obj.model_dump_json()
+    loaded = RTCEUCellMetrics.model_validate_json(js)
+    assert loaded == obj
+
+
+def test_rtc_eu_cell_metrics_extends_metrics_json() -> None:
+    from subsideo.validation.matrix_schema import MetricsJson, RTCEUCellMetrics
+
+    obj = RTCEUCellMetrics(
+        pass_count=0,
+        total=1,
+        all_pass=False,
+        any_investigation_required=False,
+        per_burst=[],
+    )
+    assert isinstance(obj, MetricsJson)
+
+
+def test_rtc_eu_cell_metrics_total_ge_1() -> None:
+    from subsideo.validation.matrix_schema import RTCEUCellMetrics
+
+    with pytest.raises(ValidationError):
+        RTCEUCellMetrics(
+            pass_count=0,
+            total=0,
+            all_pass=False,
+            any_investigation_required=False,
+            per_burst=[],
+        )
