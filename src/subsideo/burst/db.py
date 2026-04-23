@@ -8,6 +8,7 @@ Data source: ESA Sentinel-1 burst ID maps, licensed under CC-BY 4.0.
 """
 from __future__ import annotations
 
+import contextlib
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -213,7 +214,10 @@ def query_bounds(
             f"`subsideo.burst.db.build_burst_db(...)` first."
         )
 
-    with sqlite3.connect(str(db_path)) as conn:
+    # WR-06: sqlite3.Connection's context manager commits/rollbacks but does
+    # NOT close the connection (per CPython docs); wrap with contextlib.closing
+    # so the file descriptor is released on every call.
+    with contextlib.closing(sqlite3.connect(str(db_path))) as conn:
         row = conn.execute(
             "SELECT geometry_wkt FROM burst_id_map WHERE burst_id_jpl = ?",
             (burst_id,),
