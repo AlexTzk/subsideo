@@ -116,6 +116,34 @@ def _escape_table_cell(text: str) -> str:
     return text.replace("|", "\\|")
 
 
+def _validate_metrics_path(
+    metrics_path_str: str, manifest_path: Path
+) -> Path:
+    """Resolve *metrics_path_str* and enforce an allow-list (WR-08).
+
+    Accepts paths that resolve inside either the current working directory or
+    the manifest's parent directory tree. Rejects anything outside that
+    allow-list (e.g. ``../../../etc/passwd``) so a malicious manifest cannot
+    trigger reads of arbitrary filesystem paths via ``matrix_writer``.
+    """
+    resolved = Path(metrics_path_str).resolve()
+    allowed_roots = [
+        Path.cwd().resolve(),
+        manifest_path.resolve().parent,
+    ]
+    for root in allowed_roots:
+        try:
+            resolved.relative_to(root)
+            return resolved
+        except ValueError:
+            continue
+    raise ValueError(
+        f"manifest {manifest_path}: cell metrics_file {metrics_path_str!r} "
+        f"resolves outside the allowed roots ({[str(r) for r in allowed_roots]}); "
+        f"resolved to {resolved}; refusing to load."
+    )
+
+
 def write_matrix(manifest_path: Path, out_path: Path) -> None:
     """Read manifest + sidecars; write a two-column-per-cell Markdown table.
 
@@ -145,7 +173,12 @@ def write_matrix(manifest_path: Path, out_path: Path) -> None:
     for cell in cells:
         product = str(cell["product"]).upper()
         region = str(cell["region"]).upper()
-        metrics_path = Path(cell["metrics_file"])
+        # WR-08: validate metrics_file path before touching the filesystem so
+        # a malicious manifest cannot coax matrix_writer into reading
+        # arbitrary files (e.g. ``../../../etc/passwd``).
+        metrics_path = _validate_metrics_path(
+            str(cell["metrics_file"]), manifest_path
+        )
         metrics, err_reason = _load_metrics(metrics_path)
         if metrics is None:
             pq_col = f"RUN_FAILED ({err_reason})"
