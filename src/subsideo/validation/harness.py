@@ -512,6 +512,16 @@ def download_reference_with_retry(
                     time.sleep(wait)
                     continue
 
+                # CR-02 mitigation: any HTTP error status that is NOT in
+                # ``retry_on`` must fail fast. Without this explicit branch,
+                # ``resp.raise_for_status()`` raises ``requests.HTTPError``
+                # which falls through to the ``except requests.RequestException``
+                # handler below and is silently retried up to ``max_retries``
+                # -- violating the per-source RETRY_POLICY contract
+                # (PITFALLS P0.4).
+                if status >= 400:
+                    raise ReferenceDownloadError(source, status, current_url)
+
                 resp.raise_for_status()
                 # 2xx — stream to a .partial tempfile and atomically rename
                 # on success (T-06-04 — avoid half-written files in dest).
@@ -525,7 +535,10 @@ def download_reference_with_retry(
                 return dest
         except ReferenceDownloadError:
             raise
-        except requests.RequestException as e:
+        except (requests.ConnectionError, requests.Timeout) as e:
+            # Only transport-level errors are retried. HTTPErrors are handled
+            # above by the explicit status-code branches so they never reach
+            # this handler (CR-02 mitigation).
             logger.warning(
                 "Transport error for {} attempt {}/{}: {}",
                 current_url,
