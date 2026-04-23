@@ -295,7 +295,11 @@ def credential_preflight(env_vars: Sequence[str]) -> None:
         Raised with a one-line message listing every missing var name, so
         the user can fix the ``.env`` / shell export in a single pass.
     """
-    missing = [v for v in env_vars if not os.environ.get(v)]
+    # WR-09: strip before truthiness so a whitespace-only value (common result
+    # of a ``.env`` mis-edit with a trailing space) is also flagged as missing,
+    # rather than passing preflight and failing deeper with a less actionable
+    # error.
+    missing = [v for v in env_vars if not (os.environ.get(v) or "").strip()]
     if missing:
         raise SystemExit(
             f"credential_preflight: the following env vars are not set or "
