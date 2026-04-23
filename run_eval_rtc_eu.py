@@ -258,7 +258,7 @@ if __name__ == "__main__":
         burst_opera_ref = CACHE / "opera_reference" / cfg.burst_id
         burst_opera_ref.mkdir(parents=True, exist_ok=True)
 
-        bounds = bounds_for_burst(cfg.burst_id, buffer_deg=0.2)
+        bounds = bounds_for_burst(cfg.burst_id, buffer_deg=0.5)
         logger.info("Bounds for {}: {}", cfg.burst_id, bounds)
 
         # Stage 1: OPERA reference lookup (always via CMR; even on cache hit we
