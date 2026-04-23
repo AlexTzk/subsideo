@@ -90,7 +90,17 @@ ENV-01 (01), ENV-02 (01, 03), ENV-03 (02), ENV-04 (03), ENV-05 (07), ENV-06 (06)
   2. User reads `src/subsideo/validation/criteria.py` and confirms EU RTC reference-agreement criteria are literally the same constants as N.Am. (RMSE < 0.5 dB, r > 0.99) — no tightened constant added post-measurement even if burst RMSE lands in the 0.04-0.1 dB N.Am.-like range (RTC-02, prevents PITFALLS M1 target-creep)
   3. User opens `CONCLUSIONS_RTC_EU.md` and finds selected bursts, regime-coverage table, per-burst numerical results, and — where any burst shows materially different RMSE from N.Am. — an investigation finding in the same doc (RTC-03)
 
-**Plans**: TBD
+**Plans**: 5 plans across 4 waves
+
+Plans:
+- [ ] 02-01-PLAN.md — Framework extensions: matrix_schema (RTCEUCellMetrics + BurstResult), criteria.py (INVESTIGATION_TRIGGER entries), harness.find_cached_safe [Wave 1] [RTC-01, RTC-02, RTC-03]
+- [ ] 02-02-PLAN.md — Probe script + candidate-burst artifact + CONCLUSIONS_RTC_EU.md template shell [Wave 1] [RTC-01, RTC-03]
+- [ ] 02-03-PLAN.md — matrix_writer RTC-EU render branch + INVESTIGATION_TRIGGER filter [Wave 2] [RTC-01, RTC-03]
+- [ ] 02-04-PLAN.md — run_eval_rtc_eu.py declarative 5-burst eval script + static-invariant tests [Wave 3] [RTC-01, RTC-03]
+- [ ] 02-05-PLAN.md — Execute `make eval-rtc-eu` + populate CONCLUSIONS_RTC_EU.md + render matrix row [Wave 4] [RTC-01, RTC-02, RTC-03]
+
+**Requirements coverage audit** (all 3 Phase 2 requirement IDs):
+RTC-01 (01, 02, 03, 04, 05), RTC-02 (01, 05), RTC-03 (01, 02, 03, 04, 05). Every requirement appears in at least one plan.
 
 ### Phase 3: CSLC-S1 Self-Consistency + EU Validation
 
@@ -198,7 +208,7 @@ ENV-01 (01), ENV-02 (01, 03), ENV-03 (02), ENV-04 (03), ENV-05 (07), ENV-06 (06)
 | 8. Planning Artifact Cleanup | v1.0 | 1/1 | Complete | 2026-04-06 |
 | 9. Fix Report Criteria Keys & Cleanup | v1.0 | 1/1 | Complete | 2026-04-06 |
 | 1. Environment Hygiene, Framework Consolidation & Guardrail Scaffolding | v1.1 | 0/9 | Planned | - |
-| 2. RTC-S1 EU Validation | v1.1 | 0/0 | Not started | - |
+| 2. RTC-S1 EU Validation | v1.1 | 0/5 | Planned | - |
 | 3. CSLC-S1 Self-Consistency + EU Validation | v1.1 | 0/0 | Not started | - |
 | 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 0/0 | Not started | - |
 | 5. DIST-S1 OPERA v0.1 + EFFIS EU | v1.1 | 0/0 | Not started | - |

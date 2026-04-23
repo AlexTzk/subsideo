@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
 status: executing
-stopped_at: Phase 1 CONTEXT.md committed; ready for `/gsd-plan-phase 1`
-last_updated: "2026-04-23T00:55:19.347Z"
-last_activity: 2026-04-23
+stopped_at: Phase 2 planned (5 plans, 4 waves); ready for `/gsd-execute-phase 2`
+last_updated: "2026-04-23T03:34:14.823Z"
+last_activity: 2026-04-23 -- Phase 02 planning complete
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 9
+  total_plans: 14
   completed_plans: 9
-  percent: 100
+  percent: 64
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 01 — environment-hygiene-framework-consolidation-guardrail-scaffolding
+**Current focus:** Phase 02 — rtc-s1-eu-validation
 
 ## Current Position
 
 Phase: 2
 Plan: Not started
-Status: Executing Phase 01
-Last activity: 2026-04-23
+Status: Ready to execute
+Last activity: 2026-04-23 -- Phase 02 planning complete
 
 ## Performance Metrics
 
@@ -96,6 +96,10 @@ Recent decisions affecting current work (v1.1):
 - [Phase 1 CONTEXT]: Watchdog is **per-script subprocess wrap** via `python -m subsideo.validation.supervisor` invoked from Makefile; mtime staleness heuristic; caller-supplied `EXPECTED_WALL_S` per script; `os.killpg` + py-spy stack dump to `watchdog-stacks.txt` before SIGTERM→SIGKILL; exit 124
 - [Phase 1 CONTEXT]: **Two-layer `conda-env.yml`** (conda-forge heavies + trailing `pip: -e .[validation,viz]`); **per-platform explicit lockfiles** `env.lockfile.linux-64.txt` + `env.lockfile.osx-arm64.txt`; **Dockerfile primary** from `mambaorg/micromamba` + Apptainer.def derived; **both platforms validated in Phase 1** via M3 Max dev run + `docker build + docker run pytest` on arm64 Docker; Phase 7 TrueNAS cold-env audit remains separate
 - [Phase 1 CONTEXT]: Phase 1 populates `criteria.py` with v1.0 BINDING + Phase-3-needed CALIBRATING gates (CSLC/DISP self-consistency coherence>0.7, residual<5 mm/yr, `binding_after_milestone='v1.2'`); Phase 5 EFFIS and DSWx recalibration threshold additions **deferred to Phase 5**
+- [Phase 2 CONTEXT]: Standalone `.planning/milestones/v1.1-research/rtc_eu_burst_candidates.md` probe artifact committed BEFORE eval runs; plan-phase locks 5-burst list from it. Cached-SAFE reuse via harness search-path fallback (eval-rtc-eu → eval-disp-egms → eval-dist-eu; no symlinks/copies). Claude drafts specific burst IDs in plan-phase; user reviews.
+- [Phase 2 CONTEXT]: `run_eval_rtc_eu.py` is a single script with declarative `BURSTS: list[BurstConfig]` looping sequentially, per-burst try/except isolation (one failure doesn't block matrix cell), per-burst whole-pipeline skip + per-stage `ensure_resume_safe`. Supervisor wraps as outer boundary; `_mp.configure_multiprocessing()` fires once per cell.
+- [Phase 2 CONTEXT]: Single aggregate `eval-rtc-eu/metrics.json` with nested `per_burst: [...]` list (new `RTCEUCellMetrics` Pydantic extension of base `CellMetrics`); top-level aggregates include pass_count/total, reference_agreement.worst_rmse_db/worst_r/worst_burst_id, any_investigation_required. Single cell-level `meta.json` with nested per-burst input hashes. Matrix row renders as single `X/N PASS` + link to CONCLUSIONS_RTC_EU.md.
+- [Phase 2 CONTEXT]: RTC-03 investigation trigger is RMSE >= 0.15 dB (~3× N.Am. baseline) OR r < 0.999; dual trigger (RMSE catches bias, r catches structure). Triggers live in `criteria.py` as new `type='INVESTIGATION_TRIGGER'` entries (extending Phase 1 D-01 Literal) — non-gate, do NOT tighten pass criteria (RTC-02 explicit). Eval script auto-flags `per_burst[i].investigation_required` + reason; human writes structured observation + hypothesis + evidence sub-section in CONCLUSIONS_RTC_EU.md per flagged burst.
 
 **v1.0 decisions (reference):** see PROJECT.md Key Decisions table + historical log below for ordering context.
 
@@ -128,7 +132,7 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 
 ## Session Continuity
 
-Last activity: 2026-04-21 — Phase 1 context gathered (19 decisions across 4 gray areas)
-Last session: 2026-04-21
-Stopped at: Phase 1 CONTEXT.md committed; ready for `/gsd-plan-phase 1`
-Resume file: .planning/phases/01-environment-hygiene-framework-consolidation-guardrail-scaffolding/01-CONTEXT.md
+Last activity: 2026-04-22 — Phase 2 planned (5 plans, 4 waves; 11 checker findings resolved in revision pass); Phase 2 context gathered 2026-04-22; Phase 1 completed + code-review-fixed
+Last session: 2026-04-22
+Stopped at: Phase 2 planned; ready for `/gsd-execute-phase 2`
+Resume file: .planning/phases/02-rtc-s1-eu-validation/02-01-PLAN.md
