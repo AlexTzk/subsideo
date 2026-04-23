@@ -1,6 +1,7 @@
 """DSWx-S2 product validation against JRC Global Surface Water."""
 from __future__ import annotations
 
+import urllib.error
 import urllib.request
 from pathlib import Path
 
