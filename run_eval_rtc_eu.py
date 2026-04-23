@@ -108,10 +108,12 @@ if __name__ == "__main__":
     BURSTS: list[BurstConfig] = [
         # 1. Alpine (Swiss/Italian Alps, Valtellina) -- >1000 m relief, RTC-01 constraint.
         #    Expected max_relief ~3200 m computed at eval time from cached DEM.
+        #    burst_id locked from live OPERA L2 RTC catalog query (2026-04-23); dominant
+        #    burst over Valtellina AOI. Relorb 66 confirmed from granule track code.
         BurstConfig(
-            burst_id="t066_140712_iw2",   # TODO(user): update from probe artifact if different
+            burst_id="t066_140413_iw1",
             regime="Alpine",
-            sensing_time=datetime(2024, 7, 12, 5, 13, 0),
+            sensing_time=datetime(2024, 5, 2, 5, 35, 47),
             output_epsg=32632,            # UTM 32N
             centroid_lat=46.35,
             relative_orbit=66,
@@ -120,25 +122,31 @@ if __name__ == "__main__":
             ),
         ),
         # 2. Scandinavian (Northern Sweden, Norrbotten, >55N) -- RTC-01 constraint.
+        #    burst_id locked from live OPERA L2 RTC catalog query (2026-04-23); dominant
+        #    burst over Norrbotten AOI. Track 058 descending (not 029 as originally
+        #    drafted) -- OPERA coverage is heavier on this track over the AOI.
         BurstConfig(
-            burst_id="t029_062015_iw1",   # TODO(user): update from probe artifact if different
+            burst_id="t058_122828_iw3",
             regime="Scandinavian",
-            sensing_time=datetime(2024, 7, 18, 15, 55, 0),
+            sensing_time=datetime(2024, 5, 1, 16, 7, 25),
             output_epsg=32634,            # UTM 34N
             centroid_lat=67.15,
-            relative_orbit=29,
+            relative_orbit=58,
             cached_safe_search_dirs=(
                 Path("eval-rtc-eu/input"),
             ),
         ),
         # 3. Iberian arid (Meseta north of Madrid).
+        #    burst_id locked from live OPERA L2 RTC catalog query (2026-04-23); dominant
+        #    burst over Meseta AOI. Track 103 ascending (not 154 as originally drafted)
+        #    -- OPERA coverage is heavier on this track over the AOI.
         BurstConfig(
-            burst_id="t154_329834_iw2",   # TODO(user): update from probe artifact if different
+            burst_id="t103_219329_iw1",
             regime="Iberian",
-            sensing_time=datetime(2024, 8, 3, 18, 21, 0),
+            sensing_time=datetime(2024, 5, 4, 18, 3, 39),
             output_epsg=32630,            # UTM 30N
             centroid_lat=41.15,
-            relative_orbit=154,
+            relative_orbit=103,
             cached_safe_search_dirs=(
                 Path("eval-rtc-eu/input"),
             ),
@@ -157,13 +165,16 @@ if __name__ == "__main__":
             ),
         ),
         # 5. Fire (Aveiro/Viseu 2024 footprint) -- SAFE cached from DIST-EU (D-02).
+        #    burst_id locked from live OPERA L2 RTC catalog query (2026-04-23); dominant
+        #    burst over Aveiro/Viseu AOI. Track 045 descending (not 154 as originally
+        #    drafted) -- OPERA coverage is heavier on this track over the AOI.
         BurstConfig(
-            burst_id="t154_329100_iw2",   # TODO(user): update from probe artifact if different
+            burst_id="t045_094744_iw3",
             regime="Fire",
-            sensing_time=datetime(2024, 9, 28, 6, 32, 0),
+            sensing_time=datetime(2024, 5, 12, 18, 36, 21),
             output_epsg=32629,            # UTM 29N
             centroid_lat=40.70,
-            relative_orbit=154,
+            relative_orbit=45,
             cached_safe_search_dirs=(
                 Path("eval-rtc-eu/input"),
                 Path("eval-dist-eu/input"),
