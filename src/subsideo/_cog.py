@@ -11,6 +11,7 @@ module cleanly.  Do NOT add ``import rio_cogeo`` at module top.
 """
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -111,13 +112,27 @@ def ensure_valid_cog(path: str | Path) -> None:
         path,
         heal_signals,
     )
-    tmp = path.with_suffix(path.suffix + ".cogtmp")
-    profile = cog_profiles().get("deflate")
-    cog_translate(
-        src=str(path),
-        dst=str(tmp),
-        profile=profile,
-        in_memory=False,
-        quiet=True,
+    # WR-03: use a unique tempfile per heal call so concurrent pipelines
+    # targeting the same output path cannot race on a deterministic
+    # ``.cogtmp`` filename and corrupt each other's output.
+    tmp_fd = tempfile.NamedTemporaryFile(
+        prefix=path.stem + ".",
+        suffix=".cogtmp",
+        dir=path.parent,
+        delete=False,
     )
-    tmp.replace(path)
+    tmp_fd.close()
+    tmp = Path(tmp_fd.name)
+    profile = cog_profiles().get("deflate")
+    try:
+        cog_translate(
+            src=str(path),
+            dst=str(tmp),
+            profile=profile,
+            in_memory=False,
+            quiet=True,
+        )
+        tmp.replace(path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
