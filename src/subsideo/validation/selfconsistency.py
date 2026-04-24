@@ -101,7 +101,7 @@ def coherence_stats(
 
     # median_of_persistent = median per-pixel-mean coherence over pixels that are
     # both in the stable mask AND persistently coherent in every IFG (P2.2 robust
-    # gate stat — Phase 3 D-01; immune to bimodal dune/playa contamination).
+    # gate stat -- Phase 3 D-01; immune to bimodal dune/playa contamination).
     persistent_stable = all_ifgs_above & stable_mask
     if int(persistent_stable.sum()) == 0:
         stats["median_of_persistent"] = 0.0
@@ -194,40 +194,125 @@ def compute_residual_velocity(
     """Per-pixel linear-fit residual velocity (mm/yr) from a CSLC stack.
 
     Per CONTEXT 03-CONTEXT.md D-Claude's-Discretion: linear-fit per-pixel
-    over the stack (NOT MintPy SBAS). Wraps the pixel-wise unwrapped-phase
-    -> velocity regression used by the Phase 3 eval scripts.
+    over the stack (NOT MintPy SBAS).
+
+    Algorithm:
+      1. Load each CSLC HDF5 into a complex (H, W) ndarray; stack to (N, H, W).
+      2. Extract phase = np.angle(complex) for every pixel, every epoch.
+      3. Unwrap the per-pixel time-series via np.unwrap along the time axis.
+         (Pure temporal unwrap; pixels that jump by more than pi between
+         consecutive epochs are assumed to wrap -- acceptable for stable-
+         terrain pixels over 12-day baselines.)
+      4. Per-pixel linear-fit phase_rad vs days_since_t0 via vectorised OLS:
+         slope_rad_per_day = cov(days, phase) / var(days).
+      5. Convert slope to LOS velocity mm/yr:
+           wavelength = 0.055465763 m  # Sentinel-1 C-band
+           v_m_per_day = -slope_rad_per_day * wavelength / (4 * np.pi)
+           v_mm_per_yr = v_m_per_day * 1000.0 * 365.25
+         (LOS convention: positive phase rate -> target moving towards sensor
+          -> negative vertical velocity for vertical-dominant motion.)
+      6. Return (H, W) float32 velocity raster; pixels outside stable_mask
+         set to NaN (caller uses stable_mask to filter; NaN fill makes it
+         explicit).
 
     Parameters
     ----------
     cslc_stack_paths : list[Path]
-        Ordered list of subsideo CSLC HDF5 paths (one per epoch).
+        Ordered HDF5 paths, one per epoch.
     stable_mask : (H, W) bool np.ndarray
         True where pixel is stable terrain.
     sensing_dates : list[datetime] | None
-        One datetime per CSLC; required for the mm/yr scaling. If None,
-        dates are extracted from the HDF5 ``identification/zero_doppler_start_time``
-        attribute (OPERA CSLC-S1 spec) via a lazy h5py read.
+        One datetime per CSLC. If None, extract from each HDF5 via
+        identification/zero_doppler_start_time attribute (OPERA spec).
 
     Returns
     -------
     velocity_mm_yr : (H, W) float32 np.ndarray
-        Linear-fit slope converted to mm/yr via Sentinel-1 wavelength
-        (lambda = 0.055465763 m, LOS: v_mm_yr = -slope_rad_per_yr * lambda /
-        (4*pi) * 1000 * seconds_per_year_inverse). NaN outside stable_mask.
+        Linear-fit slope converted to mm/yr. NaN outside stable_mask.
 
     Raises
     ------
-    NotImplementedError
-        Implementation is deferred to Plan 03-03 which runs the full CSLC
-        stack. This stub documents the signature and type contract for
-        downstream callers (run_eval_cslc_selfconsist_nam.py etc.).
     ValueError
         If ``len(cslc_stack_paths) < 3`` (minimum required for a meaningful
         linear fit; fewer epochs under-constrain the velocity regression).
+    RuntimeError
+        If no VV/HH CSLC dataset is found in an HDF5 file.
     """
-    # Implementation deferred to Plan 03-03 (eval script integration).
-    # Plan 03-01 ships the signature + type contract only.
-    raise NotImplementedError(
-        "compute_residual_velocity is implemented in Plan 03-03. "
-        "This stub defines the interface for downstream eval scripts."
+    import h5py  # lazy per PATTERNS "Two-layer install + lazy imports"
+
+    if len(cslc_stack_paths) < 3:
+        raise ValueError(
+            f"compute_residual_velocity requires >=3 epochs; got {len(cslc_stack_paths)}"
+        )
+
+    # Step 1 -- load all CSLCs; extract phase.
+    stacks: list[np.ndarray] = []
+    extracted_dates: list[datetime] = []
+    for p in cslc_stack_paths:
+        with h5py.File(p, "r") as f:
+            # Candidate dataset paths (matches compare_cslc._load_cslc_complex)
+            for dset_path in (
+                "/data/VV",
+                "/data/HH",
+                "/science/SENTINEL1/CSLC/grids/VV",
+                "/science/SENTINEL1/CSLC/grids/HH",
+            ):
+                if dset_path in f:
+                    cslc = f[dset_path][:].astype(np.complex64)
+                    break
+            else:
+                raise RuntimeError(f"No VV/HH CSLC dataset found in {p}")
+            if sensing_dates is None:
+                # Try attribute first, then dataset
+                id_group = f["identification"]
+                ts_val = id_group.attrs.get("zero_doppler_start_time")
+                if ts_val is None and "zero_doppler_start_time" in id_group:
+                    ts_val = id_group["zero_doppler_start_time"][()]
+                if ts_val is None:
+                    raise RuntimeError(
+                        f"Cannot extract zero_doppler_start_time from {p}: "
+                        "attribute and dataset both missing under 'identification'"
+                    )
+                if isinstance(ts_val, bytes):
+                    ts_val = ts_val.decode()
+                # OPERA format: "YYYY-MM-DDTHH:MM:SS.sssssssssZ"
+                extracted_dates.append(
+                    datetime.fromisoformat(str(ts_val).rstrip("Z"))
+                )
+        stacks.append(np.angle(cslc).astype(np.float32))
+
+    if sensing_dates is None:
+        sensing_dates = extracted_dates
+    assert len(sensing_dates) == len(cslc_stack_paths), (
+        f"sensing_dates length {len(sensing_dates)} != stack length {len(cslc_stack_paths)}"
     )
+
+    phase_stack = np.stack(stacks, axis=0)  # (N, H, W)
+    logger.info("compute_residual_velocity: stack shape {}", phase_stack.shape)
+
+    # Step 3 -- temporal unwrap per-pixel
+    phase_unwrapped = np.unwrap(phase_stack, axis=0)
+
+    # Step 4 -- linear fit per-pixel (vectorised OLS)
+    t0 = sensing_dates[0]
+    days = np.array(
+        [(d - t0).total_seconds() / 86400.0 for d in sensing_dates],
+        dtype=np.float64,
+    )
+    days_c = days - days.mean()
+    # (N, H, W): mean-centred phase
+    phase_d = phase_unwrapped.astype(np.float64)
+    phase_c = phase_d - phase_d.mean(axis=0, keepdims=True)
+    var_days = float((days_c**2).sum())
+    # slope = cov(days, phase) / var(days)
+    slope = (days_c[:, None, None] * phase_c).sum(axis=0) / var_days
+    slope_rad_per_day = slope.astype(np.float32)
+
+    # Step 5 -- convert to mm/yr
+    wavelength = 0.055465763  # Sentinel-1 C-band, metres
+    v_m_per_day = -slope_rad_per_day * wavelength / (4.0 * float(np.pi))
+    v_mm_per_yr = (v_m_per_day * 1000.0 * 365.25).astype(np.float32)
+
+    # Step 6 -- NaN outside stable_mask
+    v_mm_per_yr[~stable_mask] = np.float32("nan")
+    return np.asarray(v_mm_per_yr, dtype=np.float32)
