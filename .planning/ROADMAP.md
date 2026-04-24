@@ -122,8 +122,8 @@ RTC-01 (01, 02, 03, 04, 05), RTC-02 (01, 05), RTC-03 (01, 02, 03, 04, 05). Every
 
 - [x] 03-01-PLAN.md — Scaffolding: selfconsistency `median_of_persistent`, criteria `gate_metric_key`, matrix_schema + matrix_writer types, `compare_cslc_egms_l2a_residual`, data/worldcover + data/natural_earth, Makefile + matrix_manifest + pyproject dev extras [Wave 1] [CSLC-03, CSLC-04, CSLC-05]
 - [x] 03-02-PLAN.md — CSLC AOI probe script + committed artifact naming 7 candidate burst IDs (4 Mojave + 3 Iberian) with 15-epoch sensing windows + SoCal window lock + user lock-in checkpoint [Wave 1] [CSLC-04, CSLC-05]
-- [ ] 03-03-PLAN.md — N.Am. CSLC self-consistency eval: SoCal 15-epoch stack + Mojave fallback chain + CONCLUSIONS_CSLC_SELFCONSIST_NAM.md [Wave 2] [CSLC-03, CSLC-04]
-- [ ] 03-04-PLAN.md — EU CSLC self-consistency eval: Iberian Meseta + three-number schema (OPERA amp / self-consistency / EGMS L2a residual) + CONCLUSIONS_CSLC_EU.md [Wave 2] [CSLC-05]
+- [~] 03-03-PLAN.md — N.Am. CSLC self-consistency eval: SoCal 15-epoch stack + Mojave fallback chain + CONCLUSIONS_CSLC_SELFCONSIST_NAM.md [Wave 2] [CSLC-03, CSLC-04] *(Task 1 code complete; Task 2 compute + CONCLUSIONS + sign-off deferred to user — `make eval-cslc-nam`, ~12h cold, ~48h worst-case Mojave fallback)*
+- [~] 03-04-PLAN.md — EU CSLC self-consistency eval: Iberian Meseta + three-number schema (OPERA amp / self-consistency / EGMS L2a residual) + CONCLUSIONS_CSLC_EU.md [Wave 2] [CSLC-05] *(Task 1 code complete; Task 2 compute + CONCLUSIONS + sign-off deferred to user — `make eval-cslc-eu`, ~14h cold)*
 - [ ] 03-05-PLAN.md — `docs/validation_methodology.md`: cross-version phase impossibility + precision-first cross-sensor framing + OPERA frame selection + DSWE-family ceiling [Wave 3] [CSLC-06]
 
 ### Phase 4: DISP-S1 Comparison Adapter + Honest FAIL
