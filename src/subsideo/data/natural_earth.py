@@ -1,15 +1,18 @@
 """Natural Earth coastline + water-body geometries for stable-terrain buffers.
 
-Uses the ``naturalearth`` PyPI package (Claude's Discretion resolution —
-CONTEXT 03-CONTEXT.md — over OSM for simplicity at the current AOI scale).
+Uses ``cartopy.io.shapereader.natural_earth`` (already a main dependency via
+pyproject.toml) to download Natural Earth shapefiles on demand from
+``naturalearth.s3.amazonaws.com`` and cache them under
+``~/.local/share/cartopy/shapefiles/natural_earth/``.
+
 Returns geometries in EPSG:4326.
 
-Note on water-body exclusion: This module provides **coastline geometry only**.
-For exclusion of permanent inland water bodies (ephemeral playas, endorheic
-lakes missed by Natural Earth ``lakes``), use
+Note on water-body exclusion: this module provides **coastline + lakes only**.
+For exclusion of permanent inland water bodies that Natural Earth ``lakes``
+misses (ephemeral playas, endorheic pans), use
 ``data.worldcover.build_permanent_water_mask`` which reads WorldCover v200
-class 200 (permanent water bodies) and applies a 500 m buffer. See
-PITFALLS §P2.1 mitigation (b) for rationale.
+class 80 (permanent water) and applies a 500 m buffer. See PITFALLS §P2.1
+mitigation (b) for rationale.
 """
 
 from __future__ import annotations
@@ -54,31 +57,36 @@ def load_coastline_and_waterbodies(
     Raises
     ------
     ImportError
-        When the ``naturalearth`` PyPI package is not installed. Install via
-        ``pip install naturalearth`` or ``pip install -e ".[dev]"`` (it is
-        listed in ``[project.optional-dependencies.dev]``).
+        When ``cartopy`` is not installed (it is listed as a main dep in
+        pyproject.toml; this should not happen in the subsideo environment).
     """
     import geopandas as gpd
     from shapely.geometry import box
 
     try:
-        import naturalearth  # lazy
+        from cartopy.io import shapereader  # lazy; cartopy is a main dep
     except ImportError as err:
         raise ImportError(
-            "naturalearth PyPI package is required. "
-            "Install via: pip install naturalearth  "
-            "(or pip install -e '.[dev]' to pull all dev extras)"
+            "cartopy is required for Natural Earth data access. "
+            "Install via conda-forge: `mamba install -c conda-forge cartopy` "
+            "(or `pip install -e '.[dev]'` to pull all pip-layer extras). "
+            "cartopy is already listed as a main dependency in pyproject.toml; "
+            "if this error fires, the environment is broken."
         ) from err
 
     clip_geom = box(*bbox)
 
-    coastline_path = naturalearth.get_path(scale=scale, name="coastline")
+    coastline_path = shapereader.natural_earth(
+        resolution=scale, category="physical", name="coastline"
+    )
     coastline_gdf = gpd.read_file(coastline_path)
     coastline = coastline_gdf[coastline_gdf.intersects(clip_geom)].geometry.reset_index(
         drop=True
     )
 
-    lakes_path = naturalearth.get_path(scale=scale, name="lakes")
+    lakes_path = shapereader.natural_earth(
+        resolution=scale, category="physical", name="lakes"
+    )
     lakes_gdf = gpd.read_file(lakes_path)
     lakes = lakes_gdf[lakes_gdf.intersects(clip_geom)].geometry.reset_index(drop=True)
 

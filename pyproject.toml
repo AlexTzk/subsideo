@@ -156,7 +156,10 @@ dev = [
     "mypy>=1.14,<2",
     "types-tqdm>=4.67",
     "EGMStoolkit==0.2.15",              # Phase 3 EU EGMS L2a CSV download (compare_cslc_egms_l2a_residual, run_eval_cslc_selfconsist_eu.py)
-    "naturalearth",                      # Phase 3 coastline geometries (data/natural_earth.load_coastline_and_waterbodies); version-pinning skipped — PyPI package ships small, stable tile data
+    # Natural Earth coastline/lakes are fetched via cartopy.io.shapereader.natural_earth
+    # (cartopy is a main dep at line 113). No separate `naturalearth` PyPI package —
+    # that name doesn't exist on PyPI; the 03-01 plan-spec mis-named it. See
+    # data/natural_earth.py for the cartopy-based loader.
     "ipython>=8.30,<9",
 ]
 
