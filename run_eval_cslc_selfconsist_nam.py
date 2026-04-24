@@ -974,15 +974,57 @@ if __name__ == "__main__":
         # <burst_id>_<YYYYMMDD>.h5, so use a recursive glob not a flat one.
         sorted_h5 = sorted(burst_out.rglob("*.h5"))
         ifgrams_stack = _compute_ifg_coherence_stack(sorted_h5, boxcar_px=5)
-        coh_stats = coherence_stats(ifgrams_stack, stable_mask, coherence_threshold=0.6)
+
+        # Reproject stable_mask (DEM grid, ~30m) onto the CSLC output grid
+        # (OPERA 5m range × 10m azimuth per runconfig) so that coherence_stats
+        # + residual_mean_velocity can boolean-index the coherence stack.
+        import h5py  # noqa: PLC0415
+        from affine import Affine  # noqa: PLC0415
+        from rasterio.warp import Resampling, reproject  # noqa: PLC0415
+
+        with h5py.File(sorted_h5[0], "r") as _f:
+            _xc = _f["/data/x_coordinates"][:]
+            _yc = _f["/data/y_coordinates"][:]
+            _xs = float(_f["/data/x_spacing"][()])
+            _ys = float(_f["/data/y_spacing"][()])
+            _epsg = int(_f["/data/projection"][()])
+        cslc_transform = Affine(_xs, 0, _xc[0] - _xs / 2, 0, _ys, _yc[0] - _ys / 2)
+        cslc_crs = f"EPSG:{_epsg}"
+        cslc_shape = (ifgrams_stack.shape[-2], ifgrams_stack.shape[-1])
+        stable_mask_cslc = np.zeros(cslc_shape, dtype=np.uint8)
+        reproject(
+            source=stable_mask.astype(np.uint8),
+            destination=stable_mask_cslc,
+            src_transform=dem_transform,
+            src_crs=dem_crs,
+            dst_transform=cslc_transform,
+            dst_crs=cslc_crs,
+            resampling=Resampling.nearest,
+        )
+        stable_mask_cslc = stable_mask_cslc.astype(bool)
+        n_stable_on_cslc = int(stable_mask_cslc.sum())
+        logger.info(
+            "{}: reprojected stable_mask onto CSLC grid "
+            "(DEM shape {} → CSLC shape {}); n_stable_on_cslc={}",
+            cfg.aoi_name, stable_mask.shape, cslc_shape, n_stable_on_cslc,
+        )
+        if n_stable_on_cslc < 1000:
+            raise RuntimeError(
+                f"{cfg.aoi_name}: stable_mask_cslc has only {n_stable_on_cslc} "
+                f"pixels after reprojection; DEM/CSLC extent overlap too small"
+            )
+
+        coh_stats = coherence_stats(
+            ifgrams_stack, stable_mask_cslc, coherence_threshold=0.6
+        )
 
         # 7. Residual velocity (linear-fit per D-Claude's-Discretion; P2.3)
         velocity_raster = compute_residual_velocity(
-            sorted_h5, stable_mask, sensing_dates=list(cfg.sensing_window)
+            sorted_h5, stable_mask_cslc, sensing_dates=list(cfg.sensing_window)
         )
         # Reference-frame alignment via stable-set median anchor (P2.3 mitigation)
         residual = residual_mean_velocity(
-            velocity_raster, stable_mask, frame_anchor="median"
+            velocity_raster, stable_mask_cslc, frame_anchor="median"
         )
 
         # 8. Amplitude sanity — gated on per-AOI run_amplitude_sanity flag (D-07).
@@ -1015,13 +1057,15 @@ if __name__ == "__main__":
                     cfg.aoi_name, ref_aoi_dir,
                 )
 
-        # 9. Stable-mask sanity artifacts (P2.1 mitigation) — mask is on DEM/UTM grid
+        # 9. Stable-mask sanity artifacts (P2.1) — use the CSLC-grid stable_mask
+        # (same grid as coherence_stack so _write_sanity_artifacts can boolean-
+        # index into the coherence stack without another shape mismatch).
         _write_sanity_artifacts(
             cfg.aoi_name,
-            stable_mask=stable_mask,
+            stable_mask=stable_mask_cslc,
             coherence_stack=ifgrams_stack,
-            transform=dem_transform,
-            crs=dem_crs,
+            transform=cslc_transform,
+            crs=cslc_crs,
             out_dir=CACHE / "sanity" / cfg.aoi_name,
         )
 
