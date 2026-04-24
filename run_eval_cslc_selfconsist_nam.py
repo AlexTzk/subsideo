@@ -392,9 +392,23 @@ if __name__ == "__main__":
     ) -> Path:
         """Download the Sentinel-1 SAFE containing burst_id at epoch from ASF.
 
-        Uses asf_search to find the SLC that contains the burst at the given
-        sensing time, then downloads via authenticated HTTPS.
+        Filters ASF search by relativeOrbit (parsed from burst_id) + the burst
+        footprint polygon so we don't accidentally grab a different orbit that
+        happens to be acquiring at the same UTC minute (e.g. track 42 when the
+        target is track 144). Validates the zip before returning; corrupt
+        partial downloads are deleted + re-raised.
         """
+        import zipfile
+
+        from shapely.geometry import box as _shapely_box
+
+        # Parse track from burst_id (format: t{NNN}_{NNNNNN}_{iwN})
+        track_num = int(burst_id.split("_")[0].lstrip("t"))
+
+        # Burst footprint (light buffer to be inclusive of frame edges)
+        bounds = bounds_for_burst(burst_id, buffer_deg=0.1)
+        wkt = _shapely_box(*bounds).wkt
+
         window_start = (epoch - timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
         window_end = (epoch + timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -402,13 +416,16 @@ if __name__ == "__main__":
             platform=asf.PLATFORM.SENTINEL1,
             processingLevel="SLC",
             beamMode="IW",
+            relativeOrbit=track_num,
+            intersectsWith=wkt,
             start=window_start,
             end=window_end,
             maxResults=5,
         )
         if not results:
             raise RuntimeError(
-                f"No S1 SLC found on ASF for {burst_id} around {epoch}"
+                f"No S1 SLC found on ASF for {burst_id} "
+                f"(track={track_num}, bbox={bounds}) around {epoch}"
             )
         scene = results[0]
         granule_id = str(scene.properties["fileID"]).removesuffix("-SLC")
@@ -425,6 +442,19 @@ if __name__ == "__main__":
                 raise RuntimeError(
                     f"ASF download failed for {granule_id}: no zip in {dest_dir}"
                 )
+
+        # Validate the zip — partial/HTML-error downloads previously passed
+        # silently and only blew up deep inside compass ("File is not a zip file").
+        try:
+            with zipfile.ZipFile(safe_path) as zf:
+                if not any(".SAFE" in n for n in zf.namelist()):
+                    raise zipfile.BadZipFile("no .SAFE entries inside zip")
+        except zipfile.BadZipFile as err:
+            safe_path.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Downloaded SAFE {safe_path.name} is corrupt ({err}); "
+                "deleted — caller should retry the epoch"
+            ) from err
             safe_path = zips[-1]
         return safe_path
 
