@@ -72,7 +72,6 @@ if __name__ == "__main__":
     from subsideo.validation.harness import (
         bounds_for_burst,
         credential_preflight,
-        ensure_resume_safe,
         find_cached_safe,
         select_opera_frame_by_utc_hour,
     )
@@ -903,11 +902,13 @@ if __name__ == "__main__":
         # 5. Per-epoch: download SAFE, orbit, run CSLC
         burst_out = CACHE / "output" / cfg.aoi_name
         burst_out.mkdir(parents=True, exist_ok=True)
-        expected_h5 = [
-            f"{cfg.burst_id}_{epoch.date().isoformat()}.h5"
-            for epoch in cfg.sensing_window
-        ]
-        if not ensure_resume_safe(burst_out, expected_h5):
+        # compass writes nested <burst_id>/<YYYYMMDD>/<burst_id>_<YYYYMMDD>.h5,
+        # so ensure_resume_safe's top-level iterdir check can't see them.
+        # Count recursively instead; skip the loop only when every epoch wrote.
+        have_all_epochs = (
+            len(list(burst_out.rglob("*.h5"))) >= len(cfg.sensing_window)
+        )
+        if not have_all_epochs:
             for epoch_idx, epoch in enumerate(cfg.sensing_window):
                 granule_hint = _safe_granule_for_epoch(cfg.burst_id, epoch)
                 safe = find_cached_safe(granule_hint, list(cfg.cached_safe_search_dirs))
@@ -969,7 +970,9 @@ if __name__ == "__main__":
                 )
 
         # 6. IFG coherence stack
-        sorted_h5 = sorted(burst_out.glob("*.h5"))
+        # compass writes outputs nested as <burst_out>/<burst_id>/<YYYYMMDD>/
+        # <burst_id>_<YYYYMMDD>.h5, so use a recursive glob not a flat one.
+        sorted_h5 = sorted(burst_out.rglob("*.h5"))
         ifgrams_stack = _compute_ifg_coherence_stack(sorted_h5, boxcar_px=5)
         coh_stats = coherence_stats(ifgrams_stack, stable_mask, coherence_threshold=0.6)
 
