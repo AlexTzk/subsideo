@@ -155,6 +155,8 @@ dev = [
     "ruff>=0.8,<1",
     "mypy>=1.14,<2",
     "types-tqdm>=4.67",
+    "EGMStoolkit==0.2.15",              # Phase 3 EU EGMS L2a CSV download (compare_cslc_egms_l2a_residual, run_eval_cslc_selfconsist_eu.py)
+    "naturalearth",                      # Phase 3 coastline geometries (data/natural_earth.load_coastline_and_waterbodies); version-pinning skipped — PyPI package ships small, stable tile data
     "ipython>=8.30,<9",
 ]
 
