@@ -259,6 +259,15 @@ def compute_residual_velocity(
             ):
                 if dset_path in f:
                     cslc = f[dset_path][:].astype(np.complex64)
+                    # Outside the parallelogram burst footprint the rectangular
+                    # CSLC grid is NaN (~64% of pixels for SoCal t144_308029_iw1).
+                    # np.angle(NaN+NaNj) is NaN; replace with 0 so the phase is
+                    # deterministic (0 rad) on invalid pixels. The caller's
+                    # stable_mask filters them out before the linear fit.
+                    bad = ~(np.isfinite(cslc.real) & np.isfinite(cslc.imag))
+                    if bad.any():
+                        cslc = cslc.copy()
+                        cslc[bad] = np.complex64(0)
                     break
             else:
                 raise RuntimeError(f"No VV/HH CSLC dataset found in {p}")

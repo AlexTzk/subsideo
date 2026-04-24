@@ -490,7 +490,19 @@ if __name__ == "__main__":
             )
 
         def _load_cslc(p: Path) -> np.ndarray:
-            """Load complex CSLC from HDF5; return (H, W) complex64."""
+            """Load complex CSLC from HDF5; return (H, W) complex64.
+
+            The rectangular CSLC grid has NaN outside the parallelogram burst
+            footprint (~64% of the grid for SoCal t144_308029_iw1). Leaving
+            NaN in place causes scipy.ndimage.uniform_filter to propagate NaN
+            into every 5×5 neighbourhood that touches a NaN pixel — with 64%
+            NaN coverage, that's every output position → denom is NaN
+            globally → np.where(NaN > 0, ...) → coh == 0 everywhere.
+
+            Replace NaN with 0+0j so uniform_filter averages with zeros at the
+            NaN/valid boundary (reducing coherence near the burst edge but
+            preserving interior-valid coherence values).
+            """
             with h5py.File(p, "r") as f:
                 for dset_path in (
                     "/data/VV", "/data/HH",
@@ -498,7 +510,12 @@ if __name__ == "__main__":
                     "/science/SENTINEL1/CSLC/grids/HH",
                 ):
                     if dset_path in f:
-                        return f[dset_path][:].astype(np.complex64)
+                        arr = f[dset_path][:].astype(np.complex64)
+                        bad = ~(np.isfinite(arr.real) & np.isfinite(arr.imag))
+                        if bad.any():
+                            arr = arr.copy()
+                            arr[bad] = np.complex64(0)
+                        return arr
             raise RuntimeError(f"No VV/HH CSLC dataset in {p}")
 
         coherence_ifgs: list[np.ndarray] = []

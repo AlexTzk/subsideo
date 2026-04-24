@@ -329,7 +329,16 @@ if __name__ == "__main__":
                                   "/science/SENTINEL1/CSLC/grids/VV",
                                   "/science/SENTINEL1/CSLC/grids/HH"):
                     if dset_path in f:
-                        stacks.append(f[dset_path][:].astype("complex64"))
+                        arr = f[dset_path][:].astype("complex64")
+                        # Rectangular CSLC grid is NaN outside the burst
+                        # parallelogram footprint; NaN poisons uniform_filter
+                        # and forces coh == 0 everywhere. Zero-fill so the
+                        # filter averages with 0s at the burst boundary.
+                        bad = ~(np.isfinite(arr.real) & np.isfinite(arr.imag))
+                        if bad.any():
+                            arr = arr.copy()
+                            arr[bad] = np.complex64(0)
+                        stacks.append(arr)
                         break
 
         coherence_stack = []
