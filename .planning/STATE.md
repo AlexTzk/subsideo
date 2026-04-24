@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
-status: executing
-stopped_at: Phase 2 complete (3/5 PASS, 2 FAIL w/ investigation); ready for `/gsd-execute-phase 3`
-last_updated: "2026-04-24T01:20:00.000Z"
-last_activity: 2026-04-23 -- Phase 02 complete (3/5 PASS w/ investigation)
+status: executing-partial
+stopped_at: "Phase 3 partial: Wave 1 (03-01, 03-02) complete; Wave 2 Task 1 (03-03, 03-04 code) complete; Wave 2 Task 2 compute (14-16h/cell) + Wave 3 (03-05 methodology) deferred to user. See 03-VERIFICATION.md."
+last_updated: "2026-04-24T05:15:00.000Z"
+last_activity: "2026-04-24 -- Phase 03 partial execution: scaffolding + probe + eval scripts landed; compute + methodology deferred"
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 14
-  completed_plans: 14
-  percent: 100
+  total_plans: 19
+  completed_plans: 16
+  percent: 84
 ---
 
 # Project State
@@ -21,14 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 03 — CSLC-S1 Self-Consistency + EU Validation (next)
+**Current focus:** Phase 03 — cslc-s1-self-consistency-eu-validation
 
 ## Current Position
 
-Phase: 02 (rtc-s1-eu-validation) — COMPLETE (3/5 PASS w/ investigation)
-Plan: 5 of 5
-Status: Phase 02 done; awaiting routing to Phase 03
-Last activity: 2026-04-23 -- Phase 02 complete (3/5 PASS; Alpine/Fire FAIL documented)
+Phase: 03 (cslc-s1-self-consistency-eu-validation) — PARTIAL (user-deferred compute)
+Plan: 2 of 5 fully complete + 2 partial (Task 1 only) + 1 deferred
+Status: Wave 1 ✅ done, Wave 2 Task 1 ✅ done, Wave 2 Task 2 + Wave 3 ❌ deferred to user
+Last activity: 2026-04-24 -- VERIFICATION.md committed, phase paused awaiting user compute runs
+
+**Resume path:** User runs `make eval-cslc-nam` (~12h) + `make eval-cslc-eu` (~12h), populates `CONCLUSIONS_CSLC_SELFCONSIST_NAM.md` + `CONCLUSIONS_CSLC_EU.md`, then invokes `/gsd-execute-phase 3` to pick up Plan 03-05 (methodology doc).
 
 ## Performance Metrics
 
@@ -132,7 +134,7 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 
 ## Session Continuity
 
-Last activity: 2026-04-22 — Phase 2 planned (5 plans, 4 waves; 11 checker findings resolved in revision pass); Phase 2 context gathered 2026-04-22; Phase 1 completed + code-review-fixed
-Last session: 2026-04-22
-Stopped at: Phase 2 planned; ready for `/gsd-execute-phase 2`
-Resume file: .planning/phases/02-rtc-s1-eu-validation/02-01-PLAN.md
+Last activity: 2026-04-23 — Phase 3 planned (5 plans, 3 waves; 14 checker findings resolved in revision 1 — no regression); Phase 3 CONTEXT gathered 2026-04-23; Phase 2 complete 2026-04-23
+Last session: 2026-04-23T20:30:00.000Z
+Stopped at: Phase 3 planned — ready to execute
+Resume file: .planning/phases/03-cslc-s1-self-consistency-eu-validation/03-01-PLAN.md
