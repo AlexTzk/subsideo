@@ -273,51 +273,71 @@ if __name__ == "__main__":
         return f"S1A_IW_SLC__{epoch.strftime('%Y%m%d')}*"
 
     def _download_safe_for_epoch(burst_id: str, epoch: datetime, dest_dir: Path) -> Path:
-        """Download Sentinel-1 SAFE for a burst epoch from CDSE (fallback path)."""
-        import boto3  # noqa: PLC0415
-        import pystac_client  # noqa: PLC0415
-        from botocore.config import Config  # noqa: PLC0415
+        """Download Sentinel-1 SAFE for a burst epoch from ASF.
+
+        Mirrors the NAM script: filters ASF search by relativeOrbit (parsed
+        from burst_id) + the burst footprint polygon so we don't accidentally
+        grab a different orbit acquiring at the same UTC minute. Validates
+        the zip before returning; corrupt partial downloads are deleted +
+        re-raised. CDSE STAC returned 0 items for 2024 Iberian queries,
+        ASF serves the same S1 SLCs reliably.
+        """
+        import zipfile  # noqa: PLC0415
+
+        import asf_search as asf  # noqa: PLC0415
+        from shapely.geometry import box as _shapely_box  # noqa: PLC0415
 
         dest_dir.mkdir(parents=True, exist_ok=True)
-        bounds = bounds_for_burst(burst_id, buffer_deg=0.5)
-        west, south, east, north = bounds
 
-        catalog = pystac_client.Client.open(
-            "https://catalogue.dataspace.copernicus.eu/stac",
-            headers={"Accept": "application/json"},
+        track_num = int(burst_id.split("_")[0].lstrip("t"))
+        bounds = bounds_for_burst(burst_id, buffer_deg=0.1)
+        wkt = _shapely_box(*bounds).wkt
+
+        window_start = (epoch - timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        window_end = (epoch + timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        results = asf.search(
+            platform=asf.PLATFORM.SENTINEL1,
+            processingLevel="SLC",
+            beamMode="IW",
+            relativeOrbit=track_num,
+            intersectsWith=wkt,
+            start=window_start,
+            end=window_end,
+            maxResults=5,
         )
-        window_start = (epoch - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        window_end = (epoch + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        items = catalog.search(
-            collections=["SENTINEL-1"],
-            bbox=[west, south, east, north],
-            datetime=f"{window_start}/{window_end}",
-            query={"productType": {"eq": "SLC"}},
-        ).item_collection()
-
-        if not items:
+        if not results:
             raise RuntimeError(
-                f"No Sentinel-1 SLC found for burst {burst_id} near {epoch.isoformat()}"
+                f"No S1 SLC found on ASF for {burst_id} "
+                f"(track={track_num}, bbox={bounds}) around {epoch}"
             )
+        scene = results[0]
+        granule_id = str(scene.properties["fileID"]).removesuffix("-SLC")
+        safe_path = dest_dir / f"{granule_id}.zip"
+        if not safe_path.exists():
+            logger.info("Downloading SAFE from ASF (~4 GB): {}", granule_id)
+            session = asf.ASFSession().auth_with_creds(
+                username=os.environ["EARTHDATA_USERNAME"],
+                password=os.environ["EARTHDATA_PASSWORD"],
+            )
+            scene.download(path=str(dest_dir), session=session)
+            zips = sorted(dest_dir.glob(f"{granule_id}*.zip"))
+            if not zips:
+                raise RuntimeError(
+                    f"ASF download failed for {granule_id}: no zip in {dest_dir}"
+                )
 
-        item = items[0]
-        s3_path = item.assets["PRODUCT"].href  # s3://eodata/...
-        bucket, key = s3_path.replace("s3://", "").split("/", 1)
-        safe_name = Path(key).name
-        dest = dest_dir / safe_name
-        if dest.exists():
-            return dest
-
-        s3 = boto3.client(
-            "s3",
-            endpoint_url="https://eodata.dataspace.copernicus.eu",
-            aws_access_key_id=os.environ.get("CDSE_CLIENT_ID", ""),
-            aws_secret_access_key=os.environ.get("CDSE_CLIENT_SECRET", ""),
-            config=Config(signature_version="s3v4"),
-        )
-        logger.info("Downloading {} from CDSE s3://{}/{}", safe_name, bucket, key)
-        s3.download_file(bucket, key, str(dest))
-        return dest
+        try:
+            with zipfile.ZipFile(safe_path) as zf:
+                if not any(".SAFE" in n for n in zf.namelist()):
+                    raise zipfile.BadZipFile("no .SAFE entries inside zip")
+        except zipfile.BadZipFile as err:
+            safe_path.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Downloaded SAFE {safe_path.name} is corrupt ({err}); "
+                "deleted — caller should retry the epoch"
+            ) from err
+        return safe_path
 
     def _compute_ifg_coherence_stack(
         hdf5_paths: list[Path],
