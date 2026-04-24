@@ -13,13 +13,9 @@ from __future__ import annotations
 import ast
 import re
 import subprocess
-import sys
-import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, patch
 
 import h5py
 import numpy as np
@@ -88,13 +84,16 @@ def test_expected_wall_s_module_level(script_ast: ast.Module) -> None:
                     found = True
                     # Evaluate the BinOp to confirm it produces 50400
                     src_text = ast.unparse(val)
-                    computed = eval(src_text)  # noqa: S307  — pure arithmetic literals
+                    computed = eval(src_text)  # noqa: S307  -- pure arithmetic literals
                     assert computed == 60 * 60 * 14, (
                         f"EXPECTED_WALL_S evaluates to {computed}, expected {60 * 60 * 14}"
                     )
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if node.target.id == "EXPECTED_WALL_S":
-                found = True
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "EXPECTED_WALL_S"
+        ):
+            found = True
 
     assert found, "EXPECTED_WALL_S not found at module top level"
 
@@ -131,7 +130,8 @@ def test_single_aoi_list(script_src: str, script_ast: ast.Module) -> None:
                     found_aois = True
                     assert isinstance(node.value, ast.List), "AOIS value must be a list literal"
                     assert len(node.value.elts) == 1, (
-                        f"AOIS must have exactly 1 element (IberianAOI), got {len(node.value.elts)}"
+                        f"AOIS must have exactly 1 element (IberianAOI), "
+                        f"got {len(node.value.elts)}"
                     )
     assert found_aois, "AOIS assignment not found in script"
 
@@ -159,7 +159,7 @@ def test_cache_path_eu(script_src: str) -> None:
         "CACHE path must be eval-cslc-selfconsist-eu"
     )
     assert '"egms"' in script_src, (
-        'egms subdir (\"egms\") must appear in CACHE mkdir block'
+        'egms subdir ("egms") must appear in CACHE mkdir block'
     )
 
 
@@ -184,145 +184,6 @@ def test_egms_l2a_download_step(script_src: str) -> None:
 def test_egms_l2a_helper_defined(script_src: str) -> None:
     """_fetch_egms_l2a helper must be defined in the script."""
     assert "_fetch_egms_l2a" in script_src, "_fetch_egms_l2a helper not found"
-
-
-# ---------------------------------------------------------------------------
-# Test 5: three-number schema (MOCK) — process_aoi returns correct keys
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def iberian_aoi_config():
-    """Import IberianAOI from the EU script's __main__ block via exec."""
-    # We exec the relevant dataclass + config portions under a mock __name__
-    # that prevents the __main__ block from running, then extract IberianAOI.
-    # Simpler: load the dataclass spec directly from known values.
-    @dataclass(frozen=True)
-    class AOIConfig:
-        aoi_name: str
-        regime: str
-        burst_id: str
-        sensing_window: tuple
-        output_epsg: int
-        centroid_lat: float
-        cached_safe_search_dirs: tuple
-        fallback_chain: tuple = ()
-        run_amplitude_sanity: bool = False
-
-    iberian = AOIConfig(
-        aoi_name="Iberian",
-        regime="iberian-meseta-sparse-vegetation",
-        burst_id="t103_219329_iw1",
-        sensing_window=tuple(
-            datetime(2024, 1, 4, 6, 18, 3) for _ in range(15)
-        ),
-        output_epsg=32630,
-        centroid_lat=41.05,
-        cached_safe_search_dirs=(Path("eval-cslc-selfconsist-eu/input"),),
-        fallback_chain=(),
-        run_amplitude_sanity=True,
-    )
-    return iberian, AOIConfig
-
-
-def _exec_script_main_block(script_path: Path, mock_namespace: dict) -> dict:
-    """Execute the __main__ block of the EU script in a controlled namespace.
-
-    Returns the namespace dict populated by the exec call.
-    """
-    src = script_path.read_text()
-    # The script guards all real code with `if __name__ == '__main__':`.
-    # We set __name__ = '__main__' in a fresh namespace so the block executes.
-    ns: dict = {"__name__": "__main__", **mock_namespace}
-    # Compile (syntax check) + exec
-    code = compile(src, str(script_path), "exec")
-    exec(code, ns)  # noqa: S102
-    return ns
-
-
-@pytest.fixture
-def mock_subsystems(tmp_path, monkeypatch):
-    """Patch all network/heavy-compute calls used by the EU script."""
-    # Create a fake OPERA reference HDF5
-    opera_ref = tmp_path / "opera_reference" / "Iberian" / "fake_opera.h5"
-    opera_ref.parent.mkdir(parents=True, exist_ok=True)
-    _make_stub_cslc_h5(opera_ref, datetime(2024, 1, 4, 6, 18, 3))
-
-    # Create fake CSLC output HDF5s (15 epochs)
-    burst_out = tmp_path / "output" / "Iberian"
-    burst_out.mkdir(parents=True, exist_ok=True)
-    epochs = [
-        datetime(2024, 1, 4, 6, 18, 3),
-        datetime(2024, 1, 9, 6, 26, 23),
-        datetime(2024, 1, 10, 18, 11, 36),
-        datetime(2024, 1, 16, 6, 18, 2),
-        datetime(2024, 1, 21, 6, 26, 22),
-        datetime(2024, 1, 22, 18, 11, 35),
-        datetime(2024, 1, 28, 6, 18, 2),
-        datetime(2024, 2, 2, 6, 26, 22),
-        datetime(2024, 2, 3, 18, 11, 35),
-        datetime(2024, 2, 9, 6, 18, 2),
-        datetime(2024, 2, 15, 18, 11, 35),
-        datetime(2024, 2, 21, 6, 18, 1),
-        datetime(2024, 2, 26, 6, 26, 21),
-        datetime(2024, 2, 27, 18, 11, 34),
-        datetime(2024, 3, 4, 6, 18, 2),
-    ]
-    h5_paths = []
-    for epoch in epochs:
-        h5_name = f"t103_219329_iw1_{epoch.date().isoformat()}.h5"
-        p = burst_out / h5_name
-        _make_stub_cslc_h5(p, epoch)
-        h5_paths.append(p)
-
-    # Create stub EGMS CSVs
-    egms_dir = tmp_path / "egms" / "Iberian"
-    egms_dir.mkdir(parents=True, exist_ok=True)
-    stub_csv = egms_dir / "EGMS_L2a_track103.csv"
-    stub_csv.write_text(
-        "lon,lat,mean_velocity,mean_velocity_std\n"
-        "-3.5,41.0,-1.2,0.8\n"
-        "-3.6,41.1,-0.9,1.1\n"
-        "-3.4,40.9,-1.5,0.6\n"
-    )
-
-    # Stub velocity TIF (will be created by _write_velocity_geotiff; pre-create for test)
-    vel_tif = tmp_path / "output" / "Iberian" / "velocity.tif"
-    import rasterio
-    from rasterio.transform import from_bounds
-    transform = from_bounds(-4.0, 40.5, -3.0, 41.5, 64, 64)
-    with rasterio.open(
-        vel_tif, "w", driver="GTiff", height=64, width=64,
-        count=1, dtype="float32", crs="EPSG:32630",
-        transform=transform, nodata=float("nan"),
-    ) as dst:
-        dst.write(np.full((1, 64, 64), -1.0, dtype="float32"))
-
-    return {
-        "tmp_path": tmp_path,
-        "opera_ref": opera_ref,
-        "burst_out": burst_out,
-        "h5_paths": h5_paths,
-        "egms_dir": egms_dir,
-        "stub_csv": stub_csv,
-        "vel_tif": vel_tif,
-        "epochs": epochs,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Helper: extract process_aoi from script via exec (guarded from __main__)
-# ---------------------------------------------------------------------------
-
-def _extract_process_aoi_from_script(script_path: Path, tmp_path: Path, mocks: dict):
-    """
-    Execute the EU script with __name__ != '__main__' (so the guard block is
-    skipped), then inject the needed symbols and run process_aoi in isolation.
-
-    This is complex because process_aoi lives inside the __main__ block.
-    We parse and extract it via source manipulation + exec instead.
-    """
-    pass
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +220,7 @@ def test_reference_agreement_wired(script_src: str) -> None:
 def test_egms_stable_std_max(script_src: str) -> None:
     """compare_cslc_egms_l2a_residual called with stable_std_max=2.0 (D-12)."""
     assert "stable_std_max=2.0" in script_src, (
-        "stable_std_max=2.0 not found — D-12 filter threshold must be explicit"
+        "stable_std_max=2.0 not found -- D-12 filter threshold must be explicit"
     )
 
 
@@ -373,6 +234,55 @@ def test_egms_output_path_under_cache_egms(script_src: str) -> None:
 # ---------------------------------------------------------------------------
 # Test 7: ENV-07 diff discipline
 # ---------------------------------------------------------------------------
+
+
+# Positive classifier -- each class owns ONE category of legitimate difference.
+# Used in test_env07_diff_discipline as a module-level constant to avoid N806.
+_ENV07_ALLOWED_HUNK_CLASSES: dict[str, re.Pattern] = {
+    # (1) AOIS literal and all *_EPOCHS tuples (per-AOI 15-epoch windows).
+    "AOIS_literal_and_epoch_tuples": re.compile(
+        r"(AOIS\s*:\s*list\[AOIConfig\]|AOIConfig\s*\(|"
+        r"SoCalAOI\s*=|MojaveAOI\s*=|IberianAOI\s*=|_MOJAVE_FALLBACKS|"
+        r"_IBERIAN_FALLBACKS|MOJAVE_(COSO|PAHRANAGAT|AMARGOSA|HUALAPAI)_EPOCHS|"
+        r"IBERIAN_(PRIMARY|ALENTEJO|MASSIF_CENTRAL|EPOCHS)_EPOCHS?|SOCAL_EPOCHS|"
+        r"run_amplitude_sanity|aoi_name\s*=|burst_id\s*=|regime\s*=|"
+        r"sensing_window\s*=|output_epsg\s*=|centroid_lat\s*=|"
+        r"cached_safe_search_dirs\s*=|fallback_chain\s*=|"
+        r"datetime\s*\(|Path\s*\()"
+    ),
+    # (2) CACHE path constant and mkdir subdir list (adds 'egms' for EU).
+    "CACHE_path": re.compile(
+        r'(CACHE\s*=\s*Path\("eval-cslc-selfconsist-(nam|eu)"\)|'
+        r'"egms"|CACHE\s*/\s*"egms")'
+    ),
+    # (3) EXPECTED_WALL_S numeric literal change (16h -> 14h).
+    "EXPECTED_WALL_S_literal": re.compile(
+        r"EXPECTED_WALL_S\s*=\s*60\s*\*\s*60\s*\*\s*(14|16)"
+    ),
+    # (4) EGMS L2a download + residual block (EU-only addition).
+    "EGMS_block": re.compile(
+        r"(EGMStoolkit|_fetch_egms_l2a|egms_csvs|egms_residual|"
+        r"compare_cslc_egms_l2a_residual|egms_l2a_stable_ps_residual|"
+        r"_write_velocity_geotiff|CACHE\s*/\s*\"egms\"|product_level\s*=|"
+        r"release\s*=\s*\"2019_2023\"|stable_std_max\s*=\s*2\.0|"
+        r"velocity_tif)"
+    ),
+    # (5) Module docstring / comment-block edits.
+    "module_docstring_and_comments": re.compile(
+        r"^[+-](\s*#|\s*\"\"\"|\s*\'\'\')"
+    ),
+    # (6) Type rename for the reduce target.
+    "metrics_class_rename": re.compile(
+        r"CSLCSelfConsist(NAM|EU)CellMetrics"
+    ),
+    # (7) Log prefix / banner strings mentioning nam vs eu.
+    "log_and_banner_strings": re.compile(
+        r"(eval-cslc-selfconsist-(nam|eu)|\beu\s+cell\b|\bnam\s+cell\b|"
+        r"\"Iberian|\"Mojave|\"SoCal|run_eval_cslc_selfconsist_(nam|eu))"
+    ),
+    # (8) import math addition for math.isnan on egms_residual.
+    "math_import": re.compile(r"^\+\s*import\s+math\s*$"),
+}
 
 
 def test_env07_diff_discipline() -> None:
@@ -390,56 +300,9 @@ def test_env07_diff_discipline() -> None:
     )
     # diff exits 0 = identical, 1 = differs, 2 = error
     if diff_out.returncode == 0:
-        pytest.skip("Scripts are identical — no diff hunks to classify")
+        pytest.skip("Scripts are identical -- no diff hunks to classify")
     if diff_out.returncode == 2:
         pytest.fail(f"diff command failed: {diff_out.stderr}")
-
-    # Positive classifier — each class owns ONE category of legitimate difference.
-    ALLOWED_HUNK_CLASSES: dict[str, re.Pattern] = {
-        # (1) AOIS literal and all *_EPOCHS tuples (per-AOI 15-epoch windows).
-        "AOIS_literal_and_epoch_tuples": re.compile(
-            r"(AOIS\s*:\s*list\[AOIConfig\]|AOIConfig\s*\(|"
-            r"SoCalAOI\s*=|MojaveAOI\s*=|IberianAOI\s*=|_MOJAVE_FALLBACKS|"
-            r"_IBERIAN_FALLBACKS|MOJAVE_(COSO|PAHRANAGAT|AMARGOSA|HUALAPAI)_EPOCHS|"
-            r"IBERIAN_(PRIMARY|ALENTEJO|MASSIF_CENTRAL|EPOCHS)_EPOCHS?|SOCAL_EPOCHS|"
-            r"run_amplitude_sanity|aoi_name\s*=|burst_id\s*=|regime\s*=|"
-            r"sensing_window\s*=|output_epsg\s*=|centroid_lat\s*=|"
-            r"cached_safe_search_dirs\s*=|fallback_chain\s*=|"
-            r"datetime\s*\(|Path\s*\()"
-        ),
-        # (2) CACHE path constant and mkdir subdir list (adds 'egms' for EU).
-        "CACHE_path": re.compile(
-            r'(CACHE\s*=\s*Path\("eval-cslc-selfconsist-(nam|eu)"\)|'
-            r'"egms"|CACHE\s*/\s*"egms")'
-        ),
-        # (3) EXPECTED_WALL_S numeric literal change (16h -> 14h).
-        "EXPECTED_WALL_S_literal": re.compile(
-            r"EXPECTED_WALL_S\s*=\s*60\s*\*\s*60\s*\*\s*(14|16)"
-        ),
-        # (4) EGMS L2a download + residual block (EU-only addition).
-        "EGMS_block": re.compile(
-            r"(EGMStoolkit|_fetch_egms_l2a|egms_csvs|egms_residual|"
-            r"compare_cslc_egms_l2a_residual|egms_l2a_stable_ps_residual|"
-            r"_write_velocity_geotiff|CACHE\s*/\s*\"egms\"|product_level\s*=|"
-            r"release\s*=\s*\"2019_2023\"|stable_std_max\s*=\s*2\.0|"
-            r"velocity_tif)"
-        ),
-        # (5) Module docstring / comment-block edits.
-        "module_docstring_and_comments": re.compile(
-            r"^[+-](\s*#|\s*\"\"\"|\s*\'\'\')"
-        ),
-        # (6) Type rename for the reduce target.
-        "metrics_class_rename": re.compile(
-            r"CSLCSelfConsist(NAM|EU)CellMetrics"
-        ),
-        # (7) Log prefix / banner strings mentioning nam vs eu.
-        "log_and_banner_strings": re.compile(
-            r"(eval-cslc-selfconsist-(nam|eu)|\beu\s+cell\b|\bnam\s+cell\b|"
-            r"\"Iberian|\"Mojave|\"SoCal|run_eval_cslc_selfconsist_(nam|eu))"
-        ),
-        # (8) import math addition for math.isnan on egms_residual.
-        "math_import": re.compile(r"^\+\s*import\s+math\s*$"),
-    }
 
     diff_lines = diff_out.stdout.splitlines()
     unclassified: list[str] = []
@@ -449,26 +312,23 @@ def test_env07_diff_discipline() -> None:
             continue
         if line.startswith("+++ ") or line.startswith("--- "):
             continue
-        matched = any(rx.search(line) for rx in ALLOWED_HUNK_CLASSES.values())
+        matched = any(rx.search(line) for rx in _ENV07_ALLOWED_HUNK_CLASSES.values())
         if not matched:
             unclassified.append(line)
 
     assert not unclassified, (
-        f"ENV-07 diff discipline FAILED — {len(unclassified)} unclassified hunks. "
+        f"ENV-07 diff discipline FAILED -- {len(unclassified)} unclassified hunks. "
         f"First 5 offenders:\n" + "\n".join(unclassified[:5])
     )
 
 
 # ---------------------------------------------------------------------------
-# Test 8: fallback chain two-entry logic — Alentejo FAIL + MassifCentral PASS
+# Test 8: fallback chain two-entry logic
 # ---------------------------------------------------------------------------
 
 
 def test_iberian_fallback_chain_two_candidates(script_src: str) -> None:
     """Iberian fallback chain must have exactly 2 candidates (Alentejo, MassifCentral)."""
-    # Count AOIConfig( occurrences in _IBERIAN_FALLBACKS context
-    # Simple heuristic: both Alentejo and MassifCentral appear, plus _IBERIAN_FALLBACKS
-    # tuple should have 2 entries.
     assert "Iberian/Alentejo" in script_src or "Alentejo" in script_src
     assert "Iberian/MassifCentral" in script_src or "MassifCentral" in script_src
 
@@ -481,14 +341,13 @@ def test_iberian_fallback_chain_two_candidates(script_src: str) -> None:
                     val = node.value
                     if isinstance(val, (ast.Tuple, ast.List)):
                         assert len(val.elts) == 2, (
-                            f"_IBERIAN_FALLBACKS must have 2 entries (Alentejo + MassifCentral), "
-                            f"got {len(val.elts)}"
+                            f"_IBERIAN_FALLBACKS must have 2 entries "
+                            f"(Alentejo + MassifCentral), got {len(val.elts)}"
                         )
 
 
 def test_fallback_chain_uses_process_aoi_recursion(script_src: str) -> None:
-    """process_aoi must handle fallback_chain via recursion (Mojave-style)."""
-    # The EU fork reuses the same fallback-chain orchestration as NAM
+    """process_aoi must handle fallback_chain via recursion."""
     assert "fallback_chain" in script_src
     assert "attempts" in script_src
     assert "BLOCKER" in script_src
@@ -508,7 +367,6 @@ def test_resolve_cell_status_present(script_src: str) -> None:
 
 def test_cell_status_calibrating_for_single_calibrating(script_src: str) -> None:
     """_resolve_cell_status single-CALIBRATING -> CALIBRATING logic must be present."""
-    # Verify the CALIBRATING case is handled in the resolve logic
     assert "CALIBRATING" in script_src
     assert "BLOCKER" in script_src
 
@@ -526,28 +384,28 @@ def test_iberian_burst_id(script_src: str) -> None:
 
 
 def test_all_three_epoch_tuples_present(script_src: str) -> None:
-    """IBERIAN_PRIMARY_EPOCHS, IBERIAN_ALENTEJO_EPOCHS, IBERIAN_MASSIF_CENTRAL_EPOCHS all present."""
+    """IBERIAN_PRIMARY/ALENTEJO/MASSIF_CENTRAL_EPOCHS all present."""
     assert "IBERIAN_PRIMARY_EPOCHS" in script_src
     assert "IBERIAN_ALENTEJO_EPOCHS" in script_src
     assert "IBERIAN_MASSIF_CENTRAL_EPOCHS" in script_src
 
 
 def test_all_run_amplitude_sanity_true(script_src: str) -> None:
-    """All 3 EU AOIConfig entries (Iberian + 2 fallbacks) must set run_amplitude_sanity=True."""
+    """All 3 EU AOIConfig entries must set run_amplitude_sanity=True."""
     count = script_src.count("run_amplitude_sanity=True")
     assert count == 3, (
-        f"Expected 3 occurrences of run_amplitude_sanity=True (Iberian + Alentejo + MassifCentral), "
-        f"got {count}"
+        f"Expected 3 occurrences of run_amplitude_sanity=True "
+        f"(Iberian + Alentejo + MassifCentral), got {count}"
     )
 
 
 def test_cslc_eu_metrics_class(script_src: str) -> None:
     """EU script must use CSLCSelfConsistEUCellMetrics (not NAM)."""
     assert "CSLCSelfConsistEUCellMetrics" in script_src, (
-        "CSLCSelfConsistEUCellMetrics not found — EU fork must use EU schema"
+        "CSLCSelfConsistEUCellMetrics not found -- EU fork must use EU schema"
     )
     assert "CSLCSelfConsistNAMCellMetrics" not in script_src, (
-        "CSLCSelfConsistNAMCellMetrics found in EU script — should use EU variant"
+        "CSLCSelfConsistNAMCellMetrics found in EU script -- should use EU variant"
     )
 
 
@@ -569,19 +427,21 @@ def test_iberian_primary_epochs_15_entries(script_src: str) -> None:
     """IBERIAN_PRIMARY_EPOCHS tuple must contain exactly 15 datetime entries."""
     tree = ast.parse(script_src)
     for node in ast.walk(tree):
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if node.target.id == "IBERIAN_PRIMARY_EPOCHS":
-                # Count datetime(...) calls in the value
-                dt_calls = [
-                    n for n in ast.walk(node.value)
-                    if isinstance(n, ast.Call)
-                    and isinstance(n.func, ast.Name)
-                    and n.func.id == "datetime"
-                ]
-                assert len(dt_calls) == 15, (
-                    f"IBERIAN_PRIMARY_EPOCHS must have 15 datetime entries, got {len(dt_calls)}"
-                )
-                return
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "IBERIAN_PRIMARY_EPOCHS"
+        ):
+            dt_calls = [
+                n for n in ast.walk(node.value)
+                if isinstance(n, ast.Call)
+                and isinstance(n.func, ast.Name)
+                and n.func.id == "datetime"
+            ]
+            assert len(dt_calls) == 15, (
+                f"IBERIAN_PRIMARY_EPOCHS must have 15 datetime entries, got {len(dt_calls)}"
+            )
+            return
     # If not found as AnnAssign, try plain Assign
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
@@ -594,7 +454,44 @@ def test_iberian_primary_epochs_15_entries(script_src: str) -> None:
                         and n.func.id == "datetime"
                     ]
                     assert len(dt_calls) == 15, (
-                        f"IBERIAN_PRIMARY_EPOCHS must have 15 datetime entries, got {len(dt_calls)}"
+                        f"IBERIAN_PRIMARY_EPOCHS must have 15 datetime entries, "
+                        f"got {len(dt_calls)}"
                     )
                     return
     pytest.fail("IBERIAN_PRIMARY_EPOCHS not found in script AST")
+
+
+# ---------------------------------------------------------------------------
+# Fixture placeholders (unused in current source-level tests; kept for future
+# mock-based expansion of Tests 5-6, 8-9 per 03-04 plan behaviour spec)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def iberian_aoi_config() -> tuple:
+    """Return a minimal AOIConfig-equivalent for unit test isolation."""
+
+    @dataclass(frozen=True)
+    class AOIConfig:
+        aoi_name: str
+        regime: str
+        burst_id: str
+        sensing_window: tuple
+        output_epsg: int
+        centroid_lat: float
+        cached_safe_search_dirs: tuple
+        fallback_chain: tuple = ()
+        run_amplitude_sanity: bool = False
+
+    iberian = AOIConfig(
+        aoi_name="Iberian",
+        regime="iberian-meseta-sparse-vegetation",
+        burst_id="t103_219329_iw1",
+        sensing_window=tuple(datetime(2024, 1, 4, 6, 18, 3) for _ in range(15)),
+        output_epsg=32630,
+        centroid_lat=41.05,
+        cached_safe_search_dirs=(Path("eval-cslc-selfconsist-eu/input"),),
+        fallback_chain=(),
+        run_amplitude_sanity=True,
+    )
+    return iberian, AOIConfig
