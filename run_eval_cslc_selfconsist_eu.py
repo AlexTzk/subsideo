@@ -236,8 +236,21 @@ if __name__ == "__main__":
                 "worldcover", "coastline", "sanity", "egms"):
         (CACHE / sub).mkdir(parents=True, exist_ok=True)
 
-    # Path to EU burst DB (built by Phase 1 burst/db.py)
-    EU_BURST_DB_PATH = Path(os.path.expanduser("~/.subsideo/eu_burst_db.sqlite"))
+    # compass needs a real burst_database_file path. The OPERA burst DB
+    # (opera-adt/burst_db v0.9.0 opera-burst-bbox-only.sqlite3) covers all
+    # global S1 bursts including the EU — t103_219329_iw1 Meseta-North has
+    # an entry there (EPSG 32630). Phase 1's planned eu_burst_db.sqlite
+    # doesn't exist yet, so reuse the OPERA DB the NAM script auto-fetches
+    # (cached at ~/.subsideo/opera_burst_bbox.sqlite3).
+    EU_BURST_DB_PATH = Path.home() / ".subsideo" / "opera_burst_bbox.sqlite3"
+    if not EU_BURST_DB_PATH.exists():
+        raise RuntimeError(
+            f"OPERA burst DB missing at {EU_BURST_DB_PATH}; "
+            f"run `make eval-cslc-nam` once to trigger auto-fetch, "
+            f"or fetch manually from "
+            f"https://github.com/opera-adt/burst_db/releases/download/"
+            f"v0.9.0/opera-burst-bbox-only.sqlite3.zip"
+        )
 
     run_started = time.time()
     run_started_iso = datetime.now().astimezone().strftime("%Y-%m-%dT%H:%M:%SZ")
