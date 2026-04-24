@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "git_sha": "00774ca3dd03af8968f575e121bee72928264ddb",
+  "git_dirty": true,
+  "run_started_iso": "2026-04-23T16:02:52Z",
+  "run_duration_s": 4204.319921731949,
+  "python_version": "3.12.13",
+  "platform": "macOS-26.3.1-arm64-arm-64bit",
+  "input_hashes": {
+    "t066_140413_iw1_dem_sha256": "0101a6e3589e53777961835149fb94cabf575478cf6b08432dc5e2973c01f0a0",
+    "t066_140413_iw1_opera_ref_sha256": "a03d847f54bf2702e78ac9d817c9c42684d00783f2896c58d7c66e438e7d920b",
+    "t058_122828_iw3_dem_sha256": "3495e4b66935caaf1c40339ac291a766a2d2397bd683e25dacf67cbd9637a07b",
+    "t058_122828_iw3_opera_ref_sha256": "14c125d049010eac66f69f44f4b38179c6126605f8795b520e5f69583de26a80",
+    "t103_219329_iw1_dem_sha256": "520258cb1043a2a2045a573bbcabdbe3c395466a291b4f0be31feb73460bb7f0",
+    "t103_219329_iw1_opera_ref_sha256": "c5a032b72340e948df0004b238c781cc383d4017541398c9efa59128752d4675",
+    "t117_249422_iw2_dem_sha256": "78825a86676e6397393ab6fd6ea21cb25b817deb958fef3ea10551524af3bd20",
+    "t117_249422_iw2_opera_ref_sha256": "0f6609ba3ddc464fb1e2e28a29f5114222c8ceac19f18a96b5fadc6e47df3439"
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "product_quality": {
+    "measurements": {},
+    "criterion_ids": []
+  },
+  "reference_agreement": {
+    "measurements": {
+      "worst_rmse_db": 0.3538820483233178,
+      "worst_correlation": 0.992572147480582
+    },
+    "criterion_ids": [
+      "rtc.rmse_db_max",
+      "rtc.correlation_min"
+    ]
+  },
+  "criterion_ids_applied": [
+    "rtc.rmse_db_max",
+    "rtc.correlation_min"
+  ],
+  "runtime_conda_list_hash": null,
+  "pass_count": 3,
+  "total": 5,
+  "all_pass": false,
+  "any_investigation_required": true,
+  "reference_agreement_aggregate": {
+    "worst_rmse_db": 0.3538820483233178,
+    "worst_r": 0.992572147480582,
+    "worst_burst_id": "t103_219329_iw1"
+  },
+  "per_burst": [
+    {
+      "burst_id": "t066_140413_iw1",
+      "regime": "Alpine",
+      "lat": 46.35,
+      "max_relief_m": 3796.048355102539,
+      "cached": true,
+      "status": "FAIL",
+      "product_quality": null,
+      "reference_agreement": {
+        "measurements": {
+          "rmse_db": 1.152239329685004,
+          "correlation": 0.975351032684654,
+          "bias_db": -0.21084742182531657
+        },
+        "criterion_ids": [
+          "rtc.rmse_db_max",
+          "rtc.correlation_min"
+        ]
+      },
+      "investigation_required": true,
+      "investigation_reason": "RMSE 1.152 dB >= 0.15 dB; r 0.9754 < 0.999",
+      "error": null,
+      "traceback": null
+    },
+    {
+      "burst_id": "t058_122828_iw3",
+      "regime": "Scandinavian",
+      "lat": 67.15,
+      "max_relief_m": 487.82701110839844,
+      "cached": true,
+      "status": "PASS",
+      "product_quality": null,
+      "reference_agreement": {
+        "measurements": {
+          "rmse_db": 0.1375208546483603,
+          "correlation": 0.9993144636624055,
+          "bias_db": -0.010359646230191474
+        },
+        "criterion_ids": [
+          "rtc.rmse_db_max",
+          "rtc.correlation_min"
+        ]
+      },
+      "investigation_required": false,
+      "investigation_reason": null,
+      "error": null,
+      "traceback": null
+    },
+    {
+      "burst_id": "t103_219329_iw1",
+      "regime": "Iberian",
+      "lat": 41.15,
+      "max_relief_m": 1494.3344116210938,
+      "cached": false,
+      "status": "PASS",
+      "product_quality": null,
+      "reference_agreement": {
+        "measurements": {
+          "rmse_db": 0.3538820483233178,
+          "correlation": 0.992572147480582,
+          "bias_db": -0.029193668987088677
+        },
+        "criterion_ids": [
+          "rtc.rmse_db_max",
+          "rtc.correlation_min"
+        ]
+      },
+      "investigation_required": true,
+      "investigation_reason": "RMSE 0.354 dB >= 0.15 dB; r 0.9926 < 0.999",
+      "error": null,
+      "traceback": null
+    },
+    {
+      "burst_id": "t117_249422_iw2",
+      "regime": "TemperateFlat",
+      "lat": 44.5,
+      "max_relief_m": 1015.8565425872803,
+      "cached": true,
+      "status": "PASS",
+      "product_quality": null,
+      "reference_agreement": {
+        "measurements": {
+          "rmse_db": 0.12841445262618673,
+          "correlation": 0.9996194318042807,
+          "bias_db": -0.006068610174881991
+        },
+        "criterion_ids": [
+          "rtc.rmse_db_max",
+          "rtc.correlation_min"
+        ]
+      },
+      "investigation_required": false,
+      "investigation_reason": null,
+      "error": null,
+      "traceback": null
+    },
+    {
+      "burst_id": "t045_094744_iw3",
+      "regime": "Fire",
+      "lat": 40.7,
+      "max_relief_m": null,
+      "cached": false,
+      "status": "FAIL",
+      "product_quality": null,
+      "reference_agreement": {
+        "measurements": {},
+        "criterion_ids": []
+      },
+      "investigation_required": false,
+      "investigation_reason": null,
+      "error": "RuntimeError(\"run_rtc failed for t045_094744_iw3: ['opera-rtc processing failed']\")",
+      "traceback": "Traceback (most recent call last):\n  File \"/Volumes/Geospatial/Geospatial/subsideo/.claude/worktrees/agent-afead852/run_eval_rtc_eu.py\", line 566, in <module>\n    row = process_burst(cfg)\n          ^^^^^^^^^^^^^^^^^^\n  File \"/Volumes/Geospatial/Geospatial/subsideo/.claude/worktrees/agent-afead852/run_eval_rtc_eu.py\", line 492, in process_burst\n    raise RuntimeError(\nRuntimeError: run_rtc failed for t045_094744_iw3: ['opera-rtc processing failed']\n"
+    }
+  ]
+}
