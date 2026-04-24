@@ -684,8 +684,19 @@ if __name__ == "__main__":
             bounds, tiles_dir=wc_tiles
         )
 
-        # 2. DEM + slope
-        dem_path = fetch_dem(bounds, output_dir=CACHE / "dem")
+        # 2. DEM + slope (fetch_dem requires output_epsg and returns a tuple)
+        dem_aoi_dir = CACHE / "dem" / cfg.aoi_name
+        dem_tifs = sorted(dem_aoi_dir.glob("*.tif")) if dem_aoi_dir.exists() else []
+        if dem_tifs:
+            dem_path = dem_tifs[0]
+            logger.info("DEM cached for {}: {}", cfg.aoi_name, dem_path.name)
+        else:
+            dem_path, _ = fetch_dem(
+                bounds=list(bounds),
+                output_epsg=cfg.output_epsg,
+                output_dir=dem_aoi_dir,
+            )
+            logger.info("DEM fetched for {}: {}", cfg.aoi_name, dem_path.name)
         slope_deg, dem_transform, dem_crs = _compute_slope_deg(dem_path)
 
         # 3. Align WorldCover onto the DEM grid (WC is EPSG:4326 10m; DEM is UTM 30m)
@@ -727,7 +738,13 @@ if __name__ == "__main__":
                 )
                 if safe is None:
                     safe = _download_safe_for_epoch(cfg.burst_id, epoch, CACHE / "input")
-                orbit = fetch_orbit(safe, output_dir=CACHE / "orbits")
+                # fetch_orbit takes (sensing_time, satellite, output_dir); pass epoch
+                # explicitly rather than the SAFE path.
+                orbit = fetch_orbit(
+                    sensing_time=epoch,
+                    satellite="S1A",
+                    output_dir=CACHE / "orbits",
+                )
                 if epoch_idx == 0 and cfg.run_amplitude_sanity:
                     # D-07 amplitude sanity -- gated on per-AOI AOIConfig flag.
                     # BLOCKER 4 fix: flag drives whether compare_cslc runs;
