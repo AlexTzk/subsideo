@@ -53,7 +53,6 @@ if __name__ == "__main__":
     from subsideo.data.natural_earth import load_coastline_and_waterbodies
     from subsideo.data.orbits import fetch_orbit
     from subsideo.data.worldcover import fetch_worldcover_class60, load_worldcover_for_bbox
-    from subsideo.products import _mp
     from subsideo.products.cslc import run_cslc
     from subsideo.validation.compare_cslc import compare_cslc, compare_cslc_egms_l2a_residual
     from subsideo.validation.criteria import CRITERIA  # noqa: F401
@@ -753,7 +752,8 @@ if __name__ == "__main__":
                             [chosen_meta["_granule"]],
                             str(CACHE / "opera_reference" / cfg.aoi_name),
                         )
-                _mp.configure_multiprocessing()
+                # run_cslc calls subsideo._mp.configure_multiprocessing() at
+                # its top (Phase 1 D-14), so no explicit call needed here.
                 run_cslc(
                     safe_paths=[safe],
                     orbit_path=orbit,
