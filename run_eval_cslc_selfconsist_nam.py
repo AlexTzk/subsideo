@@ -1008,10 +1008,29 @@ if __name__ == "__main__":
             "(DEM shape {} → CSLC shape {}); n_stable_on_cslc={}",
             cfg.aoi_name, stable_mask.shape, cslc_shape, n_stable_on_cslc,
         )
-        if n_stable_on_cslc < 1000:
+
+        # Intersect with CSLC valid-data mask. The CSLC output is a rectangular
+        # grid, but the burst footprint is a parallelogram — ~64% of the grid
+        # (for SoCal t144_308029_iw1) is NaN/zero outside the footprint.
+        # Coherence is structurally 0 on those pixels, so leaving them in the
+        # stable mask drags per-pixel-mean coherence to 0.0. Derive validity
+        # from the coherence stack itself (pixels with any non-zero coherence
+        # must have valid SLC data); avoids re-reading the h5.
+        valid_on_cslc = (ifgrams_stack > 0).any(axis=0)
+        stable_mask_cslc = stable_mask_cslc & valid_on_cslc
+        n_stable_valid = int(stable_mask_cslc.sum())
+        logger.info(
+            "{}: intersected stable_mask with CSLC valid-data: "
+            "{} → {} pixels ({} dropped as NaN/zero burst corners)",
+            cfg.aoi_name, n_stable_on_cslc, n_stable_valid,
+            n_stable_on_cslc - n_stable_valid,
+        )
+        if n_stable_valid < 100:
             raise RuntimeError(
-                f"{cfg.aoi_name}: stable_mask_cslc has only {n_stable_on_cslc} "
-                f"pixels after reprojection; DEM/CSLC extent overlap too small"
+                f"{cfg.aoi_name}: stable_mask_cslc has only {n_stable_valid} "
+                f"valid pixels after burst-footprint intersection "
+                f"(was {n_stable_on_cslc} before); AOI too sparse or "
+                f"stable-terrain criteria too strict for this burst"
             )
 
         coh_stats = coherence_stats(

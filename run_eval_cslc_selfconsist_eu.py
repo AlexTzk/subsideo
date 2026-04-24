@@ -759,15 +759,72 @@ if __name__ == "__main__":
         # <burst_id>_<YYYYMMDD>.h5, so recurse.
         cslc_h5s = sorted(burst_out.rglob("*.h5"))
         ifgrams_stack = _compute_ifg_coherence_stack(cslc_h5s, boxcar_px=5)
-        coh_stats = coherence_stats(ifgrams_stack, stable_mask, coherence_threshold=0.6)
+
+        # Reproject stable_mask (DEM grid, ~30m) onto the CSLC output grid
+        # (OPERA 5m range × 10m azimuth per compass runconfig). coherence_stats
+        # + residual_mean_velocity boolean-index the coherence stack, which is
+        # on the CSLC grid, so the mask must match.
+        import h5py  # noqa: PLC0415
+        from affine import Affine  # noqa: PLC0415
+        from rasterio.warp import Resampling, reproject  # noqa: PLC0415
+
+        with h5py.File(cslc_h5s[0], "r") as _f:
+            _xc = _f["/data/x_coordinates"][:]
+            _yc = _f["/data/y_coordinates"][:]
+            _xs = float(_f["/data/x_spacing"][()])
+            _ys = float(_f["/data/y_spacing"][()])
+            _epsg = int(_f["/data/projection"][()])
+        cslc_transform = Affine(_xs, 0, _xc[0] - _xs / 2, 0, _ys, _yc[0] - _ys / 2)
+        cslc_crs = f"EPSG:{_epsg}"
+        cslc_shape = (ifgrams_stack.shape[-2], ifgrams_stack.shape[-1])
+        stable_mask_cslc = np.zeros(cslc_shape, dtype=np.uint8)
+        reproject(
+            source=stable_mask.astype(np.uint8),
+            destination=stable_mask_cslc,
+            src_transform=dem_transform,
+            src_crs=dem_crs,
+            dst_transform=cslc_transform,
+            dst_crs=cslc_crs,
+            resampling=Resampling.nearest,
+        )
+        stable_mask_cslc = stable_mask_cslc.astype(bool)
+        n_stable_on_cslc = int(stable_mask_cslc.sum())
+        logger.info(
+            "{}: reprojected stable_mask onto CSLC grid "
+            "(DEM shape {} → CSLC shape {}); n_stable_on_cslc={}",
+            cfg.aoi_name, stable_mask.shape, cslc_shape, n_stable_on_cslc,
+        )
+
+        # Intersect with CSLC valid-data mask. The rectangular CSLC grid has
+        # NaN/zero corners outside the burst parallelogram footprint;
+        # coherence is structurally 0 there. Derived from the coherence stack
+        # itself to avoid re-reading the h5.
+        valid_on_cslc = (ifgrams_stack > 0).any(axis=0)
+        stable_mask_cslc = stable_mask_cslc & valid_on_cslc
+        n_stable_valid = int(stable_mask_cslc.sum())
+        logger.info(
+            "{}: intersected stable_mask with CSLC valid-data: "
+            "{} → {} pixels ({} dropped as NaN/zero burst corners)",
+            cfg.aoi_name, n_stable_on_cslc, n_stable_valid,
+            n_stable_on_cslc - n_stable_valid,
+        )
+        if n_stable_valid < 100:
+            raise RuntimeError(
+                f"{cfg.aoi_name}: stable_mask_cslc has only {n_stable_valid} "
+                f"valid pixels after burst-footprint intersection "
+                f"(was {n_stable_on_cslc} before); AOI too sparse or "
+                f"stable-terrain criteria too strict for this burst"
+            )
+
+        coh_stats = coherence_stats(ifgrams_stack, stable_mask_cslc, coherence_threshold=0.6)
 
         # 7. Residual velocity (linear-fit per D-Claude's-Discretion)
         velocity_raster = compute_residual_velocity(
             cslc_h5s,
-            stable_mask,
+            stable_mask_cslc,
             sensing_dates=list(cfg.sensing_window),
         )
-        residual = residual_mean_velocity(velocity_raster, stable_mask, frame_anchor="median")
+        residual = residual_mean_velocity(velocity_raster, stable_mask_cslc, frame_anchor="median")
 
         # 8. Amplitude sanity -- gated on per-AOI run_amplitude_sanity flag (D-07)
         ra_result: ReferenceAgreementResultJson | None = None
@@ -798,13 +855,14 @@ if __name__ == "__main__":
                     cfg.aoi_name,
                 )
 
-        # 9. Stable-mask sanity artifacts (P2.1 mitigation) — mask is on DEM/UTM grid
+        # 9. Stable-mask sanity artifacts (P2.1 mitigation) — use the CSLC-grid
+        # stable_mask so per-pixel-mean coherence indexing matches the stack.
         _write_sanity_artifacts(
             cfg.aoi_name,
-            stable_mask=stable_mask,
+            stable_mask=stable_mask_cslc,
             coherence_stack=ifgrams_stack,
-            transform=dem_transform,
-            crs=dem_crs,
+            transform=cslc_transform,
+            crs=cslc_crs,
             out_dir=CACHE / "sanity" / cfg.aoi_name,
         )
 
@@ -816,10 +874,12 @@ if __name__ == "__main__":
             if egms_csvs:
                 # velocity_raster was computed above; persist as GeoTIFF so
                 # compare_cslc_egms_l2a_residual can rasterio.open it.
+                # velocity_raster is on the CSLC grid (from compute_residual_velocity);
+                # use cslc_transform/cslc_crs to write it as a georeferenced GeoTIFF.
                 velocity_tif = _write_velocity_geotiff(
                     velocity_raster,
-                    wc_transform,
-                    wc_crs,
+                    cslc_transform,
+                    cslc_crs,
                     out_path=CACHE / "output" / cfg.aoi_name / "velocity.tif",
                 )
                 egms_residual = compare_cslc_egms_l2a_residual(
