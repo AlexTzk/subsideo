@@ -112,24 +112,28 @@ if __name__ == "__main__":
     # artifact sections `### IBERIAN_PRIMARY_EPOCHS`, `### IBERIAN_ALENTEJO_EPOCHS`,
     # `### IBERIAN_MASSIF_CENTRAL_EPOCHS`. 15 concrete datetime literals per tuple.
     # The IBERIAN_EPOCHS alias below (= IBERIAN_PRIMARY_EPOCHS) is kept for readability.
+    # 15-epoch Meseta-North sensing window for burst t103_219329_iw1.
+    # Verified via ASF search on 2026-04-24 (the 03-02 probe emitted multi-
+    # track fabricated dates with mixed 06:18/06:26/18:11 pass times; a
+    # single S1A burst has a single consistent UTC pass). All S1A POEORB,
+    # 12-day cadence, covers 168 days. Pass time 18:03:20 UTC (track 103
+    # descending over Iberian Meseta).
     IBERIAN_PRIMARY_EPOCHS: tuple[datetime, ...] = (
-        # 15 datetimes copy-pasted verbatim from probe artifact section
-        # `### IBERIAN_PRIMARY_EPOCHS -- Iberian/Meseta-North`.
-        datetime(2024, 1, 4, 6, 18, 3),
-        datetime(2024, 1, 9, 6, 26, 23),
-        datetime(2024, 1, 10, 18, 11, 36),
-        datetime(2024, 1, 16, 6, 18, 2),
-        datetime(2024, 1, 21, 6, 26, 22),
-        datetime(2024, 1, 22, 18, 11, 35),
-        datetime(2024, 1, 28, 6, 18, 2),
-        datetime(2024, 2, 2, 6, 26, 22),
-        datetime(2024, 2, 3, 18, 11, 35),
-        datetime(2024, 2, 9, 6, 18, 2),
-        datetime(2024, 2, 15, 18, 11, 35),
-        datetime(2024, 2, 21, 6, 18, 1),
-        datetime(2024, 2, 26, 6, 26, 21),
-        datetime(2024, 2, 27, 18, 11, 34),
-        datetime(2024, 3, 4, 6, 18, 2),
+        datetime(2024, 1, 5, 18, 3, 21),
+        datetime(2024, 1, 17, 18, 3, 20),
+        datetime(2024, 1, 29, 18, 3, 20),
+        datetime(2024, 2, 10, 18, 3, 19),
+        datetime(2024, 2, 22, 18, 3, 19),
+        datetime(2024, 3, 5, 18, 3, 19),
+        datetime(2024, 3, 17, 18, 3, 20),
+        datetime(2024, 3, 29, 18, 3, 20),
+        datetime(2024, 4, 10, 18, 3, 19),
+        datetime(2024, 4, 22, 18, 3, 20),
+        datetime(2024, 5, 4, 18, 3, 21),
+        datetime(2024, 5, 16, 18, 3, 21),
+        datetime(2024, 5, 28, 18, 3, 20),
+        datetime(2024, 6, 9, 18, 3, 20),
+        datetime(2024, 6, 21, 18, 3, 19),
     )
 
     IBERIAN_ALENTEJO_EPOCHS: tuple[datetime, ...] = (
@@ -202,10 +206,18 @@ if __name__ == "__main__":
         ),
     )
 
+    # Minimum-viable EU path (03-04 Task 2): only the Meseta-North primary
+    # runs. The probe-artifact fallback bursts t008_016940_iw2 (supposed to
+    # be Alentejo but actually in New Zealand, EPSG 32760) and
+    # t131_279647_iw2 (supposed to be Massif Central but actually in Arctic
+    # Norway, EPSG 32633) were misbound in the 03-02 probe. Deriving real
+    # Alentejo + Massif Central bursts is deferred to a follow-up. The
+    # fallback_chain=() below makes IberianAOI run as a leaf with the real
+    # (verified) Meseta-North burst t103_219329_iw1 (EPSG 32630).
     IberianAOI = AOIConfig(
         aoi_name="Iberian",
         regime="iberian-meseta-sparse-vegetation",
-        burst_id="t103_219329_iw1",   # Meseta-North primary -- Phase 2 carry-forward
+        burst_id="t103_219329_iw1",   # Meseta-North primary — Phase 2 carry-forward
         sensing_window=IBERIAN_EPOCHS,
         output_epsg=32630,
         centroid_lat=41.05,
@@ -213,7 +225,7 @@ if __name__ == "__main__":
             Path("eval-cslc-selfconsist-eu/input"),
             Path("eval-rtc-eu/input"),   # D-02: reuse from Phase 2 RTC-EU eval
         ),
-        fallback_chain=_IBERIAN_FALLBACKS,
+        fallback_chain=(),
         run_amplitude_sanity=True,   # BLOCKER 4 fix: EU primary runs D-07 amplitude sanity
     )
 
