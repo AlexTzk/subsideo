@@ -156,26 +156,31 @@ if __name__ == "__main__":
                     OPERA_BURST_DB_PATH, OPERA_BURST_DB_PATH.stat().st_size)
         return OPERA_BURST_DB_PATH
 
-    # -- Locked sensing windows (from 03-02 probe artifact, user-approved) ---
-
-    # 15-epoch SoCal sensing window (locked from 03-02 probe, user-approved 2026-04-24):
-    # S1A 12-day cadence, all POEORB, no RESORB. burst_id = t144_308029_iw1.
+    # -- Locked sensing windows --------------------------------------------
+    #
+    # 15-epoch SoCal sensing window for burst t144_308029_iw1.
+    # Verified via ASF search against the real burst footprint on 2026-04-24
+    # (the 03-02 probe emitted fabricated 12-day-cadence dates starting
+    # 2024-01-13T14:01:16Z that did NOT correspond to actual acquisitions —
+    # this tuple is the ground truth pulled from asf_search with
+    # relativeOrbit=144 + intersectsWith=burst.footprint). All S1A POEORB,
+    # 12-day cadence, covers 168 days.
     SOCAL_EPOCHS: tuple[datetime, ...] = (
-        datetime(2024, 1, 13, 14, 1, 16),
-        datetime(2024, 1, 25, 14, 1, 16),
-        datetime(2024, 2, 6, 14, 1, 16),
-        datetime(2024, 2, 18, 14, 1, 16),
-        datetime(2024, 3, 1, 14, 1, 16),
-        datetime(2024, 3, 13, 14, 1, 16),
-        datetime(2024, 3, 25, 14, 1, 16),
-        datetime(2024, 4, 6, 14, 1, 16),
-        datetime(2024, 4, 18, 14, 1, 16),
-        datetime(2024, 4, 30, 14, 1, 16),
-        datetime(2024, 5, 12, 14, 1, 16),
-        datetime(2024, 5, 24, 14, 1, 16),
-        datetime(2024, 6, 5, 14, 1, 16),
-        datetime(2024, 6, 17, 14, 1, 16),
-        datetime(2024, 6, 29, 14, 1, 16),
+        datetime(2024, 1, 8, 14, 1, 14),
+        datetime(2024, 1, 20, 14, 1, 14),
+        datetime(2024, 2, 1, 14, 1, 13),
+        datetime(2024, 2, 13, 14, 1, 13),
+        datetime(2024, 2, 25, 14, 1, 13),
+        datetime(2024, 3, 8, 14, 1, 13),
+        datetime(2024, 3, 20, 14, 1, 13),
+        datetime(2024, 4, 1, 14, 1, 14),
+        datetime(2024, 4, 13, 14, 1, 13),
+        datetime(2024, 4, 25, 14, 1, 14),
+        datetime(2024, 5, 7, 14, 1, 14),
+        datetime(2024, 5, 19, 14, 1, 14),
+        datetime(2024, 5, 31, 14, 1, 14),
+        datetime(2024, 6, 12, 14, 1, 13),
+        datetime(2024, 6, 24, 14, 1, 13),
     )
 
     SoCalAOI = AOIConfig(
@@ -200,10 +205,15 @@ if __name__ == "__main__":
     # _compute_ifg_coherence_stack requires >=2 epochs. The fallback policy
     # (CONTEXT D-11) picks WHICH burst; it does not relax the stack shape.
 
-    # ### MOJAVE_COSO_EPOCHS — Mojave/Coso-Searles
-    # burst_id: t064_135527_iw2 (probe artifact row 1, score 302.40)
-    # All S1A POEORB, 12-day cadence (epoch 14 shift due to S1A schedule)
+    # All four tuples below were regenerated via asf.search on 2026-04-24
+    # (the original probe had fabricated dates / mixed tracks / synthetic
+    # placeholders). Each tuple is the last 15 real acquisitions for that
+    # specific track/burst through 2024-06-30, extending back into late 2023
+    # where H1 2024 alone had fewer than 15 acquisitions.
+
+    # ### MOJAVE_COSO_EPOCHS — Mojave/Coso-Searles (track 064)
     MOJAVE_COSO_EPOCHS: tuple[datetime, ...] = (
+        datetime(2023, 12, 22, 1, 51, 11),
         datetime(2024, 1, 3, 1, 51, 11),
         datetime(2024, 1, 15, 1, 51, 10),
         datetime(2024, 1, 27, 1, 51, 10),
@@ -217,12 +227,10 @@ if __name__ == "__main__":
         datetime(2024, 5, 2, 1, 51, 11),
         datetime(2024, 5, 14, 1, 51, 11),
         datetime(2024, 5, 26, 1, 51, 11),
-        datetime(2024, 6, 7, 13, 52, 3),
         datetime(2024, 6, 19, 1, 51, 10),
     )
 
-    # ### MOJAVE_PAHRANAGAT_EPOCHS — Mojave/Pahranagat
-    # burst_id: t173_370296_iw2 (probe artifact row 2, score 135.30)
+    # ### MOJAVE_PAHRANAGAT_EPOCHS — Mojave/Pahranagat (track 173)
     MOJAVE_PAHRANAGAT_EPOCHS: tuple[datetime, ...] = (
         datetime(2024, 1, 10, 13, 43, 40),
         datetime(2024, 1, 22, 13, 43, 40),
@@ -241,48 +249,42 @@ if __name__ == "__main__":
         datetime(2024, 6, 26, 13, 43, 39),
     )
 
-    # ### MOJAVE_AMARGOSA_EPOCHS — Mojave/Amargosa
-    # burst_id: t064_135530_iw3 (probe artifact row 3, score 224.75)
+    # ### MOJAVE_AMARGOSA_EPOCHS — Mojave/Amargosa (track 064)
     MOJAVE_AMARGOSA_EPOCHS: tuple[datetime, ...] = (
+        datetime(2023, 12, 22, 1, 51, 11),
         datetime(2024, 1, 3, 1, 51, 11),
-        datetime(2024, 1, 10, 13, 43, 40),
         datetime(2024, 1, 15, 1, 51, 10),
-        datetime(2024, 1, 22, 13, 43, 40),
         datetime(2024, 1, 27, 1, 51, 10),
-        datetime(2024, 2, 3, 13, 43, 40),
         datetime(2024, 2, 8, 1, 51, 10),
-        datetime(2024, 2, 15, 13, 43, 39),
         datetime(2024, 2, 20, 1, 51, 10),
-        datetime(2024, 2, 27, 13, 43, 39),
         datetime(2024, 3, 3, 1, 51, 10),
-        datetime(2024, 3, 10, 13, 43, 39),
         datetime(2024, 3, 15, 1, 51, 10),
-        datetime(2024, 3, 22, 13, 43, 40),
         datetime(2024, 3, 27, 1, 51, 10),
+        datetime(2024, 4, 8, 1, 51, 11),
+        datetime(2024, 4, 20, 1, 51, 11),
+        datetime(2024, 5, 2, 1, 51, 11),
+        datetime(2024, 5, 14, 1, 51, 11),
+        datetime(2024, 5, 26, 1, 51, 11),
+        datetime(2024, 6, 19, 1, 51, 10),
     )
 
-    # ### MOJAVE_HUALAPAI_EPOCHS — Mojave/Hualapai
-    # burst_id: t100_213507_iw2 (probe artifact row 4, score 141.20)
-    # [SYNTHETIC FALLBACK] ASF query returned < 15 scenes or failed.
-    # User MUST confirm or override this list before Plan 03-03/04 lock.
-    # These epochs mirror SOCAL_EPOCHS cadence as a synthetic placeholder
-    # because the ASF query failed to return 15 distinct scenes for this burst.
+    # ### MOJAVE_HUALAPAI_EPOCHS — Mojave/Hualapai (track 100)
     MOJAVE_HUALAPAI_EPOCHS: tuple[datetime, ...] = (
-        datetime(2024, 1, 13, 14, 1, 16),
-        datetime(2024, 1, 25, 14, 1, 16),
-        datetime(2024, 2, 6, 14, 1, 16),
-        datetime(2024, 2, 18, 14, 1, 16),
-        datetime(2024, 3, 1, 14, 1, 16),
-        datetime(2024, 3, 13, 14, 1, 16),
-        datetime(2024, 3, 25, 14, 1, 16),
-        datetime(2024, 4, 6, 14, 1, 16),
-        datetime(2024, 4, 18, 14, 1, 16),
-        datetime(2024, 4, 30, 14, 1, 16),
-        datetime(2024, 5, 12, 14, 1, 16),
-        datetime(2024, 5, 24, 14, 1, 16),
-        datetime(2024, 6, 5, 14, 1, 16),
-        datetime(2024, 6, 17, 14, 1, 16),
-        datetime(2024, 6, 29, 14, 1, 16),
+        datetime(2023, 12, 24, 13, 35, 57),
+        datetime(2024, 1, 5, 13, 35, 57),
+        datetime(2024, 1, 17, 13, 35, 56),
+        datetime(2024, 1, 29, 13, 35, 56),
+        datetime(2024, 2, 10, 13, 35, 55),
+        datetime(2024, 2, 22, 13, 35, 55),
+        datetime(2024, 3, 5, 13, 35, 55),
+        datetime(2024, 3, 17, 13, 35, 56),
+        datetime(2024, 3, 29, 13, 35, 56),
+        datetime(2024, 4, 10, 13, 35, 55),
+        datetime(2024, 4, 22, 13, 35, 56),
+        datetime(2024, 5, 4, 13, 35, 57),
+        datetime(2024, 5, 28, 13, 35, 57),
+        datetime(2024, 6, 9, 13, 35, 56),
+        datetime(2024, 6, 21, 13, 35, 56),
     )
 
     # Mojave fallback chain — probe-locked order (D-11, highest score first):
