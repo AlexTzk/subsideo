@@ -10,13 +10,16 @@ import pytest
 
 
 def test_coherence_stats_keys_exact() -> None:
-    """Return dict must have EXACTLY five keys -- no extras (CSLC-02 + P2.2)."""
+    """Return dict must have EXACTLY six keys -- no extras (CSLC-02 + P2.2 + Phase 3 D-01)."""
     from subsideo.validation.selfconsistency import coherence_stats
 
     stack = np.full((3, 10, 10), 0.8, dtype=np.float32)
     mask = np.ones((10, 10), dtype=bool)
     stats = coherence_stats(stack, mask)
-    assert set(stats.keys()) == {"mean", "median", "p25", "p75", "persistently_coherent_fraction"}
+    assert set(stats.keys()) == {
+        "mean", "median", "p25", "p75",
+        "persistently_coherent_fraction", "median_of_persistent",
+    }
 
 
 def test_coherence_stats_all_floats() -> None:
@@ -31,13 +34,16 @@ def test_coherence_stats_all_floats() -> None:
 
 
 def test_coherence_stats_empty_mask_returns_zeros() -> None:
-    """Empty stable_mask: every field returns 0.0, no crash."""
+    """Empty stable_mask: every field returns 0.0, no crash (Phase 3 D-01: 6 keys)."""
     from subsideo.validation.selfconsistency import coherence_stats
 
     stack = np.full((3, 4, 4), 0.8, dtype=np.float32)
     mask = np.zeros((4, 4), dtype=bool)
     stats = coherence_stats(stack, mask)
-    assert set(stats.keys()) == {"mean", "median", "p25", "p75", "persistently_coherent_fraction"}
+    assert set(stats.keys()) == {
+        "mean", "median", "p25", "p75",
+        "persistently_coherent_fraction", "median_of_persistent",
+    }
     for v in stats.values():
         assert v == 0.0
 
@@ -174,11 +180,99 @@ def test_residual_mean_velocity_nan_tolerant() -> None:
     assert np.isfinite(result)
 
 
-def test_coherence_stats_docstring_mentions_five_keys() -> None:
-    """Docstring advertises the five keys Phase 3/4 consumers need."""
+def test_coherence_stats_docstring_mentions_six_keys() -> None:
+    """Docstring advertises the six keys Phase 3/4 consumers need (D-01 update)."""
     from subsideo.validation.selfconsistency import coherence_stats
 
     doc = coherence_stats.__doc__ or ""
     assert "persistently_coherent_fraction" in doc
     assert "mean" in doc
     assert "median" in doc
+    assert "median_of_persistent" in doc
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 additions: median_of_persistent (6th stat key, D-01 + P2.2)
+# ---------------------------------------------------------------------------
+
+
+class TestMedianOfPersistent:
+    """Phase 3 D-01: coherence_stats returns 6th key 'median_of_persistent'."""
+
+    def test_six_key_shape(self) -> None:
+        """Return dict must have EXACTLY six keys including median_of_persistent."""
+        from subsideo.validation.selfconsistency import coherence_stats
+
+        stack = np.full((14, 20, 20), 0.85, dtype=np.float32)
+        mask = np.zeros((20, 20), dtype=bool)
+        mask[:10, :10] = True  # 100 stable pixels
+        stats = coherence_stats(stack, mask)
+        assert set(stats.keys()) == {
+            "mean", "median", "p25", "p75",
+            "persistently_coherent_fraction", "median_of_persistent",
+        }
+
+    def test_median_of_persistent_value(self) -> None:
+        """median_of_persistent ~ 0.85 on a uniform 0.85 stack (tolerance 1e-6)."""
+        from subsideo.validation.selfconsistency import coherence_stats
+
+        stack = np.full((14, 20, 20), 0.85, dtype=np.float32)
+        mask = np.zeros((20, 20), dtype=bool)
+        mask[:10, :10] = True
+        stats = coherence_stats(stack, mask)
+        assert stats["median_of_persistent"] == pytest.approx(0.85, abs=1e-5)
+
+    def test_bimodal_contamination_robustness(self) -> None:
+        """P2.2 robustness: median_of_persistent ignores 20% contaminants.
+
+        80 pixels at coh=0.85 (stable), 20 pixels at coh=0.25 (contaminants).
+        The plain mean drops to ~0.73; median_of_persistent stays ~0.85.
+        """
+        from subsideo.validation.selfconsistency import coherence_stats
+
+        # 100-pixel stable mask, (14, 10, 10) stack
+        stack = np.full((14, 10, 10), 0.85, dtype=np.float32)
+        # Last 20 pixels (columns 8-9 all rows) = 0.25 in every IFG
+        stack[:, :, 8:] = 0.25
+        mask = np.ones((10, 10), dtype=bool)
+        stats = coherence_stats(stack, mask, coherence_threshold=0.6)
+        # The 20 contaminants never exceed 0.6 so they are NOT persistently coherent.
+        # persistently_coherent_fraction should be 0.8 (80/100 pixels)
+        assert stats["persistently_coherent_fraction"] == pytest.approx(0.8, abs=1e-3)
+        # median_of_persistent should be ~0.85 (ignores the 0.25 contaminants)
+        assert stats["median_of_persistent"] == pytest.approx(0.85, abs=1e-5)
+        # Plain mean drops because contaminants pull it down
+        assert stats["mean"] < stats["median_of_persistent"] - 0.05
+
+    def test_empty_mask_sentinel_returns_zero(self) -> None:
+        """Empty stable_mask: median_of_persistent returns 0.0, not NaN/missing."""
+        from subsideo.validation.selfconsistency import coherence_stats
+
+        stack = np.full((3, 10, 10), 0.8, dtype=np.float32)
+        mask = np.zeros((10, 10), dtype=bool)
+        stats = coherence_stats(stack, mask)
+        # Must have 6 keys and median_of_persistent == 0.0
+        assert "median_of_persistent" in stats
+        assert stats["median_of_persistent"] == 0.0
+
+    def test_nan_handling_in_persistent_computation(self) -> None:
+        """NaN coherence entries are treated as 0 before persistence check."""
+        from subsideo.validation.selfconsistency import coherence_stats
+
+        stack = np.full((3, 5, 5), 0.8, dtype=np.float32)
+        stack[0, 0, 0] = np.nan  # NaN -> 0.0 after cleaning
+        mask = np.ones((5, 5), dtype=bool)
+        stats = coherence_stats(stack, mask)
+        # Must not crash; result should be finite
+        assert np.isfinite(stats["median_of_persistent"])
+        assert "median_of_persistent" in stats
+
+    def test_compute_residual_velocity_stub_importable(self) -> None:
+        """compute_residual_velocity stub is importable with correct name."""
+        from subsideo.validation import selfconsistency
+        assert hasattr(selfconsistency, "compute_residual_velocity")
+        fn = selfconsistency.compute_residual_velocity
+        import inspect
+        sig = inspect.signature(fn)
+        assert "cslc_stack_paths" in sig.parameters
+        assert "stable_mask" in sig.parameters

@@ -229,7 +229,13 @@ def _load_egms_l2a_points(
                 f"'{velocity_col}'. Available: {list(df.columns)[:15]}"
             )
 
-        frames.append(df[["lon", "lat", velocity_col]])
+        # Optional mean_velocity_std column (Phase 3 D-12 stable-PS filter).
+        # Existing compare_disp_egms_l2a does not require it; keep it as an
+        # additive column only when the CSV publishes it (backward-compat).
+        cols_to_keep = ["lon", "lat", velocity_col]
+        if "mean_velocity_std" in df.columns:
+            cols_to_keep.append("mean_velocity_std")
+        frames.append(df[cols_to_keep])
 
     merged = pd.concat(frames, ignore_index=True)
     logger.info("Loaded {} EGMS L2a points from {} file(s)", len(merged), len(csv_paths))

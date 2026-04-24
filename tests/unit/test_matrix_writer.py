@@ -473,3 +473,255 @@ def test_non_rtc_eu_cells_render_unchanged(tmp_path: Path) -> None:
     # MUST NOT render as X/N PASS (that's RTC-EU format).
     assert "/1 PASS" not in body
     assert "/5 PASS" not in body
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 additions: CSLC self-consistency rendering (D-03 + D-06 + D-11 + W8)
+# ---------------------------------------------------------------------------
+
+
+def _make_cslc_selfconsist_metrics(
+    tmp_path: Path,
+    eval_dir_name: str,
+    *,
+    cell_status: str = "CALIBRATING",
+    any_blocker: bool = False,
+    worst_coh: float = 0.78,
+    worst_resid: float = 2.1,
+    worst_aoi: str = "SoCal",
+    worst_amp_r: float | None = 0.79,
+    worst_amp_rmse_db: float | None = 3.8,
+    per_aoi: list[dict] | None = None,
+    egms_resid: float | None = None,
+) -> Path:
+    """Write a synthetic CSLCSelfConsist metrics.json to tmp_path."""
+    d = tmp_path / eval_dir_name
+    d.mkdir(exist_ok=True)
+
+    if per_aoi is None:
+        per_aoi = [
+            {
+                "aoi_name": "SoCal", "regime": "", "burst_id": None,
+                "sensing_window": [], "status": "CALIBRATING",
+                "attempt_index": 0, "reason": None, "attempts": [],
+                "stable_mask_pixels": None,
+                "product_quality": {
+                    "measurements": {
+                        "coherence_median_of_persistent": worst_coh,
+                        "residual_mm_yr": worst_resid,
+                        **({"egms_l2a_stable_ps_residual_mm_yr": egms_resid} if egms_resid else {}),
+                    },
+                    "criterion_ids": ["cslc.selfconsistency.coherence_min"],
+                },
+                "reference_agreement": (
+                    {"measurements": {"amplitude_r": worst_amp_r,
+                                      "amplitude_rmse_db": worst_amp_rmse_db},
+                     "criterion_ids": ["cslc.amplitude_r_min"]}
+                    if worst_amp_r is not None else None
+                ),
+                "error": None, "traceback": None,
+            },
+        ]
+
+    body = {
+        "schema_version": 1,
+        "product_quality": {"measurements": {}, "criterion_ids": []},
+        "reference_agreement": {"measurements": {}, "criterion_ids": []},
+        "criterion_ids_applied": ["cslc.selfconsistency.coherence_min"],
+        "runtime_conda_list_hash": None,
+        "pass_count": 1,
+        "total": len(per_aoi),
+        "cell_status": cell_status,
+        "any_blocker": any_blocker,
+        "product_quality_aggregate": {
+            "worst_coherence_median_of_persistent": worst_coh,
+            "worst_residual_mm_yr": worst_resid,
+            "worst_aoi": worst_aoi,
+        },
+        "reference_agreement_aggregate": {
+            **({"worst_amp_r": worst_amp_r, "worst_amp_rmse_db": worst_amp_rmse_db,
+                "worst_aoi": worst_aoi} if worst_amp_r is not None else {}),
+        },
+        "per_aoi": per_aoi,
+    }
+    p = d / "metrics.json"
+    p.write_text(json.dumps(body))
+    return p
+
+
+def _write_cslc_selfconsist_manifest(tmp_path: Path, *, region: str = "nam") -> Path:
+    dir_name = f"eval-cslc-selfconsist-{region}"
+    m = tmp_path / "manifest.yml"
+    m.write_text(
+        yaml.safe_dump({
+            "schema_version": 1,
+            "cells": [{
+                "product": "cslc",
+                "region": region,
+                "eval_script": f"run_eval_cslc_selfconsist_{region}.py",
+                "cache_dir": str(tmp_path / dir_name),
+                "metrics_file": str(tmp_path / dir_name / "metrics.json"),
+                "meta_file": str(tmp_path / dir_name / "meta.json"),
+                "conclusions_doc": f"CONCLUSIONS_CSLC_SELFCONSIST_{region.upper()}.md",
+            }],
+        })
+    )
+    return m
+
+
+class TestCSLCSelfConsistRendering:
+    def test_is_cslc_selfconsist_shape_detects_per_aoi(self, tmp_path: Path) -> None:
+        from subsideo.validation.matrix_writer import _is_cslc_selfconsist_shape
+
+        p_aoi = tmp_path / "with_per_aoi.json"
+        p_aoi.write_text(json.dumps({"per_aoi": []}))
+        assert _is_cslc_selfconsist_shape(p_aoi) is True
+
+        p_no = tmp_path / "without_per_aoi.json"
+        p_no.write_text(json.dumps({"per_burst": []}))
+        assert _is_cslc_selfconsist_shape(p_no) is False
+
+    def test_is_cslc_selfconsist_shape_prioritised_over_rtc_eu(
+        self, tmp_path: Path
+    ) -> None:
+        """JSON with both per_aoi and per_burst -> selfconsist shape wins (D-11)."""
+        from subsideo.validation.matrix_writer import (
+            _is_cslc_selfconsist_shape,
+            _is_rtc_eu_shape,
+        )
+
+        p = tmp_path / "both.json"
+        p.write_text(json.dumps({"per_aoi": [], "per_burst": []}))
+        assert _is_cslc_selfconsist_shape(p) is True
+        assert _is_rtc_eu_shape(p) is True  # Also True, but selfconsist checked first
+
+    def test_calibrating_cell_renders_italicised(self, tmp_path: Path) -> None:
+        """CALIBRATING status renders with *...* italics (Phase 1 D-03)."""
+        from subsideo.validation.matrix_writer import write_matrix
+
+        manifest = _write_cslc_selfconsist_manifest(tmp_path, region="nam")
+        _make_cslc_selfconsist_metrics(
+            tmp_path, "eval-cslc-selfconsist-nam",
+            cell_status="CALIBRATING", any_blocker=False,
+            worst_coh=0.78, worst_resid=2.1, worst_aoi="SoCal",
+        )
+        out = tmp_path / "matrix.md"
+        write_matrix(manifest, out)
+        body = out.read_text()
+        cslc_row = [ln for ln in body.splitlines() if "| CSLC | NAM |" in ln]
+        assert len(cslc_row) == 1, f"Expected 1 CSLC NAM row, got: {cslc_row}"
+        assert "*" in cslc_row[0], f"CALIBRATING should be italicised: {cslc_row[0]}"
+        assert "CALIBRATING" in cslc_row[0]
+
+    def test_calibrating_cell_pq_format(self, tmp_path: Path) -> None:
+        """PQ column: 'X/N CALIBRATING | coh=A.AA / resid=B.B mm/yr (AOI)' format."""
+        from subsideo.validation.matrix_writer import _render_cslc_selfconsist_cell
+
+        metrics_path = _make_cslc_selfconsist_metrics(
+            tmp_path, "eval-cslc-selfconsist-nam",
+            worst_coh=0.78, worst_resid=2.1, worst_aoi="SoCal",
+        )
+        result = _render_cslc_selfconsist_cell(metrics_path, region="nam")
+        assert result is not None
+        pq_col, ra_col = result
+        assert "CALIBRATING" in pq_col
+        assert "coh=0.78" in pq_col
+        assert "resid=2.1" in pq_col
+        assert "(SoCal)" in pq_col  # W8 attribution fix
+        assert "|" in pq_col  # pipe delimiter between status and metrics
+
+    def test_blocker_mixed_rendering_with_aoi_attribution(
+        self, tmp_path: Path
+    ) -> None:
+        """MIXED cell: '1/2 CALIBRATING, 1/2 BLOCKER | coh=... (AOI)' with U+26A0 in RA."""
+        from subsideo.validation.matrix_writer import _render_cslc_selfconsist_cell
+
+        per_aoi = [
+            {
+                "aoi_name": "SoCal", "regime": "", "burst_id": None,
+                "sensing_window": [], "status": "CALIBRATING",
+                "attempt_index": 0, "reason": None, "attempts": [],
+                "stable_mask_pixels": None,
+                "product_quality": {
+                    "measurements": {"coherence_median_of_persistent": 0.78,
+                                     "residual_mm_yr": 2.1},
+                    "criterion_ids": ["cslc.selfconsistency.coherence_min"],
+                },
+                "reference_agreement": None,
+                "error": None, "traceback": None,
+            },
+            {
+                "aoi_name": "Mojave", "regime": "", "burst_id": None,
+                "sensing_window": [], "status": "BLOCKER",
+                "attempt_index": 0, "reason": "All fallbacks failed", "attempts": [],
+                "stable_mask_pixels": None,
+                "product_quality": None,
+                "reference_agreement": None,
+                "error": None, "traceback": None,
+            },
+        ]
+        body = {
+            "schema_version": 1,
+            "product_quality": {"measurements": {}, "criterion_ids": []},
+            "reference_agreement": {"measurements": {}, "criterion_ids": []},
+            "criterion_ids_applied": [],
+            "runtime_conda_list_hash": None,
+            "pass_count": 1, "total": 2,
+            "cell_status": "MIXED", "any_blocker": True,
+            "product_quality_aggregate": {
+                "worst_coherence_median_of_persistent": 0.78,
+                "worst_residual_mm_yr": 2.1,
+                "worst_aoi": "SoCal",
+            },
+            "reference_agreement_aggregate": {},
+            "per_aoi": per_aoi,
+        }
+        metrics_path = tmp_path / "metrics_mixed.json"
+        metrics_path.write_text(json.dumps(body))
+
+        result = _render_cslc_selfconsist_cell(metrics_path, region="nam")
+        assert result is not None
+        pq_col, ra_col = result
+        assert "1/2 CALIBRATING" in pq_col
+        assert "1/2 BLOCKER" in pq_col
+        assert "(SoCal)" in pq_col  # attribution of worst-case AOI
+        # U+26A0 warning glyph when any_blocker=True
+        assert "⚠" in pq_col or "⚠" in ra_col
+
+    def test_eu_cell_three_numbers(self, tmp_path: Path) -> None:
+        """EU cell PQ shows egms_resid= metric (three-number schema per CSLC-05)."""
+        from subsideo.validation.matrix_writer import _render_cslc_selfconsist_cell
+
+        metrics_path = _make_cslc_selfconsist_metrics(
+            tmp_path, "eval-cslc-selfconsist-eu",
+            cell_status="CALIBRATING", any_blocker=False,
+            worst_coh=0.75, worst_resid=2.8, worst_aoi="Iberian",
+            worst_amp_r=0.81, worst_amp_rmse_db=3.2,
+            egms_resid=1.9,
+        )
+        result = _render_cslc_selfconsist_cell(metrics_path, region="eu")
+        assert result is not None
+        pq_col, ra_col = result
+        assert "egms_resid=1.9" in pq_col
+
+    def test_rtc_eu_rendering_unaffected_by_phase3(self, tmp_path: Path) -> None:
+        """Regression: RTC-EU cell still renders X/N PASS correctly."""
+        from subsideo.validation.matrix_writer import write_matrix
+
+        manifest = _write_rtc_eu_manifest(tmp_path)
+        _write_rtc_eu_metrics(tmp_path, pass_count=5, total=5,
+                              any_investigation_required=False)
+        out = tmp_path / "matrix.md"
+        write_matrix(manifest, out)
+        body = out.read_text()
+        assert "5/5 PASS" in body
+
+    def test_makefile_references_selfconsist_scripts(self) -> None:
+        """Makefile eval-cslc-nam/eu targets must reference selfconsist scripts."""
+        makefile = Path("Makefile").read_text()
+        assert "run_eval_cslc_selfconsist_nam.py" in makefile, (
+            "Makefile eval-cslc-nam must point to run_eval_cslc_selfconsist_nam.py"
+        )
+        assert "run_eval_cslc_selfconsist_eu.py" in makefile, (
+            "Makefile eval-cslc-eu must point to run_eval_cslc_selfconsist_eu.py"
+        )
