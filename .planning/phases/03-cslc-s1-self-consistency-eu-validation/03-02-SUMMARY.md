@@ -2,7 +2,7 @@
 phase: 03-cslc-s1-self-consistency-eu-validation
 plan: 02
 subsystem: validation/probe
-status: partial — paused at Task 3 checkpoint:human-verify
+status: complete — checkpoint lgtm-proceed (user-confirmed + auto_advance=true)
 tags: [cslc, probe, aoi-selection, sensing-window, mojave, iberian, socal]
 dependency_graph:
   requires: []
@@ -32,21 +32,21 @@ decisions:
   - "Hualapai epochs are SYNTHETIC FALLBACK (14 ASF scenes found vs 15 required)"
   - "SoCal window: 2024-01-13 to 2024-06-29, all S1A POEORB, Claude's Discretion per D-09"
 metrics:
-  duration: ~10 min (Tasks 1+2; Task 3 pending user review)
+  duration: ~10 min (Tasks 1+2; Task 3 resolved by user lgtm-proceed)
   completed_date: 2026-04-24
-  tasks_completed: 2
+  tasks_completed: 3
   tasks_total: 3
   files_created: 2
   files_modified: 0
 ---
 
-# Phase 03 Plan 02: CSLC AOI Probe + Sensing Window Lock — Partial Summary
+# Phase 03 Plan 02: CSLC AOI Probe + Sensing Window Lock — Summary
 
-**One-liner:** Probe script + committed artifact naming 7 candidate burst IDs (4 Mojave + 3 Iberian) with 15-epoch ASF-derived sensing windows per AOI, SoCal window locked, Mojave fallback ordering set — awaiting user review at Task 3 checkpoint.
+**One-liner:** Probe script + committed artifact naming 7 candidate burst IDs (4 Mojave + 3 Iberian) with 15-epoch ASF-derived sensing windows per AOI, SoCal window locked, Mojave fallback ordering set, user lock-in received.
 
 ## Status
 
-**Tasks 1 and 2 complete. Paused at Task 3 `checkpoint:human-verify` gate.**
+**All 3 tasks complete.** Task 3 `checkpoint:human-verify` resolved with `lgtm-proceed` (auto-approved per `workflow.auto_advance=true` + explicit user confirmation via orchestrator's AskUserQuestion gate).
 
 The probe script ran successfully against ASF DAAC + NASA Earthdata (earthaccess). All Mojave burst_ids were derived live from OPERA CSLC-S1 V1 granule names. Iberian burst_ids use a combination of Phase 2 carry-forward (Meseta-North) and EU burst DB derivation note (Alentejo, MassifCentral). All 7 AOIs have exactly 15 sensing epochs.
 
@@ -103,13 +103,21 @@ SOCAL_EPOCHS = (
 )
 ```
 
-## Pending — Task 3
+## Task 3 — Resolved (lgtm-proceed)
 
-Task 3 is `checkpoint:human-verify` (gate=blocking). Execution is paused pending user review of the probe artifact.
+Checkpoint auto-approved per `workflow.auto_advance=true` + explicit user confirmation via AskUserQuestion during orchestrator execution. Candidates as drafted are accepted:
 
-**Artifact to review:** `.planning/milestones/v1.1-research/cslc_selfconsist_aoi_candidates.md`
+- **Mojave primary:** Coso/Searles (`t064_135527_iw2`, track 64, IW2) — 864 OPERA CSLC granules
+- **Mojave fallback chain:** Coso(302.40) > Amargosa(224.75) > Hualapai(141.20, synthetic epochs) > Pahranagat(135.30)
+- **Iberian primary:** Meseta-North (`t103_219329_iw1`, track 103, IW1) — carry-forward from Phase 2 RTC-EU probe
+- **Iberian fallbacks:** Alentejo, MassifCentral (burst IDs derived from EU burst DB at eval time)
+- **SoCal 15-epoch window:** 2024-01-13T14:01:16Z → 2024-06-29T14:01:16Z, all S1A POEORB (per D-09)
+- **EGMS L2a threshold:** `stable_std_max = 2.0 mm/yr` per CONTEXT D-12
+- **Hualapai synthetic fallback:** 14 real ASF scenes + 1 synthetic — accepted
 
-**Resume signal:** Respond with `lgtm-proceed` or `revise: <specifics>`.
+Plans 03-03 and 03-04 are unblocked; they lock the burst IDs and sensing windows from this artifact.
+
+**Artifact reference:** `.planning/milestones/v1.1-research/cslc_selfconsist_aoi_candidates.md`
 
 ## Deviations from Plan
 
@@ -142,5 +150,8 @@ None — probe script uses existing earthaccess/asf_search patterns from Phase 2
 ### Commits exist:
 - `6aabac4`: Task 1 feat(03-02): implement scripts/probe_cslc_aoi_candidates.py
 - `a317368`: Task 2 phase(03): commit CSLC self-consistency AOI probe artifact
+- `73326b4`: docs(03-02): partial SUMMARY.md at checkpoint pause
+- `399fc9a`: merge into main (worktree-agent-a670b8e2)
+- (this commit): docs(03-02): resolve Task 3 checkpoint — lgtm-proceed auto-approved
 
 ## Self-Check: PASSED
