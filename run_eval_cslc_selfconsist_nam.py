@@ -421,14 +421,39 @@ if __name__ == "__main__":
             intersectsWith=wkt,
             start=window_start,
             end=window_end,
-            maxResults=5,
+            maxResults=10,
         )
         if not results:
             raise RuntimeError(
                 f"No S1 SLC found on ASF for {burst_id} "
                 f"(track={track_num}, bbox={bounds}) around {epoch}"
             )
-        scene = results[0]
+
+        # S1 IW SLCs are cut into ~25s slices per pass and the ±10 min
+        # window usually matches 2+ slices per orbit. Pick the slice whose
+        # (startTime, stopTime) contains the target epoch; the burst can
+        # only live in one slice, and picking the wrong one causes compass
+        # to fail at runconfig.correlate_burst_to_orbit with "Could not
+        # find any of the burst IDs in the provided safe files". SoCal
+        # happened to work with results[0] because its burst aligns with
+        # the first slice returned; Iberian Meseta doesn't.
+        scene = None
+        for r in results:
+            try:
+                start_iso = r.properties["startTime"].rstrip("Z").split(".")[0]
+                stop_iso = r.properties["stopTime"].rstrip("Z").split(".")[0]
+                r_start = datetime.fromisoformat(start_iso)
+                r_stop = datetime.fromisoformat(stop_iso)
+            except (KeyError, ValueError):
+                continue
+            if r_start <= epoch <= r_stop:
+                scene = r
+                break
+        if scene is None:
+            raise RuntimeError(
+                f"No ASF slice for {burst_id} contains epoch {epoch.isoformat()} "
+                f"(candidates: {[r.properties.get('fileID', '?') for r in results]})"
+            )
         granule_id = str(scene.properties["fileID"]).removesuffix("-SLC")
         safe_path = dest_dir / f"{granule_id}.zip"
         if not safe_path.exists():
