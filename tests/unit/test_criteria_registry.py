@@ -133,3 +133,56 @@ def test_investigation_trigger_accessors() -> None:
     assert b.threshold == 0.999
     assert b.type == "INVESTIGATION_TRIGGER"
     assert b.comparator == "<"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 additions: gate_metric_key field on Criterion (D-04)
+# ---------------------------------------------------------------------------
+
+
+class TestGateMetricKey:
+    """Phase 3 D-04: Criterion has gate_metric_key field; CSLC entries tagged."""
+
+    def test_cslc_selfconsistency_coherence_min_gate_metric_key(self) -> None:
+        """CSLC coherence criterion uses 'median_of_persistent' as gate stat."""
+        assert CRITERIA["cslc.selfconsistency.coherence_min"].gate_metric_key == "median_of_persistent"
+
+    def test_cslc_selfconsistency_residual_gate_metric_key(self) -> None:
+        """CSLC residual criterion also tags gate_metric_key (D-04 audit record)."""
+        assert CRITERIA["cslc.selfconsistency.residual_mm_yr_max"].gate_metric_key == "median_of_persistent"
+
+    def test_all_other_criteria_have_gate_metric_key_field(self) -> None:
+        """All Criterion instances (not just CSLC) carry the field (default ok)."""
+        for cid, c in CRITERIA.items():
+            assert hasattr(c, "gate_metric_key"), f"{cid} missing gate_metric_key"
+
+    def test_gate_metric_key_default_value(self) -> None:
+        """Non-CSLC-selfconsistency entries carry the default (any value acceptable)."""
+        # The field must exist; its value is irrelevant for non-selfconsistency rows.
+        rtc = CRITERIA["rtc.rmse_db_max"]
+        assert isinstance(rtc.gate_metric_key, str)
+
+    def test_criterion_frozen_with_gate_metric_key(self) -> None:
+        """gate_metric_key field respects frozen=True invariant."""
+        from dataclasses import FrozenInstanceError
+
+        c = Criterion(
+            name="test.gatemk",
+            threshold=1.0,
+            comparator=">",
+            type="BINDING",
+            binding_after_milestone=None,
+            rationale="smoke test gate_metric_key frozen",
+            gate_metric_key="foo",
+        )
+        assert c.gate_metric_key == "foo"
+        with pytest.raises(FrozenInstanceError):
+            c.gate_metric_key = "bar"  # type: ignore[misc]
+
+    def test_cslc_calibrating_thresholds_unchanged(self) -> None:
+        """M1 target-creep prevention: thresholds must not change when adding field."""
+        assert CRITERIA["cslc.selfconsistency.coherence_min"].threshold == 0.7
+        assert CRITERIA["cslc.selfconsistency.coherence_min"].type == "CALIBRATING"
+        assert CRITERIA["cslc.selfconsistency.coherence_min"].binding_after_milestone == "v1.2"
+        assert CRITERIA["cslc.selfconsistency.residual_mm_yr_max"].threshold == 5.0
+        assert CRITERIA["cslc.selfconsistency.residual_mm_yr_max"].type == "CALIBRATING"

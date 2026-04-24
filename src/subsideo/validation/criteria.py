@@ -27,7 +27,16 @@ from typing import Literal
 
 @dataclass(frozen=True)
 class Criterion:
-    """A single pass/fail threshold with provenance."""
+    """A single pass/fail threshold with provenance.
+
+    ``gate_metric_key`` is only consulted by CSLC/DISP self-consistency
+    criteria during matrix_writer measurement rendering (Phase 3 D-04).
+    It identifies which key in ``ProductQualityResult.measurements`` is
+    the gate stat for a CALIBRATING/BINDING criterion. The default value
+    ``"median_of_persistent"`` is the Phase 3 coherence gate stat. For
+    BINDING and INVESTIGATION_TRIGGER rows the field is present but not
+    consulted by the matrix writer.
+    """
 
     name: str
     threshold: float
@@ -35,6 +44,7 @@ class Criterion:
     type: Literal["BINDING", "CALIBRATING", "INVESTIGATION_TRIGGER"]
     binding_after_milestone: str | None
     rationale: str
+    gate_metric_key: str = "median_of_persistent"
 
 
 CRITERIA: dict[str, Criterion] = {
