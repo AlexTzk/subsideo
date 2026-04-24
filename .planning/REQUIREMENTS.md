@@ -35,9 +35,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### RTC-S1 EU Validation
 
-- [ ] **RTC-01**: User can run `make eval-rtc-eu` and obtain per-burst PASS/FAIL across 3-5 EU bursts spanning ≥3 terrain regimes (alpine, plain, arid, boreal, wildfire); at least one burst has >1000 m relief AND at least one burst is >55°N
-- [ ] **RTC-02**: EU RTC reference-agreement criteria (RMSE < 0.5 dB, r > 0.99) are identical to N.Am. and DO NOT tighten based on per-burst scores — even if burst RMSE lands in the 0.04–0.1 dB range consistent with N.Am.
-- [ ] **RTC-03**: `CONCLUSIONS_RTC_EU.md` documents the selected bursts, regime coverage, and per-burst numerical results; any burst showing materially different RMSE than N.Am. triggers an investigation finding in the same doc
+- [x] **RTC-01**: User can run `make eval-rtc-eu` and obtain per-burst PASS/FAIL across 3-5 EU bursts spanning ≥3 terrain regimes (alpine, plain, arid, boreal, wildfire); at least one burst has >1000 m relief AND at least one burst is >55°N
+- [x] **RTC-02**: EU RTC reference-agreement criteria (RMSE < 0.5 dB, r > 0.99) are identical to N.Am. and DO NOT tighten based on per-burst scores — even if burst RMSE lands in the 0.04–0.1 dB range consistent with N.Am.
+- [x] **RTC-03**: `CONCLUSIONS_RTC_EU.md` documents the selected bursts, regime coverage, and per-burst numerical results; any burst showing materially different RMSE than N.Am. triggers an investigation finding in the same doc
 
 ### CSLC-S1 Self-Consistency Gate + EU Validation
 
@@ -172,9 +172,9 @@ Which phases cover which requirements. Populated by roadmapper.
 | GATE-03 | Phase 1 | Pending |
 | GATE-04 | Phase 1 | Pending |
 | GATE-05 | Phase 1 | Pending |
-| RTC-01 | Phase 2 | Pending |
-| RTC-02 | Phase 2 | Pending |
-| RTC-03 | Phase 2 | Pending |
+| RTC-01 | Phase 2 | Complete (2026-04-23) |
+| RTC-02 | Phase 2 | Complete (2026-04-23) |
+| RTC-03 | Phase 2 | Complete (2026-04-23) |
 | CSLC-01 | Phase 1 | Pending |
 | CSLC-02 | Phase 1 | Pending |
 | CSLC-03 | Phase 3 | Pending |

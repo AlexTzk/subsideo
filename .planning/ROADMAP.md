@@ -32,7 +32,7 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 <summary>🚧 v1.1 N.Am./EU Validation Parity & Scientific PASS (Phases 1-7) — IN PROGRESS</summary>
 
 - [ ] **Phase 1: Environment Hygiene, Framework Consolidation & Guardrail Scaffolding** — pin numpy<2, centralise `_cog`/`_mp`, build `validation.harness` + shared stable-terrain/self-consistency modules, land `criteria.py` CALIBRATING/BINDING, split result dataclasses, split tests dir, Makefile + manifest + env lockfile
-- [ ] **Phase 2: RTC-S1 EU Validation** — 3-5 EU RTC bursts PASS across ≥3 terrain regimes (≥1 with >1000 m relief AND ≥1 >55°N); per-burst reporting; proves Phase 1 harness end-to-end
+- [x] **Phase 2: RTC-S1 EU Validation** — 3-5 EU RTC bursts PASS across ≥3 terrain regimes (≥1 with >1000 m relief AND ≥1 >55°N); per-burst reporting; proves Phase 1 harness end-to-end
 - [ ] **Phase 3: CSLC-S1 Self-Consistency + EU Validation** — SoCal / Mojave / Iberian Meseta self-consistency coherence > 0.7 and residual < 5 mm/yr (CALIBRATING); OPERA CSLC amplitude sanity r > 0.6 / RMSE < 4 dB; cross-version-phase methodology consolidated
 - [ ] **Phase 4: DISP-S1 Comparison Adapter + Honest FAIL** — `prepare_for_reference` adapter (explicit `method=`); self-consistency at native 5×10 m; N.Am./EU re-runs with ramp-attribution diagnostic; DISP Unwrapper Selection scoping brief delivered
 - [ ] **Phase 5: DIST-S1 OPERA v0.1 + EFFIS EU** — T11SLT v0.1 comparison (or config-drift deferral) with block-bootstrap CI; CMR probe auto-supersede; EFFIS recall+precision cross-val; 3 EU events; optional chained `prior_dist_s1_product` run
@@ -208,7 +208,7 @@ RTC-01 (01, 02, 03, 04, 05), RTC-02 (01, 05), RTC-03 (01, 02, 03, 04, 05). Every
 | 8. Planning Artifact Cleanup | v1.0 | 1/1 | Complete | 2026-04-06 |
 | 9. Fix Report Criteria Keys & Cleanup | v1.0 | 1/1 | Complete | 2026-04-06 |
 | 1. Environment Hygiene, Framework Consolidation & Guardrail Scaffolding | v1.1 | 0/9 | Planned | - |
-| 2. RTC-S1 EU Validation | v1.1 | 0/5 | Planned | - |
+| 2. RTC-S1 EU Validation | v1.1 | 5/5 | Complete (3/5 PASS w/ investigation) | 2026-04-23 |
 | 3. CSLC-S1 Self-Consistency + EU Validation | v1.1 | 0/0 | Not started | - |
 | 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 0/0 | Not started | - |
 | 5. DIST-S1 OPERA v0.1 + EFFIS EU | v1.1 | 0/0 | Not started | - |
