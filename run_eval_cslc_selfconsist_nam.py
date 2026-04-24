@@ -1079,9 +1079,13 @@ if __name__ == "__main__":
                     reference_path=opera_ref_h5,
                 )
                 ra = cmp_result.reference_agreement
+                # compare_cslc stores the amplitude-correlation as
+                # 'amplitude_r' (not 'amplitude_correlation'); the -1.0
+                # sentinel appeared in metrics.json because the old key
+                # lookup always fell through to the default.
                 ra_result = ReferenceAgreementResultJson(
                     measurements={
-                        "amp_r": float(ra.measurements.get("amplitude_correlation", -1.0)),
+                        "amp_r": float(ra.measurements.get("amplitude_r", -1.0)),
                         "amp_rmse_db": float(ra.measurements.get("amplitude_rmse_db", -1.0)),
                     },
                     criterion_ids=["cslc.amplitude_r_min", "cslc.amplitude_rmse_db_max"],
