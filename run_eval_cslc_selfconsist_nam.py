@@ -124,8 +124,37 @@ if __name__ == "__main__":
         # conditional — the flag is the only gate, not any aoi_name string.
         run_amplitude_sanity: bool = False
 
-    # EU burst database path (compass geogrid requires this for EU bursts)
-    EU_BURST_DB_PATH: Path | None = None  # None -> compass uses N.Am. opera-utils DB
+    # OPERA burst DB (compass v0.5.6 requires a real file — passing None trips
+    # os.path.isfile(None) inside compass.utils.geo_runconfig.GeoRunConfig.load_from_yaml
+    # at line 71). We fetch opera-adt/burst_db v0.9.0's 23MB opera-burst-bbox-only
+    # sqlite on first run and cache at ~/.subsideo/opera_burst_bbox.sqlite3.
+    OPERA_BURST_DB_URL: str = (
+        "https://github.com/opera-adt/burst_db/releases/download/v0.9.0/"
+        "opera-burst-bbox-only.sqlite3.zip"
+    )
+    OPERA_BURST_DB_PATH: Path = Path.home() / ".subsideo" / "opera_burst_bbox.sqlite3"
+
+    def _ensure_opera_burst_db() -> Path:
+        """Download opera-adt/burst_db v0.9.0 opera-burst-bbox-only.sqlite3 on first use."""
+        import io
+        import zipfile
+        from urllib.request import urlopen
+
+        if OPERA_BURST_DB_PATH.exists():
+            return OPERA_BURST_DB_PATH
+        OPERA_BURST_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        logger.info("Downloading OPERA burst DB from {} (23 MB zip)...", OPERA_BURST_DB_URL)
+        with urlopen(OPERA_BURST_DB_URL, timeout=300) as resp:
+            buf = io.BytesIO(resp.read())
+        with zipfile.ZipFile(buf) as zf:
+            names = [n for n in zf.namelist() if n.endswith(".sqlite3")]
+            if not names:
+                raise RuntimeError(f"No .sqlite3 member in {OPERA_BURST_DB_URL}")
+            with zf.open(names[0]) as src, open(OPERA_BURST_DB_PATH, "wb") as dst:
+                dst.write(src.read())
+        logger.info("Cached OPERA burst DB at {} ({} bytes)",
+                    OPERA_BURST_DB_PATH, OPERA_BURST_DB_PATH.stat().st_size)
+        return OPERA_BURST_DB_PATH
 
     # -- Locked sensing windows (from 03-02 probe artifact, user-approved) ---
 
@@ -494,8 +523,7 @@ if __name__ == "__main__":
         WorldCover ships in EPSG:4326 10m; the DEM is in the CSLC output_epsg
         (UTM 30m). build_stable_mask requires both arrays on the same grid.
         """
-        import rasterio  # lazy
-        from rasterio.warp import Resampling, reproject
+        from rasterio.warp import Resampling, reproject  # lazy
 
         dst = np.zeros(dst_shape, dtype=wc_data.dtype)
         reproject(
@@ -889,7 +917,7 @@ if __name__ == "__main__":
                     dem_path=dem_path,
                     burst_ids=[cfg.burst_id],
                     output_dir=burst_out,
-                    burst_database_file=EU_BURST_DB_PATH,
+                    burst_database_file=_ensure_opera_burst_db(),
                 )
 
         # 6. IFG coherence stack
