@@ -250,3 +250,140 @@ def test_rtc_eu_cell_metrics_total_ge_1() -> None:
             any_investigation_required=False,
             per_burst=[],
         )
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 additions: AOIResult + CSLCSelfConsist{NAM,EU}CellMetrics
+# ---------------------------------------------------------------------------
+
+
+class TestAOIResult:
+    """Phase 3 D-06: AOIResult schema for per-AOI row in CSLC self-consist cells."""
+
+    def test_aoi_result_basic_construction(self) -> None:
+        from subsideo.validation.matrix_schema import (
+            AOIResult,
+            ProductQualityResultJson,
+        )
+
+        r = AOIResult(
+            aoi_name="SoCal",
+            regime="CSLC-US",
+            status="CALIBRATING",
+            product_quality=ProductQualityResultJson(
+                measurements={
+                    "coherence_median_of_persistent": 0.78,
+                    "residual_mm_yr": 2.1,
+                },
+                criterion_ids=[
+                    "cslc.selfconsistency.coherence_min",
+                    "cslc.selfconsistency.residual_mm_yr_max",
+                ],
+            ),
+            reference_agreement=None,
+        )
+        assert r.aoi_name == "SoCal"
+        assert r.status == "CALIBRATING"
+        # Round-trip
+        js = r.model_dump_json()
+        loaded = AOIResult.model_validate_json(js)
+        assert loaded == r
+
+    def test_aoi_result_extra_forbid(self) -> None:
+        from subsideo.validation.matrix_schema import AOIResult
+
+        with pytest.raises(ValidationError):
+            AOIResult(aoi_name="x", status="CALIBRATING", foo=123)  # type: ignore[call-arg]
+
+    def test_aoi_result_nested_attempts(self) -> None:
+        """Mojave fallback chain: nested AOIResult list preserves order (D-11)."""
+        from subsideo.validation.matrix_schema import AOIResult
+
+        coso = AOIResult(aoi_name="Coso", status="FAIL", attempt_index=1)
+        pahranagat = AOIResult(aoi_name="Pahranagat", status="FAIL", attempt_index=2)
+        mojave = AOIResult(
+            aoi_name="Mojave",
+            status="BLOCKER",
+            attempts=[coso, pahranagat],
+        )
+        assert len(mojave.attempts) == 2
+        assert mojave.attempts[0].aoi_name == "Coso"
+        assert mojave.attempts[1].aoi_name == "Pahranagat"
+        # Round-trip
+        js = mojave.model_dump_json()
+        loaded = AOIResult.model_validate_json(js)
+        assert loaded.attempts[0].attempt_index == 1
+
+
+class TestCSLCSelfConsistNAMCellMetrics:
+    def test_construction_with_per_aoi(self) -> None:
+        from subsideo.validation.matrix_schema import (
+            AOIResult,
+            CSLCSelfConsistNAMCellMetrics,
+        )
+
+        aoi1 = AOIResult(aoi_name="SoCal", status="CALIBRATING")
+        aoi2 = AOIResult(aoi_name="Mojave", status="BLOCKER")
+        m = CSLCSelfConsistNAMCellMetrics(
+            pass_count=1,
+            total=2,
+            cell_status="MIXED",
+            any_blocker=True,
+            product_quality_aggregate={
+                "worst_coherence_median_of_persistent": 0.78,
+                "worst_residual_mm_yr": 2.1,
+                "worst_aoi": "SoCal",
+            },
+            reference_agreement_aggregate={},
+            per_aoi=[aoi1, aoi2],
+        )
+        assert m.cell_status == "MIXED"
+        assert m.any_blocker is True
+        js = m.model_dump_json()
+        assert "per_aoi" in js
+        loaded = CSLCSelfConsistNAMCellMetrics.model_validate_json(js)
+        assert loaded.per_aoi[1].aoi_name == "Mojave"
+
+
+class TestCSLCSelfConsistEUCellMetrics:
+    def test_eu_inherits_nam(self) -> None:
+        from subsideo.validation.matrix_schema import (
+            AOIResult,
+            CSLCSelfConsistEUCellMetrics,
+            CSLCSelfConsistNAMCellMetrics,
+        )
+
+        aoi = AOIResult(aoi_name="Iberian", status="CALIBRATING")
+        eu = CSLCSelfConsistEUCellMetrics(
+            pass_count=1,
+            total=1,
+            cell_status="CALIBRATING",
+            any_blocker=False,
+            per_aoi=[aoi],
+        )
+        assert isinstance(eu, CSLCSelfConsistNAMCellMetrics)
+        assert eu.cell_status == "CALIBRATING"
+
+
+class TestManifestShape:
+    def test_cslc_cells_point_to_selfconsist_dirs(self) -> None:
+        """matrix_manifest.yml cslc:nam + cslc:eu wired to selfconsist cache dirs."""
+        import yaml
+
+        manifest_path = Path("results/matrix_manifest.yml")
+        assert manifest_path.exists(), "results/matrix_manifest.yml must exist"
+        data = yaml.safe_load(manifest_path.read_text())
+        cells = {
+            (c["product"], c["region"]): c
+            for c in data["cells"]
+        }
+        nam = cells[("cslc", "nam")]
+        eu = cells[("cslc", "eu")]
+        assert "selfconsist" in nam["eval_script"], (
+            f"cslc:nam eval_script must reference selfconsist script; got {nam['eval_script']}"
+        )
+        assert "selfconsist" in eu["eval_script"], (
+            f"cslc:eu eval_script must reference selfconsist script; got {eu['eval_script']}"
+        )
+        assert "selfconsist" in nam["cache_dir"]
+        assert "selfconsist" in eu["cache_dir"]
