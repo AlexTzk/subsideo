@@ -230,6 +230,124 @@ def _render_rtc_eu_cell(
     return pq_col, ra_col
 
 
+# --- Phase 3 CSLC self-consistency rendering (03-CONTEXT D-03 + D-06 + D-11) ---
+
+
+def _is_cslc_selfconsist_shape(metrics_path: Path) -> bool:
+    """Return True when the metrics.json has a top-level ``per_aoi`` key.
+
+    Phase 3 D-11 schema discriminator. Checked BEFORE _is_rtc_eu_shape so a
+    file that somehow contains both (defensive) is routed to the self-consist
+    branch; the schemas are structurally disjoint so this is an invariant,
+    not a guess.
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.debug("_is_cslc_selfconsist_shape: cannot read {}: {}", metrics_path, e)
+        return False
+    return isinstance(raw, dict) and "per_aoi" in raw
+
+
+def _render_cslc_selfconsist_cell(
+    metrics_path: Path,
+    *,
+    region: str,
+) -> tuple[str, str] | None:
+    """Render a Phase 3 CSLC self-consistency cell as (pq_col, ra_col).
+
+    Called for both cslc:nam (region='nam') and cslc:eu (region='eu'). The
+    cell always italicises (CALIBRATING is the only valid status for first
+    rollout per Phase 3 D-03 + GATE-05). Appends U+26A0 on any_blocker=True.
+
+    PQ column worst-case-aggregate format:
+        "X/N CALIBRATING | coh=A.AA / resid=B.B mm/yr (<worst_aoi>)"
+    EU adds: " / egms_resid=C.C mm/yr" inside the metric group when any AOI
+    carries ``egms_l2a_stable_ps_residual_mm_yr`` in its product_quality
+    measurements.
+
+    On MIXED cells (W8 fix — AOI attribution): the label reads
+        "1/2 CALIBRATING, 1/2 BLOCKER | coh=0.78 / resid=2.1 mm/yr (SoCal)"
+    The ``(<worst_aoi>)`` suffix disambiguates which AOI owns the coh/resid
+    numbers when the cell is MIXED. Pipe ``|`` separates the status label
+    from the metric block; parentheses carry the AOI name.
+    """
+    from subsideo.validation.matrix_schema import (
+        CSLCSelfConsistEUCellMetrics,
+        CSLCSelfConsistNAMCellMetrics,
+    )
+
+    try:
+        cls = CSLCSelfConsistEUCellMetrics if region == "eu" else CSLCSelfConsistNAMCellMetrics
+        metrics = cls.model_validate_json(metrics_path.read_text())
+    except Exception as e:
+        logger.warning(
+            "Failed to parse CSLCSelfConsist*CellMetrics from {}: {}", metrics_path, e
+        )
+        return None
+
+    # Status tally
+    cal_count = sum(1 for r in metrics.per_aoi if r.status == "CALIBRATING")
+    blocker_count = sum(1 for r in metrics.per_aoi if r.status == "BLOCKER")
+    fail_count = sum(1 for r in metrics.per_aoi if r.status == "FAIL")
+    tags = [f"{cal_count}/{metrics.total} CALIBRATING"]
+    if blocker_count:
+        tags.append(f"{blocker_count}/{metrics.total} BLOCKER")
+    if fail_count:
+        tags.append(f"{fail_count}/{metrics.total} FAIL")
+    status_label = ", ".join(tags)
+
+    # PQ worst-case across AOIs
+    pq_agg = metrics.product_quality_aggregate
+    worst_coh = pq_agg.get("worst_coherence_median_of_persistent")
+    worst_resid = pq_agg.get("worst_residual_mm_yr")
+    parts: list[str] = [
+        f"coh={float(worst_coh):.2f}" if worst_coh is not None else "coh=—",
+        f"resid={float(worst_resid):.1f} mm/yr" if worst_resid is not None else "resid=—",
+    ]
+    # EU extras: egms_l2a_stable_ps_residual_mm_yr
+    if region == "eu":
+        egms_vals = [
+            r.product_quality.measurements.get("egms_l2a_stable_ps_residual_mm_yr")
+            for r in metrics.per_aoi
+            if r.product_quality is not None
+        ]
+        egms_finite = [v for v in egms_vals if v is not None]
+        if egms_finite:
+            worst_egms = max(abs(float(v)) for v in egms_finite)
+            parts.append(f"egms_resid={worst_egms:.1f} mm/yr")
+
+    # W8 fix: add worst-AOI attribution in parens + pipe-delimit status vs metrics.
+    worst_aoi = str(pq_agg.get("worst_aoi") or "")
+    metric_body = " / ".join(parts)
+    if worst_aoi:
+        metric_body = f"{metric_body} ({worst_aoi})"
+    pq_body = f"{status_label} | {metric_body}"
+
+    # RA aggregate
+    ra_agg = metrics.reference_agreement_aggregate
+    worst_r = ra_agg.get("worst_amp_r")
+    worst_rmse = ra_agg.get("worst_amp_rmse_db")
+    if worst_r is not None or worst_rmse is not None:
+        ra_parts: list[str] = []
+        if worst_r is not None:
+            ra_parts.append(f"amp_r={float(worst_r):.2f}")
+        if worst_rmse is not None:
+            ra_parts.append(f"amp_rmse={float(worst_rmse):.1f} dB")
+        ra_body = " / ".join(ra_parts)
+    else:
+        ra_body = "—"  # Mojave-only cells skip amplitude sanity (D-07)
+
+    # Warning glyph on any_blocker (U+26A0)
+    warn = " ⚠" if metrics.any_blocker else ""
+    # Italicise as whole-body — CALIBRATING discipline (Phase 1 D-03 / GATE-03)
+    pq_col = f"*{pq_body}*{warn}"
+    ra_col = f"*{ra_body}*" if ra_body != "—" else "—"
+    return pq_col, ra_col
+
+
 def write_matrix(manifest_path: Path, out_path: Path) -> None:
     """Read manifest + sidecars; write a two-column-per-cell Markdown table.
 
@@ -265,6 +383,20 @@ def write_matrix(manifest_path: Path, out_path: Path) -> None:
         metrics_path = _validate_metrics_path(
             str(cell["metrics_file"]), manifest_path
         )
+
+        # Phase 3 CSLC self-consistency branch: metrics.json with a ``per_aoi`` key.
+        # Checked BEFORE the rtc_eu branch so a file with both keys (defensive)
+        # is routed here (schemas are structurally disjoint, this is an invariant).
+        if metrics_path.exists() and _is_cslc_selfconsist_shape(metrics_path):
+            cols = _render_cslc_selfconsist_cell(metrics_path, region=str(cell["region"]))
+            if cols is not None:
+                pq_col, ra_col = cols
+                lines.append(
+                    f"| {product} | {region} | {_escape_table_cell(pq_col)} | "
+                    f"{_escape_table_cell(ra_col)} |"
+                )
+                continue
+            # Fall through to default rendering on parse failure.
 
         # Phase 2 D-11 branch: metrics.json with a ``per_burst`` key is the
         # RTCEUCellMetrics shape -- render as ``X/N PASS`` aggregate plus a

@@ -304,3 +304,146 @@ class RTCEUCellMetrics(MetricsJson):
             "matrix-writer + CONCLUSIONS rendering."
         ),
     )
+
+
+# --- Phase 3 CSLC self-consistency cell metrics (03-CONTEXT D-03 + D-06 + D-11) ---
+
+AOIStatus = Literal["PASS", "FAIL", "CALIBRATING", "BLOCKER", "SKIPPED"]
+CSLCCellStatus = Literal["PASS", "FAIL", "CALIBRATING", "MIXED", "BLOCKER"]
+
+
+class AOIResult(BaseModel):
+    """Per-AOI row for CSLCSelfConsist*CellMetrics.per_aoi (Phase 3 D-06).
+
+    ``attempts`` carries the Mojave fallback-chain per CONTEXT D-11: empty list
+    for leaf AOIs (SoCal, Iberian); 1-4 entries for the Mojave parent row with
+    ``attempt_index`` + ``reason`` populated on each nested AOIResult. First
+    PASS/CALIBRATING attempt wins; all-FAIL => parent status='BLOCKER'.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    aoi_name: str = Field(..., description="Stable label: 'SoCal' / 'Mojave' / 'Iberian' / etc.")
+    regime: str = Field(default="", description="Free-form regime label for CONCLUSIONS tables.")
+    burst_id: str | None = Field(
+        default=None,
+        description="JPL lowercase burst ID; null for parent Mojave rows.",
+    )
+    sensing_window: list[str] = Field(
+        default_factory=list,
+        description=(
+            "ISO-8601 UTC strings, one per epoch. 15 entries per leaf AOI "
+            "(SoCal + each Mojave fallback + Iberian primary + each Iberian fallback); "
+            "empty list for parent Mojave/Iberian rows that delegate to fallback_chain."
+        ),
+    )
+    status: AOIStatus = Field(
+        ...,
+        description=(
+            "AOI verdict. CALIBRATING is the expected first-rollout status per D-03 "
+            "(SoCal/Mojave/Iberian = calibration data points 1/2/3). BLOCKER surfaces "
+            "when all fallback attempts fail (D-11). SKIPPED marks untried fallbacks "
+            "after an earlier attempt passed."
+        ),
+    )
+    attempt_index: int = Field(
+        default=0, description="0 for parent/leaf rows; 1..N for nested attempts."
+    )
+    reason: str | None = Field(
+        default=None,
+        description="Why this status — human-readable, populated on FAIL/SKIPPED/BLOCKER.",
+    )
+    attempts: list[AOIResult] = Field(
+        default_factory=list,
+        description="Nested fallback attempts; empty for leaf AOIs.",
+    )
+    stable_mask_pixels: int | None = Field(
+        default=None,
+        description=(
+            "Count of True pixels in the stable_terrain.build_stable_mask output "
+            "(sanity-check metric)."
+        ),
+    )
+    product_quality: ProductQualityResultJson | None = Field(
+        default=None,
+        description=(
+            "Self-consistency PQ measurements. Null on FAIL-before-PQ-computed or SKIPPED."
+        ),
+    )
+    reference_agreement: ReferenceAgreementResultJson | None = Field(
+        default=None,
+        description=(
+            "OPERA CSLC amplitude sanity. Null for Mojave per CONTEXT D-07."
+        ),
+    )
+    error: str | None = Field(
+        default=None, description="repr(exception) on FAIL; null otherwise."
+    )
+    traceback: str | None = Field(
+        default=None, description="traceback.format_exc() on FAIL."
+    )
+
+
+AOIResult.model_rebuild()  # resolve forward-ref for self-referential 'attempts' list
+
+
+class CSLCSelfConsistNAMCellMetrics(MetricsJson):
+    """Phase 3 N.Am. CSLC self-consistency aggregate (CONTEXT D-06).
+
+    matrix_writer detects this schema via presence of ``per_aoi`` key in raw JSON
+    (cheap shape-discriminator, same pattern as _is_rtc_eu_shape).
+    """
+
+    pass_count: int = Field(
+        ..., ge=0, description="Count of AOIs with status in {PASS, CALIBRATING}."
+    )
+    total: int = Field(..., ge=1, description="Total AOI count (2 for NAM: SoCal + Mojave).")
+    cell_status: CSLCCellStatus = Field(
+        ...,
+        description=(
+            "Whole-cell verdict. CALIBRATING = all AOIs CALIBRATING (expected first-rollout). "
+            "MIXED = any AOI CALIBRATING + any BLOCKER/FAIL. BLOCKER = all AOIs BLOCKER. "
+            "PASS/FAIL reserved for post-BINDING-promotion (v1.2+ per GATE-05)."
+        ),
+    )
+    any_blocker: bool = Field(
+        ...,
+        description=(
+            "True when any AOI has status='BLOCKER' (Mojave fallback exhaustion; D-11). "
+            "Drives matrix_writer warning-glyph annotation."
+        ),
+    )
+    product_quality_aggregate: dict[str, float | str] = Field(
+        default_factory=dict,
+        description=(
+            "Worst-case across AOIs: worst_coherence_median_of_persistent (float), "
+            "worst_residual_mm_yr (float), worst_aoi (str). Matrix cell consumes these."
+        ),
+    )
+    reference_agreement_aggregate: dict[str, float | str] = Field(
+        default_factory=dict,
+        description=(
+            "Worst-case across AOIs that ran amplitude sanity: worst_amp_r (float), "
+            "worst_amp_rmse_db (float), worst_aoi (str). Mojave rows excluded (null RA)."
+        ),
+    )
+    per_aoi: list[AOIResult] = Field(
+        default_factory=list,
+        description=(
+            "Per-AOI drilldown; order matches AOIS declaration in "
+            "run_eval_cslc_selfconsist_nam.py."
+        ),
+    )
+
+
+class CSLCSelfConsistEUCellMetrics(CSLCSelfConsistNAMCellMetrics):
+    """Phase 3 EU CSLC self-consistency aggregate (CONTEXT D-06).
+
+    Schema identical to NAM but distinguished for type-dispatch in matrix_writer.
+    Iberian is the only scheduled AOI (calibration data point 3); EU-specific
+    ``egms_l2a_stable_ps_residual_mm_yr`` lives inside
+    per_aoi[].product_quality.measurements as an additional measurement — not a
+    new top-level field — to keep the matrix cell-rendering code symmetric with NAM.
+    """
+
+    pass  # inherit-only; class exists so matrix_writer.render dispatch is explicit.

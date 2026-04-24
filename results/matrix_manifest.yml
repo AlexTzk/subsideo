@@ -9,9 +9,10 @@
 # Schema version: 1. Bump if adding required fields.
 #
 # Scripts referenced but not yet present at repo root (created by later phases):
-#   run_eval_rtc_eu.py      -- Phase 2
-#   run_eval_cslc_eu.py     -- Phase 3
-#   run_eval_dswx_nam.py    -- Phase 6
+#   run_eval_rtc_eu.py                    -- Phase 2
+#   run_eval_cslc_selfconsist_nam.py      -- Phase 3 (supersedes run_eval_cslc.py)
+#   run_eval_cslc_selfconsist_eu.py       -- Phase 3 (supersedes run_eval_cslc_eu.py)
+#   run_eval_dswx_nam.py                  -- Phase 6
 # Missing sidecars render as RUN_FAILED in matrix.md (ENV-09 per-cell isolation).
 
 schema_version: 1
@@ -35,17 +36,17 @@ cells:
   # --- CSLC ---
   - product: cslc
     region: nam
-    eval_script: run_eval_cslc.py
-    cache_dir: eval-cslc
-    metrics_file: eval-cslc/metrics.json
-    meta_file: eval-cslc/meta.json
-    conclusions_doc: CONCLUSIONS_CSLC_N_AM.md
+    eval_script: run_eval_cslc_selfconsist_nam.py
+    cache_dir: eval-cslc-selfconsist-nam
+    metrics_file: eval-cslc-selfconsist-nam/metrics.json
+    meta_file: eval-cslc-selfconsist-nam/meta.json
+    conclusions_doc: CONCLUSIONS_CSLC_SELFCONSIST_NAM.md
   - product: cslc
     region: eu
-    eval_script: run_eval_cslc_eu.py
-    cache_dir: eval-cslc-eu
-    metrics_file: eval-cslc-eu/metrics.json
-    meta_file: eval-cslc-eu/meta.json
+    eval_script: run_eval_cslc_selfconsist_eu.py
+    cache_dir: eval-cslc-selfconsist-eu
+    metrics_file: eval-cslc-selfconsist-eu/metrics.json
+    meta_file: eval-cslc-selfconsist-eu/meta.json
     conclusions_doc: CONCLUSIONS_CSLC_EU.md
 
   # --- DISP ---

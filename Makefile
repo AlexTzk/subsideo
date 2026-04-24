@@ -26,8 +26,8 @@ help:
 # N.Am. cells
 eval-rtc-nam:   ; $(SUPERVISOR) run_eval.py
 eval-rtc-eu:    ; $(SUPERVISOR) run_eval_rtc_eu.py
-eval-cslc-nam:  ; $(SUPERVISOR) run_eval_cslc.py
-eval-cslc-eu:   ; $(SUPERVISOR) run_eval_cslc_eu.py
+eval-cslc-nam:  ; $(SUPERVISOR) run_eval_cslc_selfconsist_nam.py
+eval-cslc-eu:   ; $(SUPERVISOR) run_eval_cslc_selfconsist_eu.py
 eval-disp-nam:  ; $(SUPERVISOR) run_eval_disp.py
 eval-disp-eu:   ; $(SUPERVISOR) run_eval_disp_egms.py
 eval-dist-nam:  ; $(SUPERVISOR) run_eval_dist.py
@@ -35,9 +35,10 @@ eval-dist-eu:   ; $(SUPERVISOR) run_eval_dist_eu.py
 eval-dswx-nam:  ; $(SUPERVISOR) run_eval_dswx_nam.py
 eval-dswx-eu:   ; $(SUPERVISOR) run_eval_dswx.py
 
-# Note: run_eval_rtc_eu.py / run_eval_cslc_eu.py / run_eval_dswx_nam.py
-# are Phase 2 / 3 / 6 deliverables (not yet present in Phase 1). Invoking
-# them now will fail-loudly; per-cell isolation contains the failure.
+# Note: run_eval_rtc_eu.py is a Phase 2 deliverable.
+# run_eval_cslc_selfconsist_{nam,eu}.py are Phase 3 deliverables (supersede run_eval_cslc.py / run_eval_cslc_eu.py).
+# run_eval_dswx_nam.py is a Phase 6 deliverable.
+# Missing scripts fail-loudly; per-cell isolation (ENV-09) contains the failure.
 
 eval-nam: eval-rtc-nam eval-cslc-nam eval-disp-nam eval-dist-nam eval-dswx-nam
 eval-eu:  eval-rtc-eu  eval-cslc-eu  eval-disp-eu  eval-dist-eu  eval-dswx-eu
