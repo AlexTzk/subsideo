@@ -723,9 +723,25 @@ if __name__ == "__main__":
                         ),
                     )
                     if ref_results:
-                        chosen = select_opera_frame_by_utc_hour(epoch, ref_results)
+                        # earthaccess DataGranule keeps sensing time at
+                        # umm['TemporalExtent']['RangeDateTime']['BeginningDateTime'];
+                        # select_opera_frame_by_utc_hour wants a flat
+                        # {'sensing_datetime': iso_str} dict per candidate.
+                        ref_metadata = [
+                            {
+                                "sensing_datetime": (
+                                    g["umm"]["TemporalExtent"]
+                                    ["RangeDateTime"]["BeginningDateTime"]
+                                ),
+                                "_granule": g,
+                            }
+                            for g in ref_results
+                        ]
+                        chosen_meta = select_opera_frame_by_utc_hour(
+                            epoch, ref_metadata
+                        )
                         earthaccess.download(
-                            [chosen],
+                            [chosen_meta["_granule"]],
                             str(CACHE / "opera_reference" / cfg.aoi_name),
                         )
                 _mp.configure_multiprocessing()

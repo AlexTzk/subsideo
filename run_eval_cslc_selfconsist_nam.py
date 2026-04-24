@@ -937,10 +937,26 @@ if __name__ == "__main__":
                             granule_name=f"OPERA_L2_CSLC-S1_{opera_burst_upper}*",
                         )
                         if ref_results:
-                            chosen = select_opera_frame_by_utc_hour(
-                                epoch, ref_results, tolerance_hours=1.0
+                            # earthaccess DataGranule carries sensing time deep inside
+                            # umm['TemporalExtent']['RangeDateTime']['BeginningDateTime'];
+                            # select_opera_frame_by_utc_hour wants a flat
+                            # {'sensing_datetime': iso_str} dict per candidate, so map.
+                            ref_metadata = [
+                                {
+                                    "sensing_datetime": (
+                                        g["umm"]["TemporalExtent"]
+                                        ["RangeDateTime"]["BeginningDateTime"]
+                                    ),
+                                    "_granule": g,
+                                }
+                                for g in ref_results
+                            ]
+                            chosen_meta = select_opera_frame_by_utc_hour(
+                                epoch, ref_metadata, tolerance_hours=1.0
                             )
-                            earthaccess.download([chosen], str(ref_aoi_dir))
+                            earthaccess.download(
+                                [chosen_meta["_granule"]], str(ref_aoi_dir)
+                            )
 
                 # run_cslc calls _mp.configure_multiprocessing() at its top (Phase 1 D-14)
                 run_cslc(
