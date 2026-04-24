@@ -346,23 +346,50 @@ if __name__ == "__main__":
 
         return np.stack(coherence_stack, axis=0)  # (N-1, H, W)
 
-    def _compute_slope_deg(dem_path: Path) -> np.ndarray:
+    def _compute_slope_deg(dem_path: Path) -> tuple[np.ndarray, object, object]:
         """Compute slope in degrees from a DEM GeoTIFF via numpy.gradient.
 
-        Uses numpy.gradient on the elevation grid to get dzdx + dzdy,
-        then arctan(sqrt(dzdx^2 + dzdy^2)).
+        Returns (slope_deg, transform, crs) so the caller can reproject other
+        rasters (WorldCover) onto this grid before feeding build_stable_mask.
         """
         import rasterio  # noqa: PLC0415
 
         with rasterio.open(dem_path) as src:
             dem = src.read(1).astype("float32")
-            res_x = abs(src.transform.a)   # pixel width in map units
-            res_y = abs(src.transform.e)   # pixel height in map units
+            res_x = abs(src.transform.a)
+            res_y = abs(src.transform.e)
+            dem_transform = src.transform
+            dem_crs = src.crs
 
         dzdx = np.gradient(dem, res_x, axis=1)
         dzdy = np.gradient(dem, res_y, axis=0)
-        slope_deg = np.degrees(np.arctan(np.sqrt(dzdx ** 2 + dzdy ** 2)))
-        return slope_deg.astype("float32")
+        slope_deg = np.degrees(np.arctan(np.sqrt(dzdx ** 2 + dzdy ** 2))).astype("float32")
+        return slope_deg, dem_transform, dem_crs
+
+    def _reproject_worldcover_to_dem_grid(
+        wc_data: np.ndarray,
+        wc_transform: object,
+        wc_crs: object,
+        *,
+        dst_shape: tuple[int, int],
+        dst_transform: object,
+        dst_crs: object,
+    ) -> np.ndarray:
+        """Reproject WorldCover onto the DEM grid (nearest neighbour — class labels)."""
+        import rasterio  # noqa: PLC0415, F401
+        from rasterio.warp import Resampling, reproject  # noqa: PLC0415
+
+        dst = np.zeros(dst_shape, dtype=wc_data.dtype)
+        reproject(
+            source=wc_data,
+            destination=dst,
+            src_transform=wc_transform,
+            src_crs=wc_crs,
+            dst_transform=dst_transform,
+            dst_crs=dst_crs,
+            resampling=Resampling.nearest,
+        )
+        return dst
 
     def _write_sanity_artifacts(
         aoi_name: str,
@@ -640,15 +667,23 @@ if __name__ == "__main__":
 
         # 2. DEM + slope
         dem_path = fetch_dem(bounds, output_dir=CACHE / "dem")
-        slope_deg = _compute_slope_deg(dem_path)
+        slope_deg, dem_transform, dem_crs = _compute_slope_deg(dem_path)
 
-        # 3. Natural Earth coastline + waterbodies
+        # 3. Align WorldCover onto the DEM grid (WC is EPSG:4326 10m; DEM is UTM 30m)
+        wc_on_dem = _reproject_worldcover_to_dem_grid(
+            wc_data, wc_transform, wc_crs,
+            dst_shape=slope_deg.shape,
+            dst_transform=dem_transform,
+            dst_crs=dem_crs,
+        )
+
+        # 4. Natural Earth coastline + waterbodies
         coast, water = load_coastline_and_waterbodies(bounds)
 
-        # 4. Stable mask
+        # 5. Stable mask (in the DEM/slope UTM grid)
         stable_mask = build_stable_mask(
-            wc_data, slope_deg, coast, water,
-            transform=wc_transform, crs=wc_crs,
+            wc_on_dem, slope_deg, coast, water,
+            transform=dem_transform, crs=dem_crs,
             coast_buffer_m=5000.0, water_buffer_m=500.0, slope_max_deg=10.0,
         )
         n_stable = int(stable_mask.sum())
@@ -745,13 +780,13 @@ if __name__ == "__main__":
                     cfg.aoi_name,
                 )
 
-        # 9. Stable-mask sanity artifacts (P2.1 mitigation)
+        # 9. Stable-mask sanity artifacts (P2.1 mitigation) — mask is on DEM/UTM grid
         _write_sanity_artifacts(
             cfg.aoi_name,
             stable_mask=stable_mask,
             coherence_stack=ifgrams_stack,
-            transform=wc_transform,
-            crs=wc_crs,
+            transform=dem_transform,
+            crs=dem_crs,
             out_dir=CACHE / "sanity" / cfg.aoi_name,
         )
 

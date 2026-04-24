@@ -461,35 +461,53 @@ if __name__ == "__main__":
 
         return np.stack(coherence_ifgs, axis=0)  # (N-1, H, W)
 
-    def _compute_slope_deg(dem_path: Path) -> np.ndarray:
-        """Compute slope in degrees from a DEM GeoTIFF using numpy.gradient.
+    def _compute_slope_deg(dem_path: Path) -> tuple[np.ndarray, object, object]:
+        """Compute slope in degrees from a DEM GeoTIFF via numpy.gradient.
 
-        Uses finite-difference gradient (dz/dx, dz/dy) from numpy.gradient,
-        then converts to degrees via arctan. Grid spacing assumed from the
-        DEM's pixel size (PATTERNS Phase 1 D-module reference).
-
-        Parameters
-        ----------
-        dem_path : Path
-            GeoTIFF DEM file (assumed single-band float, elevations in metres).
-
-        Returns
-        -------
-        slope_deg : (H, W) float32 np.ndarray
-            Slope in degrees.
+        Returns (slope_deg, transform, crs) so the caller can reproject other
+        rasters (WorldCover) onto this grid before feeding build_stable_mask.
         """
         import rasterio  # lazy
 
         with rasterio.open(dem_path) as src:
             dem = src.read(1).astype(np.float32)
-            # Pixel size in metres (approx; using the transform's x-pixel size)
             pixel_m = abs(src.transform.a)
+            dem_transform = src.transform
+            dem_crs = src.crs
 
-        # Gradient in both directions (rise over run)
         dz_dy, dz_dx = np.gradient(dem, pixel_m)
         slope_rad = np.arctan(np.sqrt(dz_dx**2 + dz_dy**2))
         slope_deg = np.degrees(slope_rad).astype(np.float32)
-        return slope_deg
+        return slope_deg, dem_transform, dem_crs
+
+    def _reproject_worldcover_to_dem_grid(
+        wc_data: np.ndarray,
+        wc_transform: object,
+        wc_crs: object,
+        *,
+        dst_shape: tuple[int, int],
+        dst_transform: object,
+        dst_crs: object,
+    ) -> np.ndarray:
+        """Reproject WorldCover onto the DEM grid (nearest neighbour — class labels).
+
+        WorldCover ships in EPSG:4326 10m; the DEM is in the CSLC output_epsg
+        (UTM 30m). build_stable_mask requires both arrays on the same grid.
+        """
+        import rasterio  # lazy
+        from rasterio.warp import Resampling, reproject
+
+        dst = np.zeros(dst_shape, dtype=wc_data.dtype)
+        reproject(
+            source=wc_data,
+            destination=dst,
+            src_transform=wc_transform,
+            src_crs=wc_crs,
+            dst_transform=dst_transform,
+            dst_crs=dst_crs,
+            resampling=Resampling.nearest,  # class labels — never interpolate
+        )
+        return dst
 
     def _write_sanity_artifacts(
         aoi_name: str,
@@ -787,19 +805,29 @@ if __name__ == "__main__":
                 output_dir=dem_aoi_dir,
             )
             logger.info("DEM fetched for {}: {}", cfg.aoi_name, dem_path.name)
-        slope_deg = _compute_slope_deg(dem_path)
+        slope_deg, dem_transform, dem_crs = _compute_slope_deg(dem_path)
 
-        # 3. Natural Earth coastline + waterbodies
+        # 3. Align WorldCover onto the DEM grid (WC is EPSG:4326 10m; DEM is UTM 30m)
+        wc_on_dem = _reproject_worldcover_to_dem_grid(
+            wc_data,
+            wc_transform,
+            wc_crs,
+            dst_shape=slope_deg.shape,
+            dst_transform=dem_transform,
+            dst_crs=dem_crs,
+        )
+
+        # 4. Natural Earth coastline + waterbodies
         coast, water = load_coastline_and_waterbodies(bounds)
 
-        # 4. Stable mask
+        # 5. Stable mask (in the DEM/slope UTM grid)
         stable_mask = build_stable_mask(
-            wc_data,
+            wc_on_dem,
             slope_deg,
             coast,
             water,
-            transform=wc_transform,
-            crs=wc_crs,
+            transform=dem_transform,
+            crs=dem_crs,
             coast_buffer_m=5000.0,
             water_buffer_m=500.0,
             slope_max_deg=10.0,
@@ -908,13 +936,13 @@ if __name__ == "__main__":
                     cfg.aoi_name, ref_aoi_dir,
                 )
 
-        # 9. Stable-mask sanity artifacts (P2.1 mitigation)
+        # 9. Stable-mask sanity artifacts (P2.1 mitigation) — mask is on DEM/UTM grid
         _write_sanity_artifacts(
             cfg.aoi_name,
             stable_mask=stable_mask,
             coherence_stack=ifgrams_stack,
-            transform=wc_transform,
-            crs=wc_crs,
+            transform=dem_transform,
+            crs=dem_crs,
             out_dir=CACHE / "sanity" / cfg.aoi_name,
         )
 
