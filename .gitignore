@@ -208,6 +208,8 @@ __marimo__/
 
 # Eval folders
 eval-cslc/*
+eval-cslc-selfconsist-nam/*
+eval-cslc-selfconsist-eu/*
 eval-disp/*
 eval-disp-egms/*
 eval-dist/*

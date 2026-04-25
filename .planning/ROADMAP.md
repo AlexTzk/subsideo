@@ -142,7 +142,17 @@ RTC-01 (01, 02, 03, 04, 05), RTC-02 (01, 05), RTC-03 (01, 02, 03, 04, 05). Every
 
 **Planning artifact — multilook method default**: research identified direct tension between PITFALLS P3.1 (Gaussian σ=0.5×ref physically-correct when reference is itself Gaussian-smoothed) and FEATURES anti-feature table (block-mean as conservative anti-inflation choice). Plan-phase ADR required; this roadmap does not pre-commit.
 
-**Plans**: TBD
+**Plans**: 5 plans across 4 waves
+
+Plans:
+- [ ] 04-01-PLAN.md — Schema + selfconsistency ramp helpers: matrix_schema.py adds DISPCellMetrics + RampAttribution + RampAggregate + PerIFGRamp + DISPProductQualityResultJson; selfconsistency.py adds fit_planar_ramp + compute_ramp_aggregate + auto_attribute_ramp; unit tests [Wave 1] [DISP-02, DISP-03]
+- [ ] 04-02-PLAN.md — compare_disp.py prepare_for_reference adapter (4 methods × 3 reference_grid forms; explicit method=, no default per DISP-01) + ReferenceGridSpec + 12-cell unit test matrix + DISP-05 no-write-back audit [Wave 1] [DISP-01, DISP-05]
+- [ ] 04-03-PLAN.md — matrix_writer.py disp:nam + disp:eu render branches (CALIBRATING italics on PQ + non-italics PASS/FAIL on RA + attributed_source label inline; DISP dispatch BEFORE CSLC self-consist) + tests [Wave 2] [DISP-03]
+- [ ] 04-04-PLAN.md — run_eval_disp.py + run_eval_disp_egms.py 5 changes per script (REFERENCE_MULTILOOK_METHOD constant, EXPECTED_WALL_S=21600, Stage 9 adapter, Stage 10 PQ block w/ cross-cell coherence read for SoCal, Stage 11 ramp-attribution, Stage 12 DISPCellMetrics write); manifest cache_dir fix; warm re-runs produce metrics.json + meta.json for both cells [Wave 3] [DISP-01, DISP-02, DISP-03, DISP-05]
+- [ ] 04-05-PLAN.md — Docs+brief: git mv CONCLUSIONS_DISP_EGMS.md → CONCLUSIONS_DISP_EU.md; append v1.1 Product Quality / Reference Agreement / Ramp Attribution / Brief link sections to both CONCLUSIONS files; write DISP_UNWRAPPER_SELECTION_BRIEF.md (4 candidates × 4 columns); append §3 multilook ADR to docs/validation_methodology.md (5-part PITFALLS+FEATURES dialogue) [Wave 4] [DISP-03, DISP-04, DISP-05]
+
+**Requirements coverage audit** (all 5 Phase 4 requirement IDs):
+DISP-01 (02, 04), DISP-02 (01, 04), DISP-03 (01, 03, 04, 05), DISP-04 (05), DISP-05 (02, 04, 05). Every requirement appears in at least one plan.
 
 ### Phase 5: DIST-S1 OPERA v0.1 + EFFIS EU
 
