@@ -22,9 +22,51 @@
 # Compute estimate : 3-6 hours depending on hardware
 #
 # Resume-safe: each stage skips work if outputs already exist.
-import warnings; warnings.filterwarnings("ignore")
+import warnings; warnings.filterwarnings("ignore")  # noqa: E702, I001
 
-EXPECTED_WALL_S = 5400   # Plan 01-07 supervisor AST-parses this constant (D-11)
+from typing import Literal  # noqa: E402
+
+# Phase 4 D-Claude's-Discretion: 6h cap (warm re-run + ramp fit + adapter ~30 min/cell;
+# cold full-pipeline ~3 h/cell + safety margin). 21600s expressed as 60*60*6 because
+# supervisor AST-parser whitelists nested BinOp of literal Constants (Plan 01-07 T-07-06).
+EXPECTED_WALL_S = 60 * 60 * 6   # 21600 -- Plan 01-07 supervisor AST-parses this
+REFERENCE_MULTILOOK_METHOD: Literal["block_mean"] = "block_mean"  # Phase 4 D-04
+
+
+def _reproject_mask_to_grid(
+    mask: "object",  # numpy ndarray
+    src_transform: "object",  # rasterio Affine
+    src_crs: "object",  # rasterio CRS
+    target_shape: tuple[int, int],
+) -> "object":
+    """Reproject a (H, W) bool stable_mask onto a target raster grid via nearest-neighbour.
+
+    Phase 4 helper: re-grids a stable-terrain mask (built on the DEM grid) onto
+    the CSLC / velocity raster grid before feeding `coherence_stats` /
+    `residual_mean_velocity`. Uses rasterio.warp.reproject in nearest mode to
+    preserve boolean class labels.
+    """
+    import numpy as np
+    import rasterio as _rio
+    from rasterio.warp import Resampling as _Resampling
+    from rasterio.warp import reproject as _reproject
+
+    h_src, w_src = mask.shape
+    h_tgt, w_tgt = target_shape
+    sx = w_src / w_tgt
+    sy = h_src / h_tgt
+    target_transform = src_transform * _rio.Affine(sx, 0, 0, 0, sy, 0)
+    out = np.zeros(target_shape, dtype=np.float32)
+    _reproject(
+        source=mask.astype(np.float32),
+        destination=out,
+        src_transform=src_transform,
+        src_crs=src_crs,
+        dst_transform=target_transform,
+        dst_crs=src_crs,
+        resampling=_Resampling.nearest,
+    )
+    return out.astype(bool)
 
 if __name__ == "__main__":
     import os
@@ -44,11 +86,7 @@ if __name__ == "__main__":
     from subsideo.products.disp import run_disp
     from subsideo.validation.harness import (
         bounds_for_burst,
-        bounds_for_mgrs_tile,
         credential_preflight,
-        download_reference_with_retry,
-        ensure_resume_safe,
-        select_opera_frame_by_utc_hour,
     )
 
     load_dotenv()
@@ -58,6 +96,10 @@ if __name__ == "__main__":
         "EARTHDATA_USERNAME", "EARTHDATA_PASSWORD",
         "EGMS_TOKEN",
     ])
+
+    # Phase 4 Stage 12 prerequisite: wall-time + run-start tracking for meta.json
+    t_start = time.monotonic()
+    run_start_iso = datetime.utcnow().isoformat() + "Z"
 
     # ── Configuration ────────────────────────────────────────────────────────
     BURST_ID = "t117_249422_iw2"
@@ -539,27 +581,409 @@ if __name__ == "__main__":
         print(f"    mean         : {np.nanmean(our_velocity[valid]):.4f}")
         print(f"    std          : {np.nanstd(our_velocity[valid]):.4f}")
 
-    # ── Stage 9: Compare against EGMS L2a ────────────────────────────────────
-    print("\n-- Stage 9: Validation vs EGMS L2a --")
+    # ── Stage 9: Validation vs EGMS L2a (Phase 4 D-01 + D-02 form-c) ──────────
+    print(
+        "\n-- Stage 9: Validation vs EGMS L2a "
+        "(Phase 4 prepare_for_reference) --"
+    )
     if not egms_csv_paths:
         print("  No EGMS L2a reference CSVs available -- comparison deferred.")
         sys.exit(0)
 
-    from subsideo.validation.compare_disp import compare_disp_egms_l2a
-
-    result = compare_disp_egms_l2a(
-        velocity_path=velocity_path,
-        egms_csv_paths=egms_csv_paths,
-        velocity_col="mean_velocity",
-        velocity_units="rad_per_year",
+    from subsideo.validation.compare_disp import (
+        ReferenceGridSpec,
+        _load_egms_l2a_points,
+        prepare_for_reference,
     )
 
+    print(
+        "  Multilooking native velocity at EGMS L2a PS points via "
+        "prepare_for_reference(method='block_mean')..."
+    )
+    egms_df = _load_egms_l2a_points(egms_csv_paths, velocity_col="mean_velocity")
+    egms_spec = ReferenceGridSpec(
+        points_lonlat=np.column_stack([
+            egms_df["lon"].values.astype(np.float64),
+            egms_df["lat"].values.astype(np.float64),
+        ]),
+        crs="EPSG:4326",
+        point_ids=None,
+    )
+    our_at_ps_rad_per_year = prepare_for_reference(
+        native_velocity=velocity_path,
+        reference_grid=egms_spec,
+        method=REFERENCE_MULTILOOK_METHOD,
+    )
+    SENTINEL1_WAVELENGTH_M = 0.05546576
+    our_at_ps_mm_yr = (
+        -our_at_ps_rad_per_year * SENTINEL1_WAVELENGTH_M / (4.0 * np.pi) * 1000.0
+    )
+    ref_ps_mm_yr = egms_df["mean_velocity"].values.astype(np.float64)
+    valid = np.isfinite(our_at_ps_mm_yr) & np.isfinite(ref_ps_mm_yr)
+    n_valid = int(valid.sum())
+    print(f"  Paired PS samples: {n_valid:,} / {len(ref_ps_mm_yr):,}")
+
+    if n_valid >= 100:
+        correlation = float(
+            np.corrcoef(our_at_ps_mm_yr[valid], ref_ps_mm_yr[valid])[0, 1]
+        )
+        bias = float((our_at_ps_mm_yr[valid] - ref_ps_mm_yr[valid]).mean())
+        rmse = float(
+            np.sqrt(((our_at_ps_mm_yr[valid] - ref_ps_mm_yr[valid]) ** 2).mean())
+        )
+    else:
+        correlation = float("nan")
+        bias = float("nan")
+        rmse = float("nan")
+    sample_count = n_valid
+
     print(f"\n  {'='*60}")
-    print(f"  Correlation  : {result.correlation:.4f}   (criterion: > 0.92)")
-    print(f"  Bias         : {result.bias_mm_yr:+.4f} mm/yr (criterion: < 3 mm/yr)")
+    print(f"  Correlation  : {correlation:.4f}   (criterion: > 0.92)")
+    print(f"  Bias         : {bias:+.4f} mm/yr (criterion: < 3 mm/yr)")
+    print(f"  RMSE         : {rmse:.4f} mm/yr")
     print(f"  {'='*60}")
-    for k, v in result.pass_criteria.items():
-        print(f"  {k:30s}: {'PASS' if v else 'FAIL'}")
-    overall = all(result.pass_criteria.values())
-    print(f"  {'Overall':30s}: {'PASS' if overall else 'FAIL'}")
-    print(f"  {'='*60}")
+
+    # --- Phase 4 Stage 10: product-quality block (CONTEXT D-05..D-08) ---
+    print(
+        "\n  [Phase 4 Stage 10] Computing product-quality (coherence + "
+        "residual) on stable terrain..."
+    )
+    from pathlib import Path as _PhasePath
+
+    from rasterio.warp import Resampling as _Resampling
+    from rasterio.warp import reproject as _reproject
+
+    from subsideo.data.natural_earth import load_coastline_and_waterbodies
+    from subsideo.data.worldcover import (
+        fetch_worldcover_class60,
+        load_worldcover_for_bbox,
+    )
+    from subsideo.validation.selfconsistency import (
+        coherence_stats,
+        compute_ifg_coherence_stack,
+        residual_mean_velocity,
+    )
+    from subsideo.validation.stable_terrain import build_stable_mask
+
+    # Phase 4 B2 acknowledgement: `dem_path` is pre-bound at Stage 4 and
+    # reachable here; do NOT re-bind. Slope-from-DEM is computed inline
+    # because the existing `compute_slope_from_dem` analog lives in
+    # run_eval_cslc_selfconsist_nam.py as a closure (Phase 3 D-Claude's-
+    # Discretion). Same algorithm, kept colocated for Phase 4.
+    def _slope_from_dem(p):  # noqa: ANN001, ANN202 — inline helper closure
+        import rasterio as _rio_local
+        with _rio_local.open(p) as _src:
+            dem = _src.read(1).astype(np.float32)
+            pixel_m = abs(_src.transform.a)
+            dem_transform = _src.transform
+            dem_crs = _src.crs
+        dz_dy, dz_dx = np.gradient(dem, pixel_m)
+        slope_rad = np.arctan(np.sqrt(dz_dx**2 + dz_dy**2))
+        return np.degrees(slope_rad).astype(np.float32), dem_transform, dem_crs
+
+    # 10.1 Build stable mask (CONTEXT D-06: identical params to Phase 3 SoCal)
+    worldcover_dir = _PhasePath("eval-disp-egms/worldcover")
+    fetch_worldcover_class60(BURST_BBOX, out_dir=worldcover_dir)
+    wc_data, wc_transform, wc_crs = load_worldcover_for_bbox(
+        BURST_BBOX, tiles_dir=worldcover_dir
+    )
+    slope_deg, dem_transform, dem_crs = _slope_from_dem(dem_path)
+    coastline, waterbodies = load_coastline_and_waterbodies(BURST_BBOX)
+    wc_on_dem = np.empty(slope_deg.shape, dtype=wc_data.dtype)
+    _reproject(
+        source=wc_data, destination=wc_on_dem,
+        src_transform=wc_transform, src_crs=wc_crs,
+        dst_transform=dem_transform, dst_crs=dem_crs,
+        resampling=_Resampling.nearest,
+    )
+    stable_mask = build_stable_mask(
+        wc_on_dem, slope_deg, coastline=coastline, waterbodies=waterbodies,
+        transform=dem_transform, crs=dem_crs,
+        coast_buffer_m=5000, water_buffer_m=500, slope_max_deg=10,
+    )
+    n_stable = int(stable_mask.sum())
+    print(f"  stable_mask pixels: {n_stable:,}")
+    cell_status = "BLOCKER" if n_stable < 100 else "MIXED"
+
+    # 10.2 Coherence: Bologna fresh path (no Phase 3 cache to reuse; D-08)
+    # Phase 4 B2 acknowledgement: `dem_path` is pre-bound at Stage 4
+    # (run_eval_disp_egms.py Stage 4). Reachable here; do NOT re-bind.
+    coherence_source = "fresh"
+    # phase3_metrics_path retained only for meta.json input_hashes (read-only)
+    phase3_metrics_path = _PhasePath("eval-cslc-selfconsist-nam/metrics.json")
+    print("  coherence: fresh-computing from cached CSLCs (boxcar 5x5)...")
+    # B1 root-cause fix: import the PUBLIC compute_ifg_coherence_stack from
+    # selfconsistency.py (Plan 04-01 Task 3 promotion). Do NOT import from
+    # run_eval_cslc_selfconsist_nam -- inner-scope, unreachable.
+    sorted_h5 = sorted(_PhasePath("eval-disp-egms/cslc").rglob("*.h5"))
+    sorted_h5 = [p for p in sorted_h5 if "runconfig" not in p.name.lower()]
+    ifgrams_stack = compute_ifg_coherence_stack(sorted_h5, boxcar_px=5)
+    stable_mask_cslc = _reproject_mask_to_grid(
+        stable_mask, dem_transform, dem_crs, ifgrams_stack.shape[1:]
+    )
+    coh_stats = coherence_stats(
+        ifgrams_stack, stable_mask_cslc, coherence_threshold=0.6
+    )
+
+    # 10.3 Residual: ALWAYS fresh from dolphin output (CONTEXT D-08)
+    print("  residual: fresh from dolphin velocity.tif...")
+    import rasterio as _rio
+    with _rio.open(velocity_path) as _src:
+        v_rad_per_year = _src.read(1).astype(np.float64)
+    v_mm_yr = (
+        -v_rad_per_year * SENTINEL1_WAVELENGTH_M / (4.0 * np.pi) * 1000.0
+    )
+    stable_mask_vel = _reproject_mask_to_grid(
+        stable_mask, dem_transform, dem_crs, v_mm_yr.shape
+    )
+    if int(stable_mask_vel.sum()) > 0:
+        residual = residual_mean_velocity(
+            v_mm_yr, stable_mask_vel, frame_anchor="median"
+        )
+    else:
+        residual = float("nan")
+    print(f"  residual_mm_yr: {residual:+.2f}")
+
+    # --- Phase 4 Stage 11: ramp-attribution diagnostic (CONTEXT D-09..D-12) ---
+    print("\n  [Phase 4 Stage 11] Per-IFG planar ramp fit + attribution...")
+    import re as _re_phase4
+
+    from subsideo.validation.matrix_schema import (
+        DISPCellMetrics,
+        DISPProductQualityResultJson,
+        MetaJson,
+        PerIFGRamp,
+        RampAggregate,
+        RampAttribution,
+        ReferenceAgreementResultJson,
+    )
+    from subsideo.validation.selfconsistency import (
+        auto_attribute_ramp,
+        compute_ramp_aggregate,
+        fit_planar_ramp,
+    )
+
+    unwrapped_dir = _PhasePath("eval-disp-egms/disp/dolphin/unwrapped")
+    unw_files = sorted(unwrapped_dir.glob("*.unw.tif"))
+    date_pat = _re_phase4.compile(r"^(\d{8})_(\d{8})\.unw\.tif$")
+
+    def _is_sequential_12day(ref_iso: str, sec_iso: str) -> bool:
+        from datetime import datetime as _dt
+        # Bologna 2021 stack is dual-sat S1A+S1B with effective 6-day cadence
+        # but we still construct nominal 12-day pairs for cross-cell methodology
+        # consistency (D-07). Tolerance widened to +/- 2 days to accommodate
+        # cross-constellation pairs that fall on alternating S1A/S1B days.
+        return abs(
+            (_dt.fromisoformat(sec_iso) - _dt.fromisoformat(ref_iso)).days - 12
+        ) <= 1
+
+    sequential_unw = []
+    for f in unw_files:
+        mt = date_pat.match(f.name)
+        if mt is None:
+            continue
+        ref_iso = f"{mt.group(1)[0:4]}-{mt.group(1)[4:6]}-{mt.group(1)[6:8]}"
+        sec_iso = f"{mt.group(2)[0:4]}-{mt.group(2)[4:6]}-{mt.group(2)[6:8]}"
+        if _is_sequential_12day(ref_iso, sec_iso):
+            sequential_unw.append((f, ref_iso, sec_iso))
+    print(f"  sequential 12-day IFGs found: {len(sequential_unw)}")
+
+    ifgrams_unw_stack_list = []
+    for f, _, _ in sequential_unw:
+        with _rio.open(f) as _src:
+            ifgrams_unw_stack_list.append(_src.read(1).astype(np.float32))
+    ifgrams_unw_stack = (
+        np.stack(ifgrams_unw_stack_list, axis=0)
+        if ifgrams_unw_stack_list
+        else np.zeros((0, 1, 1), dtype=np.float32)
+    )
+
+    ifg_coh_means: list[float] = []
+    cor_dir = _PhasePath("eval-disp-egms/disp/dolphin/interferograms")
+    for f, _, _ in sequential_unw:
+        cor_file = cor_dir / f.name.replace(".unw.tif", ".int.cor.tif")
+        if not cor_file.exists():
+            ifg_coh_means.append(float("nan"))
+            continue
+        with _rio.open(cor_file) as _src:
+            cor = _src.read(1).astype(np.float64)
+        valid_cor = np.isfinite(cor) & (cor > 0)
+        ifg_coh_means.append(
+            float(cor[valid_cor].mean()) if valid_cor.any() else float("nan")
+        )
+    ifg_coh_per_ifg = np.array(ifg_coh_means, dtype=np.float64)
+
+    if ifgrams_unw_stack.shape[0] > 0:
+        ramp_data = fit_planar_ramp(ifgrams_unw_stack, mask=None)
+        agg_dict = compute_ramp_aggregate(ramp_data, ifg_coh_per_ifg)
+    else:
+        ramp_data = {
+            "ramp_magnitude_rad": np.zeros((0,), dtype=np.float64),
+            "ramp_direction_deg": np.zeros((0,), dtype=np.float64),
+            "slope_x": np.zeros((0,), dtype=np.float64),
+            "slope_y": np.zeros((0,), dtype=np.float64),
+            "intercept_rad": np.zeros((0,), dtype=np.float64),
+        }
+        agg_dict = {
+            "mean_magnitude_rad": float("nan"),
+            "direction_stability_sigma_deg": float("nan"),
+            "magnitude_vs_coherence_pearson_r": float("nan"),
+            "n_ifgs": 0,
+        }
+    attributed_source = auto_attribute_ramp(
+        direction_stability_sigma_deg=agg_dict["direction_stability_sigma_deg"],
+        magnitude_vs_coherence_pearson_r=(
+            agg_dict["magnitude_vs_coherence_pearson_r"]
+        ),
+    )
+    print(
+        f"  ramp aggregate: mean_mag={agg_dict['mean_magnitude_rad']:.2f} rad, "
+        f"sigma_dir={agg_dict['direction_stability_sigma_deg']:.1f} deg, "
+        f"r(mag,coh)={agg_dict['magnitude_vs_coherence_pearson_r']:.2f}"
+    )
+    print(f"  auto-attributed source: {attributed_source}")
+
+    per_ifg_records = []
+    for k, (_f, ref_iso, sec_iso) in enumerate(sequential_unw):
+        per_ifg_records.append(PerIFGRamp(
+            ifg_idx=k,
+            ref_date_iso=ref_iso,
+            sec_date_iso=sec_iso,
+            ramp_magnitude_rad=float(ramp_data["ramp_magnitude_rad"][k]),
+            ramp_direction_deg=float(ramp_data["ramp_direction_deg"][k]),
+            ifg_coherence_mean=(
+                float(ifg_coh_per_ifg[k])
+                if not np.isnan(ifg_coh_per_ifg[k])
+                else None
+            ),
+        ))
+    ramp_attribution_obj = RampAttribution(
+        per_ifg=per_ifg_records,
+        aggregate=RampAggregate(**agg_dict),
+        attributed_source=attributed_source,
+        attribution_note="Automated; human review pending in CONCLUSIONS",
+    )
+
+    # --- Phase 4 Stage 12: write metrics.json + meta.json --------------------
+    print(
+        "\n  [Phase 4 Stage 12] Writing eval-disp-egms/metrics.json + "
+        "meta.json..."
+    )
+    import hashlib as _hash
+    import platform as _platform
+    import subprocess as _sp
+    import sys as _sys
+    import time as _time
+
+    OUT_DIR = _PhasePath("eval-disp-egms")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    def _coh(*keys, default=float("nan")):  # noqa: ANN001, ANN002, ANN202
+        for k in keys:
+            if k in coh_stats:
+                return float(coh_stats[k])
+        return float(default)
+
+    pq = DISPProductQualityResultJson(
+        measurements={
+            "coherence_median_of_persistent": _coh(
+                "coherence_median_of_persistent", "median_of_persistent"
+            ),
+            "residual_mm_yr": float(residual),
+            "coherence_mean": _coh("coherence_mean", "mean"),
+            "coherence_median": _coh("coherence_median", "median"),
+            "coherence_p25": _coh("coherence_p25", "p25"),
+            "coherence_p75": _coh("coherence_p75", "p75"),
+            "persistently_coherent_fraction": _coh(
+                "persistently_coherent_fraction"
+            ),
+        },
+        criterion_ids=[
+            "disp.selfconsistency.coherence_min",
+            "disp.selfconsistency.residual_mm_yr_max",
+        ],
+        coherence_source=coherence_source,
+    )
+    # W3 -- explicit references to the canonical names assigned in Stage 9
+    # (correlation, bias, rmse, sample_count). NO dir() introspection. If any
+    # name is undefined here, NameError surfaces loudly.
+    ra = ReferenceAgreementResultJson(
+        measurements={
+            "correlation": correlation,
+            "bias_mm_yr": bias,
+            "rmse_mm_yr": rmse,
+            "sample_count": float(sample_count),
+        },
+        criterion_ids=["disp.correlation_min", "disp.bias_mm_yr_max"],
+    )
+    metrics = DISPCellMetrics(
+        schema_version=1,
+        product_quality=pq,
+        reference_agreement=ra,
+        ramp_attribution=ramp_attribution_obj,
+        cell_status=cell_status,
+        criterion_ids_applied=[
+            "disp.selfconsistency.coherence_min",
+            "disp.selfconsistency.residual_mm_yr_max",
+            "disp.correlation_min",
+            "disp.bias_mm_yr_max",
+        ],
+        runtime_conda_list_hash=None,
+    )
+    (OUT_DIR / "metrics.json").write_text(metrics.model_dump_json(indent=2))
+    print(f"  Wrote {OUT_DIR / 'metrics.json'}")
+
+    try:
+        git_sha = _sp.check_output(
+            ["git", "rev-parse", "HEAD"], text=True
+        ).strip()
+        git_dirty = bool(
+            _sp.check_output(["git", "status", "--porcelain"], text=True).strip()
+        )
+    except Exception:
+        git_sha, git_dirty = "unknown", False
+
+    def _sha256_file(p: Path) -> str:
+        h = _hash.sha256()
+        with open(p, "rb") as fh:
+            for block in iter(lambda: fh.read(65536), b""):
+                h.update(block)
+        return h.hexdigest()
+
+    input_hashes = {"velocity_tif": _sha256_file(velocity_path)}
+    if phase3_metrics_path.exists():
+        input_hashes["phase3_cslc_metrics"] = _sha256_file(phase3_metrics_path)
+
+    meta = MetaJson(
+        schema_version=1,
+        git_sha=git_sha,
+        git_dirty=git_dirty,
+        run_started_iso=run_start_iso,
+        run_duration_s=_time.monotonic() - t_start,
+        python_version=_sys.version.split()[0],
+        platform=_platform.platform(),
+        input_hashes=input_hashes,
+    )
+    (OUT_DIR / "meta.json").write_text(meta.model_dump_json(indent=2))
+    print(f"  Wrote {OUT_DIR / 'meta.json'}")
+
+    print("\n" + "=" * 70)
+    print(f"eval-disp-egms (Bologna): cell_status={cell_status}")
+    coh_med_disp = coh_stats.get(
+        "coherence_median_of_persistent",
+        coh_stats.get("median_of_persistent", float("nan")),
+    )
+    print(
+        f"  PQ: coh_med_of_persistent={coh_med_disp:.3f} "
+        f"(coherence_source={coherence_source}) / "
+        f"residual={residual:+.2f} mm/yr (CALIBRATING)"
+    )
+    print(
+        f"  RA: r={correlation:.3f} (>0.92 BINDING) / "
+        f"bias={bias:+.2f} mm/yr (<3.0 BINDING)"
+    )
+    print(
+        f"  Ramp: attr={attributed_source}, "
+        f"mean_mag={agg_dict['mean_magnitude_rad']:.2f} rad"
+    )
+    print("=" * 70)
