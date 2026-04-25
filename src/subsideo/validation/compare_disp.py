@@ -566,6 +566,7 @@ def _resample_onto_grid(
             dst_transform=dst_transform,
             dst_crs=dst_crs,
             resampling=Resampling.nearest,
+            dst_nodata=np.nan,  # Phase 4 HI-01: preserve init NaN on un-touched cells
         )
         return dst_data
 
@@ -582,6 +583,7 @@ def _resample_onto_grid(
         dst_transform=dst_transform,
         dst_crs=dst_crs,
         resampling=rmap[method],
+        dst_nodata=np.nan,  # Phase 4 HI-01: preserve init NaN on un-touched cells
     )
     return dst_data
 

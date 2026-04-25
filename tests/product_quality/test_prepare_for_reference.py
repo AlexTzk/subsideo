@@ -46,11 +46,18 @@ def native_path(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def ref_path(tmp_path: Path) -> Path:
-    """Synthetic reference 50x50 raster at 30m posting in EPSG:32611, all zeros."""
-    height = width = 50
+    """Synthetic reference raster at 30m posting in EPSG:32611, all zeros.
+
+    Phase 4 HI-01: ref grid is sized to lie ENTIRELY inside the native
+    footprint so that the ">50% finite" invariant is the right one once
+    out-of-extent cells are correctly NaN'd by reproject(dst_nodata=np.nan).
+    Native covers 500m (x) x 1000m (y); ref covers 450m x 450m, anchored
+    inside.
+    """
+    height = width = 15
     data = np.zeros((height, width), dtype=np.float32)
     # Anchor inside the native footprint (origin at 500000, 4000000;
-    # native is 500m wide x 1000m tall).
+    # native is 500m wide x 1000m tall). 15 cells at 30m = 450m extent.
     transform = from_origin(500000.0, 4000000.0, 30.0, 30.0)
     out = tmp_path / "ref.tif"
     with rasterio.open(
@@ -71,7 +78,7 @@ def ref_path(tmp_path: Path) -> Path:
 @pytest.fixture
 def ref_dataarray(ref_path: Path) -> xr.DataArray:
     """Build an xr.DataArray from the same shape/transform as ref_path."""
-    height = width = 50
+    height = width = 15
     data = np.zeros((height, width), dtype=np.float32)
     transform = from_origin(500000.0, 4000000.0, 30.0, 30.0)
     da = xr.DataArray(
@@ -128,11 +135,16 @@ _METHODS: list[MultilookMethod] = ["gaussian", "block_mean", "bilinear", "neares
 def test_form_a_path_each_method(
     method: MultilookMethod, native_path: Path, ref_path: Path
 ) -> None:
-    """Form (a): reference is a GeoTIFF on disk."""
+    """Form (a): reference is a GeoTIFF on disk.
+
+    Phase 4 HI-01: ref now lies entirely inside native, so the >50% finite
+    invariant catches the dst_nodata=np.nan fix. Pre-fix, out-of-extent
+    cells were silently filled with 0.0 (finite); post-fix they are NaN.
+    """
     out = prepare_for_reference(native_path, ref_path, method=method)
     assert isinstance(out, np.ndarray)
-    assert out.shape == (50, 50)
-    # At least 50% of pixels finite (overlapping region).
+    assert out.shape == (15, 15)
+    # ref is fully inside native footprint -> overwhelmingly finite.
     assert np.isfinite(out).sum() > 0.5 * out.size
 
 
@@ -140,7 +152,10 @@ def test_form_a_path_each_method(
 def test_form_b_dataarray_each_method(
     method: MultilookMethod, native_path: Path, ref_dataarray: xr.DataArray
 ) -> None:
-    """Form (b): reference is xr.DataArray with CRS via rioxarray."""
+    """Form (b): reference is xr.DataArray with CRS via rioxarray.
+
+    Phase 4 HI-01: see test_form_a_path_each_method.
+    """
     out = prepare_for_reference(native_path, ref_dataarray, method=method)
     assert isinstance(out, xr.DataArray)
     assert out.shape == ref_dataarray.shape
