@@ -230,3 +230,112 @@ eval-cslc-selfconsist-nam/
 3. **Mojave amplitude sanity** (D-07 follow-up): Mojave fallbacks currently set `run_amplitude_sanity=False` because OPERA frame-matching across desert fallback bursts is not reliable. Re-enable for whichever fallback succeeds first (Coso-Searles in this run) by passing the verified burst_id back to the OPERA frame search.
 4. **Probe-artifact regeneration** (Plan 03-02 follow-up): the 03-02 probe shipped fabricated dates for ALL 5 N.Am. tuples (1 SoCal + 4 Mojave) — the `asf-search`-based derivation in Bug 5 should be moved into the probe so future re-runs don't carry forward the same fabrication.
 5. **EU validation**: see `CONCLUSIONS_CSLC_SELFCONSIST_EU.md` (Plan 03-04 Task 2).
+
+---
+
+## 9. Phase 3 Verification Report (2026-04-25)
+
+*Source: `.planning/phases/03-cslc-s1-self-consistency-eu-validation/03-VERIFICATION.md` (re-verification after user-deferred compute + methodology-doc work landed). Status: `human_needed` — 16/18 must-haves VERIFIED, 1 PARTIAL (#14), 1 FAIL (#18 — stale test). No functional gaps; outstanding items are scientific-narrative sign-off + PNG inspection + two named follow-ups.*
+
+### 9.1 Post-deferral completion findings
+
+Phase 3 plans 03-01 through 03-05 are now all in a closed-loop state on disk:
+
+- **Wave 1** (03-01 + 03-02): scaffolding + AOI probe + lock-in — VERIFIED.
+- **Wave 2 Task 1** (03-03 + 03-04): eval scripts + 19 NAM + 22 EU static-invariant tests — VERIFIED (with 1 pre-existing PARTIAL + 1 newly stale FAIL, both below).
+- **Wave 2 Task 2** (03-03 + 03-04 compute): user ran `make eval-cslc-{nam,eu}`; both cells produced metrics.json + sanity artifacts + CONCLUSIONS — VERIFIED.
+- **Wave 3** (03-05 methodology doc + cross-link retargets): three commits (5e1dcc0/5cef9dc/9009189); 12/12 regression tests green — VERIFIED.
+
+#### NAM compute (must_have #15) — VERIFIED
+
+`cell_status=CALIBRATING, 2/2 PASS, no BLOCKERs`. Both AOIs gate-positive on candidate Phase 4 thresholds (coh ≥ 0.7 by 10%+ headroom; |residual| ≤ 3.0 mm/yr by 2.7×+ headroom). 11 fix commits (Bugs 1–11 in CONCLUSIONS NAM §4) landed during iterative debug; `run_duration_s=4691` (78 min, not the "12h cold / 48h worst-case" deferral-note estimate). Evidence: `eval-cslc-selfconsist-nam/{metrics.json, meta.json, sanity/, output/}`; CONCLUSIONS_CSLC_SELFCONSIST_NAM.md §§1–8 narrative + §5.4 methodology cross-links.
+
+#### EU compute (must_have #16) — VERIFIED
+
+`cell_status=CALIBRATING, 1/1 PASS, no BLOCKERs`. Iberian is the cleanest of the three Phase 3 AOIs (coh 24% headroom above 0.7; residual 8.6× headroom below 3.0 mm/yr). 8 EU-specific bug fixes (Bugs 1–8 in CONCLUSIONS EU §4); two explicitly deferred follow-ups (Bug 2 Alentejo+MassifCentral burst-ID re-derivation; Bug 8 EGMStoolkit class-API adapter). `run_duration_s=4386` (73 min). Three-number schema: (a) `amp_r=0.0` (n/a; OPERA L2 CSLC-S1 V1 is N.Am.-only by design) + (b) `coh_median_of_persistent=0.868` + (c) `residual_mm_yr=+0.347` and `egms_l2a_stable_ps_residual_mm_yr` null (deferred).
+
+#### Methodology doc (must_have #17) — VERIFIED
+
+`docs/validation_methodology.md` 247 lines, §1 (CSLC cross-version phase impossibility) + §2 (Product-quality vs reference-agreement distinction); no §3/§4/§5 stubs (D-15 append-only); §1 leads with structural SLC-interpolation-kernel argument before diagnostic-evidence appendix (PITFALLS P2.4 ordering). `compare_cslc.py:1-26` docstring contains `docs/validation_methodology.md#cross-version-phase` cross-link. Both CONCLUSIONS docs §5.4/§5.5 cross-linked. `tests/unit/test_validation_methodology_doc.py` 12/12 PASS.
+
+#### Code-discipline failure (must_have #14) — still PARTIAL
+
+`test_env07_diff_discipline` still fails. 723 unclassified hunks between NAM/EU scripts (down from 731 due to landed bug fixes). Functional behavior correct in both scripts; organizational mismatch from parallel-worktree authoring of 03-03 vs 03-04. Resolution: structural alignment OR regex relaxation OR shared-helper factoring. NOT a Phase 3 must-have closure.
+
+#### Stale test (must_have #18 NEW) — FAIL
+
+`test_iberian_aoi_fallback_chain_two_entries` asserts `IberianAOI.fallback_chain=_IBERIAN_FALLBACKS` is wired. Bug 2 fix commit `2b59ad6` set `fallback_chain=()` because probe shipped invalid burst IDs for Alentejo (bbox in New Zealand) and Massif Central (bbox in Arctic Norway). Test should be relaxed to accept the post-Bug-2 state. NOT introduced by Plan 03-05 — surfaced here for the first time; not a regression.
+
+### 9.2 Must-Haves Summary Table (re-verified)
+
+| # | Must-Have | Source | Status | Notes |
+|---|-----------|--------|--------|-------|
+| 1 | `coherence_stats` returns 6-key dict with `median_of_persistent` | 03-01 | VERIFIED | Regression check |
+| 2 | `Criterion` carries `gate_metric_key`; CSLC entries tagged | 03-01 | VERIFIED | Regression check |
+| 3 | `matrix_schema` AOIResult + CSLCSelfConsist{NAM,EU}CellMetrics | 03-01 | VERIFIED | Regression check |
+| 4 | `matrix_writer` renders CALIBRATING italics + U+26A0 on BLOCKER | 03-01 | VERIFIED | Regression check |
+| 5 | `compare_cslc_egms_l2a_residual` exists with D-12 signature | 03-01 | VERIFIED | Regression check |
+| 6 | `data/worldcover.fetch_worldcover_class60` exists | 03-01 | VERIFIED | Regression check |
+| 7 | `data/natural_earth.load_coastline_and_waterbodies` exists | 03-01 | VERIFIED | Regression check |
+| 8 | Makefile `eval-cslc-nam` + `eval-cslc-eu` targets wired | 03-01 | VERIFIED | User invoked both |
+| 9 | `matrix_manifest.yml` cslc entries updated | 03-01 | VERIFIED | Regression check |
+| 10 | `pyproject.toml [dev]` extras include naturalearth + EGMStoolkit | 03-01 | VERIFIED | Regression check |
+| 11 | Probe artifact (7 candidate rows + SoCal window + Mojave ordering) | 03-02 | VERIFIED | Note: probe shipped invalid Alentejo/MassifCentral — Bug 2; primary AOIs valid |
+| 12 | 03-02 Task 3 checkpoint resolved `lgtm-proceed` | 03-02 | VERIFIED | — |
+| 13 | `run_eval_cslc_selfconsist_nam.py` + 19 static tests green | 03-03 T1 | VERIFIED | 19/19 PASS |
+| 14 | `run_eval_cslc_selfconsist_eu.py` + tests green | 03-04 T1 | PARTIAL | `test_env07_diff_discipline` FAIL — 723 hunks; pre-existing code-discipline |
+| 15 | `make eval-cslc-nam` produces metrics.json + sanity + CONCLUSIONS | 03-03 T2 | **VERIFIED** | Was DEFERRED. All artifacts on disk (f6d5492) |
+| 16 | `make eval-cslc-eu` produces metrics.json + sanity + CONCLUSIONS | 03-04 T2 | **VERIFIED** | Was DEFERRED. All artifacts on disk (f6d5492) |
+| 17 | `docs/validation_methodology.md` §1+§2 + CONCLUSIONS cross-link retargets | 03-05 | **VERIFIED** | Was DEFERRED. 12/12 regression tests PASS |
+| 18 | `test_iberian_aoi_fallback_chain_two_entries` passes (NEW) | 03-04 T1 (post Bug 2) | **FAIL** (stale) | Test should accept `fallback_chain=()` post-Bug-2; not a Phase 3 regression |
+
+**Score: 16/18 VERIFIED, 1 PARTIAL (#14), 1 FAIL (#18 — stale test)**. The two non-VERIFIED rows are both code-discipline / test-staleness concerns about `run_eval_cslc_selfconsist_eu.py`; neither blocks Phase 3 contractual closure.
+
+### 9.3 Roadmap Success Criteria Coverage
+
+| # | Roadmap SC | Status | Evidence |
+|---|------------|--------|----------|
+| 1 | SoCal self-consistency, coh > 0.7 + residual < 5 mm/yr (CSLC-03) | VERIFIED | coh_med_of_persistent=0.887; residual=−0.109 mm/yr |
+| 2 | Mojave self-consistency from fallback list OR exhaustion surfaces blocker (CSLC-04) | VERIFIED | Coso-Searles (fallback #1) CALIBRATING; coh=0.804; residual=+1.127 mm/yr; chain short-circuited on first valid fallback |
+| 3 | Iberian Meseta three-number row (a)/(b)/(c) reported with no `.passed` collapse (CSLC-05) | VERIFIED-with-deferral | Row reports (a) amp_r=0.0 n/a by design + (b) coh=0.868 + (c) residual=+0.347 mm/yr; EGMS data point null per Bug 8. Schema delivered; EGMS deferral documented |
+| 4 | `docs/validation_methodology.md` cross-version phase impossibility section + diagnostic evidence (CSLC-06) | VERIFIED | §1.1 kernel argument leads + §1.3 evidence appendix; 12/12 regression tests PASS |
+
+### 9.4 Requirement Coverage (post-completion)
+
+| Requirement | Plans | Status | Evidence |
+|-------------|-------|--------|----------|
+| CSLC-03 | 03-01, 03-03 | **SATISFIED** | SoCal CALIBRATING row + amplitude sanity (0.982/1.290 dB) |
+| CSLC-04 | 03-01, 03-02, 03-03 | **SATISFIED** | Mojave/Coso-Searles CALIBRATING row (fallback #1) |
+| CSLC-05 | 03-01, 03-02, 03-04 | **SATISFIED-with-deferral** | Iberian CALIBRATING row; three-number schema delivered; EGMS L2a follow-up |
+| CSLC-06 | 03-05 | **VERIFIED** | `docs/validation_methodology.md` committed; 12/12 regression tests PASS |
+
+### 9.5 Pre-Existing Failure Annotations (NOT introduced by Phase 3)
+
+| Test | Cause | Carryover Source |
+|------|-------|------------------|
+| `test_compare_dswx::TestJrcTileUrl::test_url_format` | Phase 2 baseline | Pre-Phase-3 HEAD `dbf62ba` |
+| `test_compare_dswx::TestBinarizeDswx::test_class_mapping` | Phase 2 baseline | Pre-Phase-3 HEAD `dbf62ba` |
+| `test_disp_pipeline::test_run_disp_mocked` | Phase 2 baseline | Pre-Phase-3 HEAD `dbf62ba` |
+| `test_disp_pipeline::test_run_disp_qc_warning` | Phase 2 baseline | Pre-Phase-3 HEAD `dbf62ba` |
+| `test_metadata_wiring::TestMetadataInjectionInDISP::test_run_disp_calls_inject_opera_metadata` | Phase 2 baseline | Pre-Phase-3 HEAD `dbf62ba` |
+| `test_orbits::TestFetchOrbit::test_fallback_to_s1_orbits` | Phase 2 baseline | Pre-Phase-3 HEAD `dbf62ba` |
+| `test_run_eval_cslc_selfconsist_eu::test_env07_diff_discipline` | Code-discipline mismatch | 03-04 T1 `52aff66`; pre-existing |
+| `test_run_eval_cslc_selfconsist_eu::test_iberian_aoi_fallback_chain_two_entries` | Stale test post Bug 2 | 03-04 fix `2b59ad6`; surfaced this re-verification |
+
+**No new functional regressions introduced by 03-05's three commits.** The 12/12 methodology-doc regression tests all pass; ruff check + format clean on the four files modified by 03-05.
+
+### 9.6 Outstanding Items (human decision required)
+
+1. **Scientific narrative sign-off** — verifier confirmed structure; scientific validity of SoCal sparse-mask interpretation (486 valid pixels) and Iberian 92.3% persistent_frac requires domain-expert judgment.
+2. **Visual sanity-artifact inspection** — `coherence_histogram.png` + `stable_mask_over_basemap.png` for SoCal, Mojave/Coso-Searles, Iberian: check for bimodal P2.1 contamination; confirm masks fall on stable terrain (not dunes / playas / water-body fringes).
+3. **Deferral acceptance for two named follow-ups** (CONCLUSIONS EU §8):
+   - (a) Iberian Alentejo + MassifCentral fallback re-derivation via asf-search + footprint-intersection.
+   - (b) EGMS L2a third-number adapter to EGMStoolkit 0.3.0 class API.
+   Neither is a Phase 3 contractual must-have; both are rollout recommendations.
+4. **Pre-existing test failures cleanup** (non-blocking): #14 structural alignment; #18 test relaxation; 6 Phase 2 baselines deferred to Phase 4/6 follow-up.
+
+### 9.7 User sign-off
+
+**Approved 2026-04-25** — user accepts Phase 3 contractual closure with the two named follow-ups deferred to post-phase work and pre-existing test failures scheduled for housekeeping. Scientific sign-off on narratives and visual PNG inspection confirmed by user; CSLC-03/04/05 flipped from Pending → Validated (CALIBRATING) and CSLC-05 flagged Validated-with-deferral for EGMS.
+
+---
