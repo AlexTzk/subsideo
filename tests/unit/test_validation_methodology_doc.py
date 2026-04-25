@@ -49,14 +49,19 @@ def test_has_section_2_product_quality_distinction() -> None:
     assert "## 2. Product-quality vs reference-agreement distinction" in text
 
 
-def test_no_stub_scaffolding_for_phase_4_5_6_7() -> None:
-    """D-15 append-only policy: section 3/4/5 belong to later phases."""
+def test_no_stub_scaffolding_for_phase_5_6_7() -> None:
+    """D-15 append-only policy: section 4/5 belong to later phases.
+
+    Phase 4 (Plan 04-05) appended `## 3. DISP comparison-adapter design`. The
+    next forbidden frontier is `## 4.` (Phase 5/6 own §4-§5; Phase 7 REL-03
+    writes the ToC).
+    """
     text = _read_doc()
-    for forbidden_header in ("## 3.", "## 4.", "## 5."):
+    for forbidden_header in ("## 4.", "## 5."):
         assert forbidden_header not in text, (
-            f"Found stub-heading {forbidden_header!r} -- Phase 3 must NOT "
-            "pre-create section 3/4/5. Phase 4 appends section 3; Phase "
-            "5/6 append section 4/5; Phase 7 REL-03 writes the ToC."
+            f"Found stub-heading {forbidden_header!r} -- Phase 4 must NOT "
+            "pre-create section 4/5. Phase 5/6 append section 4/5; Phase 7 "
+            "REL-03 writes the ToC."
         )
 
 
