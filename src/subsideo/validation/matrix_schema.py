@@ -626,3 +626,245 @@ class DISPCellMetrics(MetricsJson):
             "GATE-05). BLOCKER for stable-mask < 100 valid pixels."
         ),
     )
+
+
+# --- Phase 5 DIST cell metrics (CONTEXT D-25 + scope amendment 2026-04-25) ---
+# Phase 5 ships:
+#   - DistEUCellMetrics + DistEUEventMetrics (full schema for the 3-event EU cell;
+#     Aveiro chained_run differentiator embedded as ChainedRunResult)
+#   - DistNamCellMetrics (MINIMAL deferred-cell shape only; full schema with
+#     ConfigDriftReport + reference_agreement.metrics: dict[str, MetricWithCI] +
+#     bootstrap_config defers to v1.2 once OPERA_L3_DIST-ALERT-S1_V1 publishes
+#     operationally)
+#   - 5 helper types (MetricWithCI, BootstrapConfig, EFFISQueryMeta,
+#     RasterisationDiagnostic, ChainedRunResult)
+# ZERO edits to existing types per Phase 1 D-09 immutability + Phase 4 D-11
+# schema-extension lock-in.
+
+DistEUEventID = Literal["aveiro", "evros", "spain_culebra"]
+ChainedRunStatus = Literal[
+    "structurally_valid", "partial_output", "dist_s1_hang", "crashed", "skipped"
+]
+CMRProbeOutcome = Literal["operational_found", "operational_not_found", "probe_failed"]
+ReferenceSource = Literal["operational_v1", "v0.1_cloudfront", "none"]
+DistEUCellStatus = Literal["PASS", "FAIL", "MIXED", "BLOCKER"]
+DistNamCellStatus = Literal["PASS", "FAIL", "DEFERRED"]
+
+
+class MetricWithCI(BaseModel):
+    """One reference-agreement metric with point estimate + bootstrap CI bounds (D-07)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    point: float = Field(..., description="Point estimate (e.g. F1 = 0.823).")
+    ci_lower: float = Field(..., description="Lower bound at ci_level (default 2.5 percentile).")
+    ci_upper: float = Field(..., description="Upper bound at ci_level (default 97.5 percentile).")
+
+
+class BootstrapConfig(BaseModel):
+    """Bootstrap configuration sub-block for reproducibility audit (D-09).
+
+    Defaults mirror ``subsideo.validation.bootstrap.DEFAULT_*`` constants.
+    Switching defaults requires a visible PR diff in BOTH bootstrap.py
+    constants AND any eval-script overrides.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    block_size_m: int = Field(default=1000, description="Block edge length in metres.")
+    n_bootstrap: int = Field(default=500, ge=1, description="Number of bootstrap resamples.")
+    ci_level: float = Field(default=0.95, gt=0, lt=1, description="Confidence interval level.")
+    n_blocks_kept: int = Field(..., ge=0, description="Full blocks resampled.")
+    n_blocks_dropped: int = Field(
+        ...,
+        ge=0,
+        description="Partial blocks dropped at tile edges (D-08 transparency).",
+    )
+    rng_seed: int = Field(default=0, description="PCG64 seed (np.random.default_rng).")
+
+
+class EFFISQueryMeta(BaseModel):
+    """Per-event EFFIS WFS query metadata for meta.json (D-19 reproducibility audit)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    wfs_endpoint: str = Field(..., description="WFS GetFeature endpoint URL.")
+    layer_name: str = Field(..., description="WFS typename (e.g. 'ms:modis.ba.poly').")
+    filter_string: str = Field(..., description="OGC Filter XML serialised at fetch time.")
+    response_feature_count: int = Field(..., ge=0, description="Number of features returned.")
+    fetched_at: str = Field(..., description="ISO-8601 UTC fetch timestamp.")
+
+
+class RasterisationDiagnostic(BaseModel):
+    """all_touched=True vs False F1 delta for EFFIS rasterisation transparency (D-17).
+
+    Per PITFALLS P4.4: all_touched=True boundary-only labelling can inflate F1 by
+    2-4 percentage points vs all_touched=False (centre-in-polygon only). The gate
+    value is all_touched=False; the delta is narrative-only.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    all_touched_false_f1: float = Field(..., description="Primary F1 (gate value).")
+    all_touched_true_f1: float = Field(..., description="Diagnostic F1 (narrative-only).")
+    delta_f1: float = Field(
+        ...,
+        description="all_touched_true - all_touched_false. Expected ~+0.02..+0.04.",
+    )
+
+
+class ChainedRunResult(BaseModel):
+    """Aveiro chained ``prior_dist_s1_product`` retry result (D-13, D-14, DIST-07).
+
+    Pass criterion = ``status == 'structurally_valid'``. Other status values
+    are non-failures of the EVENT (Aveiro can still PASS on F1 against EFFIS),
+    they only fail the DIFFERENTIATOR sub-result.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: ChainedRunStatus = Field(..., description="See ChainedRunStatus Literal.")
+    output_dir: str | None = Field(
+        default=None,
+        description="Path to chained product dir; None on skip/crash.",
+    )
+    n_layers_present: int | None = Field(
+        default=None,
+        ge=0,
+        le=10,
+        description="10 expected per OPERA spec (TIF_LAYERS).",
+    )
+    dist_status_nonempty: bool | None = Field(
+        default=None,
+        description="DIST-STATUS layer has >=1 non-zero pixel.",
+    )
+    error: str | None = Field(default=None, description="repr(exception) on crashed.")
+    traceback: str | None = Field(
+        default=None,
+        description="traceback.format_exc() on crashed.",
+    )
+
+
+class DistEUEventMetrics(BaseModel):
+    """Per-event sub-result row inside DistEUCellMetrics.per_event (D-10).
+
+    Structure mirrors RTCEUCellMetrics.per_burst (Phase 2 D-09). One entry per
+    EVENT (aveiro / evros / spain_culebra; substituted from romania per
+    RESEARCH Probe 4 ADR -- EFFIS is fire-only and does not cover clear-cuts).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: DistEUEventID = Field(..., description="aveiro / evros / spain_culebra.")
+    status: Literal["PASS", "FAIL"] = Field(
+        ...,
+        description=(
+            "Per-event verdict from F1 + accuracy + DIST-05 precision/recall "
+            "criteria (precision > 0.70 AND recall > 0.50; enforced inline in "
+            "eval script per Phase 1 D-09 -- NOT new criteria.py entries)."
+        ),
+    )
+    f1: MetricWithCI = Field(..., description="F1 with 95% block-bootstrap CI.")
+    precision: MetricWithCI = Field(..., description="Precision with CI.")
+    recall: MetricWithCI = Field(..., description="Recall with CI.")
+    accuracy: MetricWithCI = Field(..., description="Overall accuracy with CI.")
+    rasterisation_diagnostic: RasterisationDiagnostic = Field(
+        ...,
+        description="all_touched delta (D-17).",
+    )
+    bootstrap_config: BootstrapConfig = Field(
+        ...,
+        description="Bootstrap params for reproducibility (D-09).",
+    )
+    effis_query_meta: EFFISQueryMeta = Field(
+        ...,
+        description="EFFIS WFS query trace (D-19).",
+    )
+    chained_run: ChainedRunResult | None = Field(
+        default=None,
+        description="Aveiro-only differentiator (D-13/D-14); None for evros + spain_culebra.",
+    )
+    error: str | None = Field(
+        default=None,
+        description="repr(exception) on event-level failure (per-event try/except isolation, Phase 2 D-06).",
+    )
+    traceback: str | None = Field(
+        default=None,
+        description="traceback.format_exc() on event-level failure.",
+    )
+
+
+class DistEUCellMetrics(MetricsJson):
+    """Phase 5 EU DIST aggregate cell (D-10 + D-25).
+
+    matrix_writer detects this schema via presence of ``per_event`` in raw JSON
+    (Plan 05-05 ``_is_dist_eu_shape`` discriminator).
+    """
+
+    pass_count: int = Field(..., ge=0, description="Count of events with status == 'PASS'.")
+    total: int = Field(..., ge=1, description="Total events (3: aveiro, evros, spain_culebra).")
+    all_pass: bool = Field(..., description="True when pass_count == total.")
+    cell_status: DistEUCellStatus = Field(..., description="Whole-cell verdict.")
+    worst_event_id: str = Field(..., description="event_id of the lowest-F1 event.")
+    worst_f1: float = Field(..., description="Lowest F1 across events (point estimate).")
+    any_chained_run_failed: bool = Field(
+        ...,
+        description=(
+            "True if Aveiro chained_run.status not in {'structurally_valid', 'skipped'}. "
+            "Renders as a warning glyph in matrix_writer (Plan 05-05)."
+        ),
+    )
+    per_event: list[DistEUEventMetrics] = Field(
+        default_factory=list,
+        description="Per-event drilldown; order matches EVENTS list in run_eval_dist_eu.py.",
+    )
+
+
+class DistNamCellMetrics(MetricsJson):
+    """Phase 5 N.Am. DIST deferred-cell shape (scope amendment 2026-04-25).
+
+    MINIMAL schema for the deferred ``dist:nam`` cell. v1.2 will EXTEND this
+    class with ``config_drift: ConfigDriftReport``, ``bootstrap_config:
+    BootstrapConfig``, and ``reference_agreement.metrics: dict[str,
+    MetricWithCI]`` once OPERA_L3_DIST-ALERT-S1_V1 publishes operationally
+    in CMR. The CMR auto-supersede probe in run_eval_dist.py Stage 0
+    (DIST-04) handles the v1.2 transition without re-planning.
+
+    matrix_writer detects this schema via cell_status == 'DEFERRED' AND
+    presence of reference_source key (Plan 05-05 ``_is_dist_nam_shape``).
+    """
+
+    cell_status: DistNamCellStatus = Field(
+        default="DEFERRED",
+        description=(
+            "Phase 5 default = 'DEFERRED' until OPERA operational publishes. "
+            "v1.2 will override to PASS/FAIL once F1+CI is computable."
+        ),
+    )
+    reference_source: ReferenceSource = Field(
+        default="none",
+        description=(
+            "Stage 0 CMR probe outcome routed: 'operational_v1' on hit (v1.2 path), "
+            "'v0.1_cloudfront' (deprecated; legacy literal preserved for forward "
+            "compat), 'none' on deferral (Phase 5 default)."
+        ),
+    )
+    cmr_probe_outcome: CMRProbeOutcome = Field(
+        ...,
+        description=(
+            "CMR probe Stage 0 disposition: 'operational_found' / "
+            "'operational_not_found' / 'probe_failed'. Echoed inline in "
+            "matrix cell render (Plan 05-05)."
+        ),
+    )
+    reference_granule_id: str | None = Field(
+        default=None,
+        description="UMM-G granule ID on operational_found; None on miss.",
+    )
+    deferred_reason: str | None = Field(
+        default=None,
+        description=(
+            "Free-form reason string written by run_eval_dist.py on deferred path. "
+            "v1.2 unsets this field when supersede happens."
+        ),
+    )
