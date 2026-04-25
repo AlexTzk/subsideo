@@ -447,3 +447,182 @@ class CSLCSelfConsistEUCellMetrics(CSLCSelfConsistNAMCellMetrics):
     """
 
     pass  # inherit-only; class exists so matrix_writer.render dispatch is explicit.
+
+
+# --- Phase 4 DISP comparison-adapter cell metrics (CONTEXT D-11) ---
+
+CoherenceSource = Literal["phase3-cached", "fresh"]
+AttributedSource = Literal["phass", "orbit", "tropospheric", "mixed", "inconclusive"]
+DISPCellStatus = Literal["PASS", "FAIL", "CALIBRATING", "MIXED", "BLOCKER"]
+
+
+class PerIFGRamp(BaseModel):
+    """One row in RampAttribution.per_ifg (Phase 4 D-11)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ifg_idx: int = Field(..., ge=0, description="IFG index in the stack (0..N-1).")
+    ref_date_iso: str = Field(
+        ...,
+        description="ISO-8601 date of the reference (earlier) epoch, e.g. '2024-01-08'.",
+    )
+    sec_date_iso: str = Field(
+        ...,
+        description="ISO-8601 date of the secondary (later) epoch.",
+    )
+    ramp_magnitude_rad: float = Field(
+        ...,
+        description=(
+            "Peak-to-peak ramp magnitude in radians across the burst. NaN "
+            "when fit_planar_ramp had insufficient valid pixels (<100)."
+        ),
+    )
+    ramp_direction_deg: float = Field(
+        ...,
+        description=(
+            "Ramp direction in degrees from East in image coordinates "
+            "(atan2(slope_y, slope_x) * 180/pi). NaN when fit failed."
+        ),
+    )
+    ifg_coherence_mean: float | None = Field(
+        default=None,
+        description=(
+            "Mean coherence over the stable mask for THIS IFG (not the "
+            "stack-wide statistic). Used by aggregate "
+            "magnitude_vs_coherence_pearson_r. None when not computed."
+        ),
+    )
+
+
+class RampAggregate(BaseModel):
+    """Aggregate ramp statistics across the IFG stack (Phase 4 D-11)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mean_magnitude_rad: float = Field(
+        ...,
+        description="Mean of per-IFG ramp_magnitude_rad over finite values.",
+    )
+    direction_stability_sigma_deg: float = Field(
+        ...,
+        description=(
+            "Circular standard deviation of per-IFG ramp_direction_deg "
+            "(degrees). Low values (< 30 deg) indicate orbit-class ramps; "
+            "high values indicate PHASS-class ramps."
+        ),
+    )
+    magnitude_vs_coherence_pearson_r: float = Field(
+        ...,
+        description=(
+            "Pearson r between per-IFG ramp_magnitude_rad and "
+            "ifg_coherence_mean. Positive correlation (r > 0.5) suggests "
+            "PHASS-class ramps (low-coherence IFGs have larger ramps); "
+            "near-zero suggests orbit."
+        ),
+    )
+    n_ifgs: int = Field(
+        ...,
+        ge=0,
+        description="Number of finite IFGs included in the aggregate.",
+    )
+
+
+class RampAttribution(BaseModel):
+    """Per-cell ramp-attribution result (Phase 4 D-11 + D-12)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    per_ifg: list[PerIFGRamp] = Field(
+        default_factory=list,
+        description="Per-IFG ramp parameters; sortable for CONCLUSIONS rendering.",
+    )
+    aggregate: RampAggregate = Field(
+        ...,
+        description="Stack-wide aggregate of ramp statistics.",
+    )
+    attributed_source: AttributedSource = Field(
+        ...,
+        description=(
+            "Auto-attribute label from the deterministic rule in CONTEXT "
+            "D-Claude's-Discretion. 'tropospheric' is reserved for "
+            "diagnostic (c) (ERA5 toggle, deferred per D-09); the auto-rule "
+            "never returns it."
+        ),
+    )
+    attribution_note: str = Field(
+        default="",
+        description=(
+            "Free-form note written by the eval script. Default: "
+            "'Automated; human review pending in CONCLUSIONS'. The "
+            "canonical labelling lives in CONCLUSIONS prose; this field is "
+            "the audit trail."
+        ),
+    )
+
+
+class DISPProductQualityResultJson(ProductQualityResultJson):
+    """DISP product-quality with explicit coherence_source provenance flag.
+
+    Inherits measurements + criterion_ids from ProductQualityResultJson.
+    Adds coherence_source as a distinct field (not a measurements key) so
+    matrix_writer can render the provenance flag inline without confusing
+    it with a measurement.
+    """
+
+    coherence_source: CoherenceSource = Field(
+        ...,
+        description=(
+            "Provenance flag. 'phase3-cached' = cross-cell read from "
+            "eval-cslc-selfconsist-nam/metrics.json[per_aoi][SoCal]. "
+            "'fresh' = computed from cached CSLC stack at this run."
+        ),
+    )
+
+
+class DISPCellMetrics(MetricsJson):
+    """Phase 4 DISP comparison-adapter cell aggregate (CONTEXT D-11).
+
+    matrix_writer detects this schema via presence of ``ramp_attribution``
+    in the raw JSON. Shape is symmetric across SoCal and Bologna -- both
+    cells carry the same fields even though SoCal coherence comes from
+    cross-cell read and Bologna's is fresh.
+
+    Inherits schema_version / runtime_conda_list_hash / criterion_ids_applied
+    from MetricsJson. The base product_quality + reference_agreement fields
+    are overridden:
+      - product_quality is DISPProductQualityResultJson (adds coherence_source)
+      - reference_agreement is the existing ReferenceAgreementResultJson
+        (correlation, bias_mm_yr, plus rmse_mm_yr + sample_count via
+        measurements dict)
+    """
+
+    product_quality: DISPProductQualityResultJson = Field(
+        ...,
+        description=(
+            "DISP self-consistency PQ measurements. Includes "
+            "coherence_median_of_persistent + 5 other coherence stats + "
+            "residual_mm_yr. coherence_source field is the cross-cell-read "
+            "provenance flag (D-08)."
+        ),
+    )
+    reference_agreement: ReferenceAgreementResultJson = Field(
+        ...,
+        description=(
+            "DISP reference-agreement against OPERA DISP-S1 (N.Am.) or "
+            "EGMS L2a (EU). Measurements: correlation, bias_mm_yr, "
+            "rmse_mm_yr, sample_count."
+        ),
+    )
+    ramp_attribution: RampAttribution = Field(
+        ...,
+        description="Per-IFG planar-ramp diagnostic (Phase 4 D-09 + D-10 + D-11).",
+    )
+    cell_status: DISPCellStatus = Field(
+        ...,
+        description=(
+            "Whole-cell verdict. MIXED is the expected first-rollout "
+            "status (CALIBRATING product_quality + FAIL reference_agreement). "
+            "PASS / FAIL reserved for post-BINDING-promotion (v1.2+ per "
+            "GATE-05). BLOCKER for stable-mask < 100 valid pixels."
+        ),
+    )
