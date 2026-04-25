@@ -17,10 +17,10 @@ from subsideo.validation.selfconsistency import (
 
 
 def test_fit_planar_ramp_recovers_known_ramp() -> None:
-    # z = 0.05*X + 0.03*Y + 7.0 on a 256x256 grid — no noise.
+    # z = 0.05*x + 0.03*y + 7.0 on a 256x256 grid — no noise.
     height, width = 256, 256
-    Y, X = np.indices((height, width))
-    z = 0.05 * X + 0.03 * Y + 7.0
+    yy, xx = np.indices((height, width))
+    z = 0.05 * xx + 0.03 * yy + 7.0
     stack = z[np.newaxis, :, :].astype(np.float64)  # (1, 256, 256)
     out = fit_planar_ramp(stack, mask=None)
     assert out["slope_x"][0] == pytest.approx(0.05, abs=1e-6)
@@ -39,8 +39,8 @@ def test_fit_planar_ramp_insufficient_pixels_returns_nan() -> None:
     # IFG 1: valid plane.
     height, width = 100, 100
     z_zero = np.zeros((height, width), dtype=np.float64)
-    Y, X = np.indices((height, width))
-    z_valid = 0.1 * X + 0.05 * Y + 1.0
+    yy, xx = np.indices((height, width))
+    z_valid = 0.1 * xx + 0.05 * yy + 1.0
     stack = np.stack([z_zero, z_valid], axis=0).astype(np.float64)
     out = fit_planar_ramp(stack)
     assert np.isnan(out["slope_x"][0])
@@ -60,8 +60,8 @@ def test_fit_planar_ramp_rejects_non_3d_stack() -> None:
 def test_fit_planar_ramp_honors_mask() -> None:
     # 256x256 plane; mask restricts to a 50x50 region — still > 100 px so fit succeeds.
     height, width = 256, 256
-    Y, X = np.indices((height, width))
-    z = 0.05 * X + 0.03 * Y + 1.0
+    yy, xx = np.indices((height, width))
+    z = 0.05 * xx + 0.03 * yy + 1.0
     stack = z[np.newaxis, :, :].astype(np.float64)
     mask = np.zeros((height, width), dtype=bool)
     mask[100:150, 100:150] = True  # 2500 pixels > 100
@@ -130,7 +130,8 @@ def test_auto_attribute_ramp_honors_custom_cutoffs() -> None:
         )
         == "inconclusive"
     )
-    # And with coherence_correlation_cutoff=0.3, r=0.4 is now correlated (was uncorrelated at default 0.5).
+    # And with coherence_correlation_cutoff=0.3, r=0.4 is now correlated
+    # (was uncorrelated at default 0.5).
     assert (
         auto_attribute_ramp(
             50.0, 0.4, coherence_correlation_cutoff=0.3

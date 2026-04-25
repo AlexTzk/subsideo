@@ -1,4 +1,8 @@
-"""Sequential-IFG coherence statistics + reference-frame aligned residual velocity.
+"""Sequential-IFG self-consistency primitives.
+
+Coherence statistics, reference-frame aligned residual, sequential-IFG
+coherence-stack construction, and per-IFG planar-ramp fitting for the Phase 4
+ramp-attribution diagnostic.
 
 Consumed by Phase 3 CSLC self-consistency eval and Phase 4 DISP
 self-consistency eval. The ``coherence_stats`` function ships all six
@@ -325,3 +329,186 @@ def compute_residual_velocity(
     # Step 6 -- NaN outside stable_mask
     v_mm_per_yr[~stable_mask] = np.float32("nan")
     return np.asarray(v_mm_per_yr, dtype=np.float32)
+
+
+def fit_planar_ramp(
+    ifgrams_stack: np.ndarray,
+    mask: np.ndarray | None = None,
+) -> dict[str, np.ndarray]:
+    """Fit a planar phase ramp to each IFG in the stack via least squares.
+
+    For each unwrapped IFG, fit ``z = a*x + b*y + c`` on finite-non-zero pixels
+    in image (pixel-index) coordinates -- NOT UTM. Reports peak-to-peak
+    magnitude across the burst extent, plus direction (degrees from East).
+
+    Per CONTEXT D-Claude's-Discretion: full-burst (not stable-mask-only)
+    least-squares plane fit because orbit/tropospheric/PHASS ramps span the
+    burst -- masking to stable-only would clip them and bias direction.
+
+    Parameters
+    ----------
+    ifgrams_stack : (N, H, W) float np.ndarray
+        Unwrapped phase in radians per IFG. NaN and zero values are excluded
+        from the fit (typical PHASS unwrapper convention: 0 outside valid
+        data, NaN for masked-out pixels).
+    mask : (H, W) bool np.ndarray | None
+        Optional restriction to specific pixels. ``None`` (default) means
+        full-burst fit per D-Claude's-Discretion.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        Per-IFG arrays of length N:
+          - ``'ramp_magnitude_rad'`` : peak-to-peak rad across the burst
+          - ``'ramp_direction_deg'`` : degrees from East
+            (``atan2(slope_y, slope_x) * 180/pi``)
+          - ``'slope_x'`` : a (rad per pixel column)
+          - ``'slope_y'`` : b (rad per pixel row)
+          - ``'intercept_rad'`` : c
+
+    Raises
+    ------
+    ValueError
+        If ``ifgrams_stack.ndim != 3``.
+    """
+    if ifgrams_stack.ndim != 3:
+        raise ValueError(
+            f"ifgrams_stack must be 3-D (N, H, W); got shape {ifgrams_stack.shape}"
+        )
+    n_ifg, height, width = ifgrams_stack.shape
+    yy, xx = np.indices((height, width))
+    x_flat = xx.ravel().astype(np.float64)
+    y_flat = yy.ravel().astype(np.float64)
+
+    out: dict[str, list[float]] = {
+        "ramp_magnitude_rad": [],
+        "ramp_direction_deg": [],
+        "slope_x": [],
+        "slope_y": [],
+        "intercept_rad": [],
+    }
+
+    for k in range(n_ifg):
+        z = ifgrams_stack[k].astype(np.float64)
+        valid = np.isfinite(z) & (z != 0.0)
+        if mask is not None:
+            valid &= mask
+        z_flat = z.ravel()
+        keep = valid.ravel()
+
+        if int(keep.sum()) < 100:
+            out["ramp_magnitude_rad"].append(float("nan"))
+            out["ramp_direction_deg"].append(float("nan"))
+            out["slope_x"].append(float("nan"))
+            out["slope_y"].append(float("nan"))
+            out["intercept_rad"].append(float("nan"))
+            continue
+
+        design_matrix = np.column_stack(
+            [
+                x_flat[keep],
+                y_flat[keep],
+                np.ones(int(keep.sum()), dtype=np.float64),
+            ]
+        )
+        b_vec = z_flat[keep]
+        coeffs, _, _, _ = np.linalg.lstsq(design_matrix, b_vec, rcond=None)
+        a, b, c = float(coeffs[0]), float(coeffs[1]), float(coeffs[2])
+
+        z_plane_flat = a * x_flat[keep] + b * y_flat[keep] + c
+        ramp_magnitude = float(z_plane_flat.max() - z_plane_flat.min())
+        ramp_direction_deg = float(np.degrees(np.arctan2(b, a)))
+
+        out["ramp_magnitude_rad"].append(ramp_magnitude)
+        out["ramp_direction_deg"].append(ramp_direction_deg)
+        out["slope_x"].append(a)
+        out["slope_y"].append(b)
+        out["intercept_rad"].append(c)
+
+    return {k: np.asarray(v, dtype=np.float64) for k, v in out.items()}
+
+
+def compute_ramp_aggregate(
+    ramp_data: dict[str, np.ndarray],
+    ifg_coherence_per_ifg: np.ndarray,
+) -> dict[str, float | int]:
+    """Compute aggregate ramp statistics across an IFG stack.
+
+    Returns a dict matching ``RampAggregate`` Pydantic model shape:
+      - ``mean_magnitude_rad``: mean of finite per-IFG magnitudes
+      - ``direction_stability_sigma_deg``: circular stddev (scipy.stats.circstd)
+      - ``magnitude_vs_coherence_pearson_r``: Pearson r between magnitude and coherence
+      - ``n_ifgs``: count of finite IFGs included
+
+    Returns NaN-filled aggregate (and n_ifgs = number of finite entries, possibly 0)
+    when fewer than 3 finite IFG entries are available.
+
+    Per RESEARCH lines 656-684: scipy.stats.circstd handles 359 -> 0 wrap on
+    angles. Lazy-imported per the conda-forge dep convention.
+
+    Returns a plain dict (not a Pydantic model) to avoid a circular import
+    between selfconsistency.py and matrix_schema.py; the caller in
+    run_eval_disp.py converts to ``RampAggregate`` at write time.
+    """
+    from scipy.stats import circstd  # lazy
+
+    mag = ramp_data["ramp_magnitude_rad"]
+    dir_deg = ramp_data["ramp_direction_deg"]
+    coh = ifg_coherence_per_ifg
+
+    finite = np.isfinite(mag) & np.isfinite(dir_deg) & np.isfinite(coh)
+    if int(finite.sum()) < 3:
+        return {
+            "mean_magnitude_rad": float("nan"),
+            "direction_stability_sigma_deg": float("nan"),
+            "magnitude_vs_coherence_pearson_r": float("nan"),
+            "n_ifgs": int(finite.sum()),
+        }
+
+    mag_f = mag[finite]
+    dir_f = dir_deg[finite]
+    coh_f = coh[finite]
+
+    mean_magnitude = float(mag_f.mean())
+    direction_sigma_deg = float(
+        np.degrees(circstd(np.radians(dir_f), high=np.pi, low=-np.pi))
+    )
+    pearson_r = float(np.corrcoef(mag_f, coh_f)[0, 1])
+    return {
+        "mean_magnitude_rad": mean_magnitude,
+        "direction_stability_sigma_deg": direction_sigma_deg,
+        "magnitude_vs_coherence_pearson_r": pearson_r,
+        "n_ifgs": int(finite.sum()),
+    }
+
+
+def auto_attribute_ramp(
+    direction_stability_sigma_deg: float,
+    magnitude_vs_coherence_pearson_r: float,
+    *,
+    direction_stability_cutoff_deg: float = 30.0,
+    coherence_correlation_cutoff: float = 0.5,
+) -> Literal["phass", "orbit", "tropospheric", "mixed", "inconclusive"]:
+    """Deterministic ramp-source auto-attribute (CONTEXT D-Claude's-Discretion).
+
+    Rules:
+      - direction stable (sigma < cutoff_deg): orbit-class signature
+      - magnitude correlates with coherence (r > correlation_cutoff): PHASS-class
+      - both stable AND correlated: 'mixed'
+      - neither: 'inconclusive'
+      - ``'tropospheric'``: reserved for diagnostic (c) (ERA5 toggle, deferred
+        per D-09); this rule never returns it.
+
+    Cutoffs are NOT criteria.py entries (this rule is for narrative
+    attribution, not gating).
+    """
+    direction_stable = direction_stability_sigma_deg < direction_stability_cutoff_deg
+    coh_correlated = magnitude_vs_coherence_pearson_r > coherence_correlation_cutoff
+
+    if direction_stable and coh_correlated:
+        return "mixed"
+    if direction_stable:
+        return "orbit"
+    if coh_correlated:
+        return "phass"
+    return "inconclusive"
