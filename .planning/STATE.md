@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
 status: executing
-stopped_at: "Phase 3 Plan 03-05 complete (CSLC-06 methodology doc landed). Phase 3 ready for transition once Wave 2 Task 2 compute write-ups (Plans 03-03/04) are signed off."
-last_updated: "2026-04-25T01:34:18.000Z"
-last_activity: "2026-04-25 -- Phase 03 Plan 05 complete: docs/validation_methodology.md sections 1+2 landed (CSLC-06)"
+stopped_at: "Phase 3 complete (user-approved 2026-04-25). All 5 plans VERIFIED; CSLC-03/04/05 Validated (CALIBRATING); CSLC-06 Validated. Ready for Phase 4 discuss."
+last_updated: "2026-04-25T01:58:00.000Z"
+last_activity: "2026-04-25 -- Phase 03 complete: VERIFICATION.md status=human_needed re-verified 16/18; user approved; report appended to CSLC CONCLUSIONS docs"
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 19
-  completed_plans: 17
-  percent: 89
+  completed_plans: 19
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 03 — cslc-s1-self-consistency-eu-validation
+**Current focus:** Phase 04 — disp-s1-comparison-adapter (next; CONTEXT.md not yet created)
 
 ## Current Position
 
-Phase: 03 (cslc-s1-self-consistency-eu-validation) — Wave 3 ✅ complete; phase ready for transition
-Plan: 03-05 ✅ complete (CSLC-06 methodology doc); 03-03/04 Task 2 user compute write-ups already in place via f6d5492
-Status: Wave 1 ✅ done, Wave 2 ✅ done (compute write-ups landed user-side), Wave 3 ✅ done (this session — Plan 03-05)
-Last activity: 2026-04-25 -- Plan 03-05 commits 5e1dcc0 (RED tests) + 5cef9dc (GREEN methodology doc); 03-05-SUMMARY.md written
+Phase: 03 ✅ COMPLETE (user-approved 2026-04-25); next: Phase 04 (DISP comparison adapter + honest FAIL)
+Plan: all 5 Phase 3 plans VERIFIED; Phase 4 planning awaits `/gsd-discuss-phase 4`
+Status: Phase 3 closed with 4 pending HUMAN-UAT sign-offs (narrative + PNG inspection + deferrals; user confirmed approval) + 2 named EU follow-ups deferred (Alentejo/MassifCentral re-derivation; EGMS L2a adapter)
+Last activity: 2026-04-25 -- Phase 3 closed; verification report appended to CONCLUSIONS_CSLC_SELFCONSIST_{NAM,EU}.md (commit b2571d1)
 
-**Resume path:** Phase 3 closeout — invoke `/gsd:transition` from Phase 3 to Phase 4. Phase 4 (DISP comparison adapter) will append §3 (DISP ramp-attribution) to `docs/validation_methodology.md` per CONTEXT D-15 append-only.
+**Resume path:** `/gsd-discuss-phase 4` to gather Phase 4 context, then `/gsd-plan-phase 4` + `/gsd-execute-phase 4`. Phase 4 (DISP comparison adapter) will append §3 (DISP ramp-attribution) to `docs/validation_methodology.md` per Phase 3 CONTEXT D-15 append-only.
 
 ## Performance Metrics
 

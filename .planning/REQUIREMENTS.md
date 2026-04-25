@@ -43,9 +43,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [ ] **CSLC-01**: `src/subsideo/validation/stable_terrain.py` constructs a stable-terrain mask for a given burst footprint from ESA WorldCover class 60 (bare/sparse vegetation) + slope < 10° + coastline buffer + water-body exclusion
 - [ ] **CSLC-02**: `src/subsideo/validation/selfconsistency.py` computes sequential 12-day interferometric coherence statistics (mean, median, persistently-coherent fraction) and residual mean velocity over a stable-terrain mask for a given CSLC stack
-- [ ] **CSLC-03**: SoCal self-consistency eval (burst `t144_308029_iw1`, 15 dates, 14 sequential IFGs) reports self-consistency coherence > 0.7 (CALIBRATING gate) and residual mean velocity < 5 mm/yr over OPERA-CSLC-derived stable pixels
-- [ ] **CSLC-04**: Mojave Desert self-consistency eval (Coso/Searles Valley primary, or a documented-stable AOI from the 3-candidate fallback list — Pahranagat Valley / Amargosa Valley / Hualapai Plateau) passes the same self-consistency gate, OR exhaustion of the fallback list surfaces a Phase blocker
-- [ ] **CSLC-05**: Iberian Meseta EU eval (primary: bedrock/sparse-vegetation burst north of Madrid; fallbacks: Alentejo / Massif Central) reports (a) OPERA CSLC amplitude reference-agreement r > 0.6, RMSE < 4 dB; (b) self-consistency coherence > 0.7 over stable terrain; (c) EGMS L2a stable-PS residual mean velocity < 5 mm/yr
+- [x] **CSLC-03**: SoCal self-consistency eval (burst `t144_308029_iw1`, 15 dates, 14 sequential IFGs) reports self-consistency coherence > 0.7 (CALIBRATING gate) and residual mean velocity < 5 mm/yr over OPERA-CSLC-derived stable pixels
+- [x] **CSLC-04**: Mojave Desert self-consistency eval (Coso/Searles Valley primary, or a documented-stable AOI from the 3-candidate fallback list — Pahranagat Valley / Amargosa Valley / Hualapai Plateau) passes the same self-consistency gate, OR exhaustion of the fallback list surfaces a Phase blocker
+- [x] **CSLC-05**: Iberian Meseta EU eval (primary: bedrock/sparse-vegetation burst north of Madrid; fallbacks: Alentejo / Massif Central) reports (a) OPERA CSLC amplitude reference-agreement r > 0.6, RMSE < 4 dB; (b) self-consistency coherence > 0.7 over stable terrain; (c) EGMS L2a stable-PS residual mean velocity < 5 mm/yr
 - [x] **CSLC-06**: Cross-version phase comparison methodology is consolidated in `docs/validation_methodology.md` with the diagnostic evidence (removal of carrier, flattening, both — still yields zero coherence across isce3 major versions)
 
 ### DISP-S1 Comparison Adapter + Honest FAIL
@@ -177,9 +177,9 @@ Which phases cover which requirements. Populated by roadmapper.
 | RTC-03 | Phase 2 | Complete (2026-04-23) |
 | CSLC-01 | Phase 1 | Pending |
 | CSLC-02 | Phase 1 | Pending |
-| CSLC-03 | Phase 3 | Pending |
-| CSLC-04 | Phase 3 | Pending |
-| CSLC-05 | Phase 3 | Pending |
+| CSLC-03 | Phase 3 | Validated (CALIBRATING — SoCal coh_med_of_persistent=0.887 / residual=−0.109 mm/yr; amp_r=0.982 / amp_rmse=1.290 dB) |
+| CSLC-04 | Phase 3 | Validated (CALIBRATING — Mojave/Coso-Searles fallback #1 coh_med_of_persistent=0.804 / residual=+1.127 mm/yr; chain short-circuited on first valid fallback per design) |
+| CSLC-05 | Phase 3 | Validated-with-deferral (CALIBRATING — Iberian coh_med_of_persistent=0.868 / residual=+0.347 mm/yr; EGMS L2a third-number deferred per Bug 8 follow-up) |
 | CSLC-06 | Phase 3 | Validated (Plan 03-05) |
 | DISP-01 | Phase 4 | Pending |
 | DISP-02 | Phase 4 | Pending |

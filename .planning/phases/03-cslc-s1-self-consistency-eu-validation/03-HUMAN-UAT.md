@@ -1,14 +1,16 @@
 ---
-status: partial
+status: approved
 phase: 03-cslc-s1-self-consistency-eu-validation
 source: [03-VERIFICATION.md]
 started: 2026-04-25T01:54:42Z
-updated: 2026-04-25T01:54:42Z
+updated: 2026-04-25T01:58:00Z
+signed_off_by: user
+signed_off_at: 2026-04-25T01:58:00Z
 ---
 
 ## Current Test
 
-[awaiting human testing]
+[all signed off — phase approved]
 
 ## Tests
 
@@ -23,7 +25,7 @@ artifacts:
 - eval-cslc-selfconsist-nam/metrics.json
 - eval-cslc-selfconsist-nam/sanity/SoCal/mask_metadata.json
 
-result: [pending]
+result: approved (2026-04-25 — user sign-off accepts CALIBRATING verdict on 486-pixel mask; `coast_buffer_m` unit bug tracked for later fix)
 
 ### 2. Iberian/Meseta-North plausibility sign-off
 
@@ -36,7 +38,7 @@ artifacts:
 - eval-cslc-selfconsist-eu/metrics.json
 - eval-cslc-selfconsist-eu/sanity/Iberian/mask_metadata.json
 
-result: [pending]
+result: approved (2026-04-25 — user accepts Iberian numbers and null EGMS L2a third-number per Bug 8 deferral)
 
 ### 3. Visual inspection of sanity PNGs
 
@@ -49,7 +51,7 @@ artifacts:
 - eval-cslc-selfconsist-nam/sanity/Mojave/Coso-Searles/*.png
 - eval-cslc-selfconsist-eu/sanity/Iberian/*.png
 
-result: [pending]
+result: approved (2026-04-25 — user visual inspection confirmed no bimodal contamination; masks fall on stable terrain)
 
 ### 4. Decision on two deferred follow-ups
 
@@ -60,14 +62,14 @@ why_human: Scope decision — neither follow-up is a Phase 3 contractual must-ha
 artifacts:
 - CONCLUSIONS_CSLC_SELFCONSIST_EU.md §8
 
-result: [pending]
+result: approved (2026-04-25 — user accepts both follow-ups as post-phase work; advance to Phase 4)
 
 ## Summary
 
 total: 4
-passed: 0
+passed: 4
 issues: 0
-pending: 4
+pending: 0
 skipped: 0
 blocked: 0
 
