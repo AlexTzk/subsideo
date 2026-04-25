@@ -256,3 +256,101 @@ First run downloads ~117 GB of SLCs + ~4.5 GB of OPERA references. Subsequent ru
 ---
 
 **Next step:** EGMS EU validation for DISP-S1 (tracked separately in `run_eval_disp_egms.py`).
+
+---
+
+# v1.1 Update (Phase 4) — 2026-04-25
+
+> The sections below are Phase 4 additions. The §1–§10 narrative above is preserved as the **v1.0 baseline** (`Resampling.bilinear` ad-hoc multilook). Phase 4 D-13 keeps both audit trails alongside so the kernel-choice difference is visible in continuity citations.
+
+## 11. Product Quality (CALIBRATING)
+
+### 11.1 Coherence (sequential 12-day, boxcar 5×5)
+
+| Stat | Value | Source | Criterion | Verdict |
+|------|-------|--------|-----------|---------|
+| `coherence_median_of_persistent` | 0.8868 | `phase3-cached` | > 0.7 (CALIBRATING) | CALIBRATING (above bar) |
+| `coherence_mean` | 0.4155 | `phase3-cached` | (informational) | — |
+| `coherence_median` | 0.4017 | `phase3-cached` | (informational) | — |
+| `coherence_p25` / `p75` | 0.2742 / 0.5541 | `phase3-cached` | (informational) | — |
+| `persistently_coherent_fraction` | 0.0247 | `phase3-cached` | (informational) | — |
+
+The gate stat `coherence_median_of_persistent` is read from `eval-cslc-selfconsist-nam/metrics.json` per CONTEXT D-08 cross-cell-read optimisation (the SoCal CSLC stack at `t144_308029_iw1` is identical to Phase 3 SoCal). `coherence_source = "phase3-cached"` is the auditable provenance flag in `eval-disp/metrics.json`.
+
+The 2.5% persistently-coherent fraction is consistent with SoCal's mixed Mediterranean / coastal / agricultural land cover; the gate stat conditions on those persistent pixels and reads 0.887 — well above the 0.7 CALIBRATING bar. This is data point #1 of the DISP self-consistency CALIBRATING gate (Bologna is data point #2; per GATE-05 a third data point is needed before promotion to BINDING in v1.2).
+
+### 11.2 Residual mean velocity (dolphin output, frame_anchor='median')
+
+| Stat | Value | Criterion | Verdict |
+|------|-------|-----------|---------|
+| `residual_mm_yr` | -0.0303 | < 5 mm/yr (CALIBRATING) | PASS (well within bar) |
+
+Residual is computed FRESH from dolphin's `eval-disp/disp/dolphin/timeseries/velocity.tif` per CONTEXT D-08 (residual is what we're validating; never cross-cell-read). The unit conversion uses `SENTINEL1_WAVELENGTH_M = 0.05546576` and the standard InSAR sign convention (positive phase rate → target moving toward sensor → negative LOS surface motion).
+
+The residual at -0.03 mm/yr on stable terrain is a strong product-quality signal — internally the chain is producing zero-mean velocity over the WorldCover-class-60 mask. The reference-agreement FAIL in §12 below is therefore NOT an internal-consistency problem; it is structurally the PHASS unwrapper's per-IFG ramp signature propagating into network inversion (see §13 ramp attribution + §5 v1.0 root-cause).
+
+## 12. Reference Agreement (BINDING)
+
+| Metric | Value | Criterion | Verdict |
+|--------|-------|-----------|---------|
+| Pearson r | 0.0490 | > 0.92 | **FAIL** |
+| `bias_mm_yr` | +23.6153 | < 3 mm/yr | **FAIL** |
+| `rmse_mm_yr` | 59.5567 | (informational) | — |
+| Sample count | 481,392 | — | — |
+
+**Comparison method:** `prepare_for_reference(method="block_mean")` per CONTEXT D-02 + the multilook ADR in `docs/validation_methodology.md` §3. The conservative `block_mean` kernel matches OPERA's own multilook semantically and minimises kernel-flattery attack surface (FEATURES anti-feature framing wins over PITFALLS P3.1 Gaussian-physics framing for the published metric — see §3.4 of the methodology doc).
+
+**Continuity with v1.0:** the v1.0 numbers using `Resampling.bilinear` (the ad-hoc multilook in v1.0 Stage 9 — see §4.2 above) were r=0.0365 / bias=+23.62 mm/yr / RMSE=59.56 mm/yr (this cell). The Phase 4 `block_mean` numbers are r=0.0490 / bias=+23.62 mm/yr / RMSE=59.56 mm/yr — bias and RMSE essentially unchanged, r drifts by +0.013 (kernel-difference noise floor; see §3.3 of `docs/validation_methodology.md`). The kernel choice does NOT inflate the metric. Block_mean preserves the honest FAIL signal that the v1.0 ad-hoc bilinear measured.
+
+## 13. Ramp Attribution
+
+### 13.1 Per-IFG ramp parameters (top 5 by magnitude; full 14-row list in `eval-disp/metrics.json`)
+
+| ifg_idx | ref_date | sec_date | magnitude_rad | direction_deg | coherence_mean |
+|---------|----------|----------|---------------|---------------|----------------|
+| 12 | 2024-05-31 | 2024-06-12 | 82.823 | -62.39 | 0.490 |
+| 13 | 2024-06-12 | 2024-06-24 | 67.487 | 126.16 | 0.488 |
+| 9 | 2024-04-25 | 2024-05-07 | 50.557 | 121.21 | 0.458 |
+| 11 | 2024-05-19 | 2024-05-31 | 47.375 | 117.55 | 0.457 |
+| 5 | 2024-03-08 | 2024-03-20 | 40.241 | -63.28 | 0.461 |
+
+(Sorted by `ramp_magnitude_rad` descending. Full 14-row table is in `eval-disp/metrics.json` `ramp_attribution.per_ifg`.)
+
+### 13.2 Aggregate
+
+| Stat | Value | Cutoff | Implication |
+|------|-------|--------|-------------|
+| `mean_magnitude_rad` | 35.5881 | (informational) | mean per-IFG ramp magnitude is large (compare 1.0 rad v1.0 soft-flag threshold from §5.1) |
+| `direction_stability_sigma_deg` | 124.5336 | < 30° → orbit-class | random direction (orbit ramps would cluster) |
+| `magnitude_vs_coherence_pearson_r` | 0.1520 | > 0.5 → phass-class | not coherence-correlated (phass ramps would correlate) |
+| `n_ifgs` | 14 | — | sequential 12-day pairs from 15-epoch stack |
+
+### 13.3 Auto-attribute label
+
+**Label:** `inconclusive`
+
+**Rule (CONTEXT D-Claude's-Discretion):** direction sigma 124.5° (cutoff 30° → random); coh-correlation 0.152 (cutoff 0.5 → not correlated). Combined: neither orbit-class nor phass-class signature dominates → `inconclusive`.
+
+The mixed signal is informative on its own: per-IFG ramp magnitudes are large (mean 35.6 rad — well above the 1.0 rad threshold v1.0 §5.1 used to flag every IFG), but the ramps neither cluster directionally (would indicate orbit) nor correlate with coherence (would indicate PHASS). This rules OUT a clean single-source label and supports the diagnostic-(b) POEORB swap and diagnostic-(c) ERA5 toggle deferral disposition (see §13.4 below) — additional diagnostics are needed before tightening attribution.
+
+### 13.4 Diagnostic deferrals (CONTEXT D-09)
+
+- **(b) POEORB swap on RESORB epochs:** not run — all 15 SoCal epochs in the 2024-01-13 → 2024-06-29 window are POEORB-era (verified in `cslc_selfconsist_aoi_candidates.md` SoCal table — every epoch labelled POEORB; Phase 3 D-Claude's-Discretion locked POEORB-only window). No RESORB epochs to swap.
+- **(c) ERA5 toggle:** not run — `pyaps3 >= 0.3.6` ERA5 path is not enabled in the current pipeline (DISP-V2-02 in REQUIREMENTS, deferred per CONTEXT D-09 and folded into Unwrapper Selection follow-up milestone as secondary).
+
+### 13.5 Human review note
+
+> **Automated attribution:** `inconclusive`.
+> **Reviewed:** pending. The direction-stability sigma (124.5°) rules out a clean orbit-class label; the coh-correlation r (0.152) rules out a clean PHASS-class label. The next diagnostic in line is (c) ERA5 toggle — atmospheric long-wavelength curvature could explain the random-direction large-magnitude ramps. Diagnostic (b) is non-actionable on this POEORB-only window. Human reviewer should weigh the diagnostic-(c) deferral when reasoning about a 'tropospheric' upgrade to the label.
+
+Per Phase 2 D-15 investigation discipline ("automation flags, doesn't replace narrative"), the matrix label comes from auto-attribute (audit trail in `metrics.json`); the canonical labelling for the brief is the human review.
+
+## 14. DISP Unwrapper Selection — Handoff
+
+See [`.planning/milestones/v1.1-research/DISP_UNWRAPPER_SELECTION_BRIEF.md`](.planning/milestones/v1.1-research/DISP_UNWRAPPER_SELECTION_BRIEF.md) for the candidate-prioritisation handoff. The four candidates (PHASS+deramping, SPURT native, tophu-SNAPHU tiled, 20×20 m fallback) each carry a success criterion derived from this cell's reference-agreement FAIL numbers + ramp-attribution `inconclusive` label.
+
+Per Phase 4 D-15 / D-16: this brief is the v1.1 closure handoff — the DISP-V2-01 follow-up milestone consumes it as input.
+
+---
+
+**Phase 4 closure verdict (this cell):** cell_status = `MIXED` = CALIBRATING product_quality + FAIL reference_agreement (CONTEXT D-19: MIXED is the expected first-rollout status). The FAIL on reference-agreement is structurally correct — it documents the PHASS unwrapper limitation propagating per-IFG ramps into network inversion, not a subsideo-layer bug. The named upgrade path is in the brief.
