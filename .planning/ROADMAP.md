@@ -170,7 +170,21 @@ DISP-01 (02, 04), DISP-02 (01, 04), DISP-03 (01, 03, 04, 05), DISP-04 (05), DISP
   5. User runs EFFIS cross-validation against cached Aveiro/Viseu 2024 subsideo output via `owslib` WFS and the matrix reports precision > 0.70 AND recall > 0.50 (DIST-05); aggregate `CONCLUSIONS_DIST_EU.md` covers 3 events — 2024 Portuguese wildfires + 2023 Evros Greece EMSR649 + 2022 Romanian forest clear-cuts (DIST-06)
   6. After Phase 1's `_mp.py` bundle lands, the chained `prior_dist_s1_product` run on the DIST EU stack (Sep 28 → Oct 10 → Nov 15) is retried; success is reported as a DIFFERENTIATOR, failure is filed upstream with dist-s1 maintainers and is non-blocking to milestone closure (DIST-07)
 
-**Plans**: TBD
+**Plans**: 9 plans across 6 waves
+
+Plans:
+- [ ] 05-01-PLAN.md — ROADMAP + REQUIREMENTS scope amendment (defer DIST-01/02/03; correct EMSR686; document Spain substitution) [Wave 0] [DIST-01, DIST-02, DIST-03]
+- [ ] 05-02-PLAN.md — EFFIS WFS endpoint GetCapabilities probe + lock artifact [Wave 0] [DIST-05]
+- [ ] 05-03-PLAN.md — Pure-additive scaffolding: bootstrap.py module + matrix_schema.py 7 EU types + minimal DistNamCellMetrics-Deferred [Wave 1] [DIST-03, DIST-05, DIST-06, DIST-07]
+- [ ] 05-04-PLAN.md — harness.RETRY_POLICY['EFFIS'] + pyproject.toml owslib pip pin [Wave 1] [DIST-05]
+- [ ] 05-05-PLAN.md — validation/effis.py (WFS query + dual rasterise) + matrix_writer dist:nam (DEFERRED) + dist:eu (X/3 PASS) render branches [Wave 2] [DIST-04, DIST-05, DIST-06]
+- [ ] 05-06-PLAN.md — run_eval_dist.py rewrite: CMR Stage 0 auto-supersede probe + DEFERRED metrics.json write [Wave 2] [DIST-04]
+- [ ] 05-07-PLAN.md — run_eval_dist_eu.py rewrite as declarative EVENTS list (Aveiro chained triple including missing Oct 10 + Evros EMSR686 + Spain Culebra) [Wave 3] [DIST-05, DIST-06, DIST-07]
+- [ ] 05-08-PLAN.md — Cache directory cleanup: eval-dist → eval-dist-park-fire rename; eval-dist-eu* → eval-dist_eu consolidation; delete run_eval_dist_eu_nov15.py [Wave 4] [DIST-04, DIST-06]
+- [ ] 05-09-PLAN.md — Docs: docs/validation_methodology.md section 4 append + CONCLUSIONS_DIST_N_AM.md (deferred sub-section) + CONCLUSIONS_DIST_EU.md (3-event sub-section) [Wave 5] [DIST-04, DIST-05, DIST-06, DIST-07]
+
+**Requirements coverage audit** (all 7 Phase 5 requirement IDs):
+DIST-01 (01), DIST-02 (01), DIST-03 (01, 03), DIST-04 (01, 05, 06, 08, 09), DIST-05 (02, 03, 04, 05, 07, 09), DIST-06 (01, 03, 05, 07, 08, 09), DIST-07 (03, 07, 09). Every requirement appears in at least one plan.
 
 ### Phase 6: DSWx-S2 N.Am. + EU Recalibration
 
@@ -227,6 +241,6 @@ DISP-01 (02, 04), DISP-02 (01, 04), DISP-03 (01, 03, 04, 05), DISP-04 (05), DISP
 | 2. RTC-S1 EU Validation | v1.1 | 5/5 | Complete (3/5 PASS w/ investigation) | 2026-04-23 |
 | 3. CSLC-S1 Self-Consistency + EU Validation | v1.1 | 0/0 | Not started | - |
 | 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 5/5 | Complete (honest FAIL on r > 0.92 + bias < 3 mm/yr; cells MIXED with attributed_source=inconclusive; v1.2 follow-up scoped via DISP_UNWRAPPER_SELECTION_BRIEF.md) | 2026-04-25 |
-| 5. DIST-S1 OPERA v0.1 + EFFIS EU | v1.1 | 0/0 | Not started | - |
+| 5. DIST-S1 OPERA v0.1 + EFFIS EU | v1.1 | 0/9 | Planned | - |
 | 6. DSWx-S2 N.Am. + EU Recalibration | v1.1 | 0/0 | Not started | - |
 | 7. Results Matrix + Release Readiness | v1.1 | 0/0 | Not started | - |

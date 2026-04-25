@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
-status: ready_to_plan
-stopped_at: Completed 04-05-PLAN.md (Wave 4 of Phase 4 done; all 5 plans complete; Phase 4 ready for verifier)
-last_updated: "2026-04-25T08:26:15.108Z"
+status: planning
+stopped_at: Phase 5 context gathered
+last_updated: "2026-04-25T21:45:44.185Z"
 last_activity: 2026-04-25
 progress:
   total_phases: 7
-  completed_phases: 5
-  total_plans: 24
+  completed_phases: 4
+  total_plans: 33
   completed_plans: 24
-  percent: 71
+  percent: 73
 ---
 
 # Project State
@@ -158,6 +158,8 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 ## Session Continuity
 
 Last activity: 2026-04-25 — Phase 4 Plan 04-04 complete (Wave 3: eval-script rewire + warm re-runs + manifest fix). 5 changes per script landed in run_eval_disp.py + run_eval_disp_egms.py (10 total: REFERENCE_MULTILOOK_METHOD constant + EXPECTED_WALL_S=21600 + prepare_for_reference adapter + product-quality block + ramp-attribution + DISPCellMetrics write); manifest cache_dir aligned with on-disk eval-disp-egms (hyphen); both warm re-runs completed (~6 min SoCal, ~3 min Bologna); both metrics.json files validate as DISPCellMetrics; matrix.md regenerated. Honest FAIL signal preserved: SoCal r=0.049 (v1.0=0.0365), bias=+23.6 (v1.0=+23.62); Bologna r=0.336 (v1.0=0.32), bias=+3.46 (v1.0=+3.35). Both attributed_source=inconclusive. Ruff clean on touched files. Commits 75dea9d (Task 1 SoCal eval) + ec2c07d (Task 2 Bologna eval) + ae2707f (Task 3 manifest fix) + 709c0c0 (Task 4 Rule 3 EGMS_TOKEN preflight relaxation) + 0d0df63 (Task 4 matrix.md regen). Plan 04-04 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-04-SUMMARY.md`.
-Last session: 2026-04-25T08:25:53.699Z
-Stopped at: Completed 04-05-PLAN.md (Wave 4 of Phase 4 done; all 5 plans complete; Phase 4 ready for verifier)
-Resume file: None
+Last session: --stopped-at
+Stopped at: Phase 5 context gathered
+Resume file: --resume-file
+
+**Planned Phase:** 05 (dist-s1-opera-v0-1-effis-eu) — 9 plans — 2026-04-25T21:45:44.176Z
