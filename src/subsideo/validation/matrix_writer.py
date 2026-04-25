@@ -348,6 +348,95 @@ def _render_cslc_selfconsist_cell(
     return pq_col, ra_col
 
 
+# --- Phase 4 DISP rendering (CONTEXT D-12 + D-13 + D-19 + D-21) ---
+
+
+def _is_disp_cell_shape(metrics_path: Path) -> bool:
+    """Return True when the metrics.json has a top-level ``ramp_attribution`` key.
+
+    Phase 4 D-11 schema discriminator. Checked BEFORE _is_cslc_selfconsist_shape
+    (per_aoi) and _is_rtc_eu_shape (per_burst) because the DISP schema is
+    structurally disjoint from both -- ``ramp_attribution`` is the unambiguous
+    Phase 4 marker.
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.debug("_is_disp_cell_shape: cannot read {}: {}", metrics_path, e)
+        return False
+    return isinstance(raw, dict) and "ramp_attribution" in raw
+
+
+def _render_disp_cell(
+    metrics_path: Path,
+    *,
+    region: str,
+) -> tuple[str, str] | None:
+    """Render a Phase 4 DISP cell as (pq_col, ra_col).
+
+    Called for both disp:nam (region='nam') and disp:eu (region='eu'). PQ
+    column always italicised (CALIBRATING per Phase 1 D-04 + Phase 4 D-19).
+    RA column renders PASS/FAIL via the existing ``_render_measurement``
+    helper (BINDING criteria; non-italics).
+
+    PQ column format:
+        "*coh=0.87 ([phase3-cached]) / resid=-0.1 mm/yr / attr=phass (CALIBRATING)*"
+    RA column format (uses _render_measurement, e.g.):
+        "0.04 (> 0.92 FAIL) / 23.6 (< 3 FAIL)"
+
+    The ``attributed_source`` label is shown inline in the PQ column per
+    CONTEXT D-13. The cell-level status (MIXED) is implicit from PQ italics
+    plus RA non-italics (per Phase 4 D-19; matrix has no separate cell-status
+    column in the v1.1 layout).
+
+    Returns None on JSON parse failure so write_matrix() falls through to the
+    default RUN_FAILED rendering.
+    """
+    from subsideo.validation.matrix_schema import DISPCellMetrics
+
+    try:
+        m = DISPCellMetrics.model_validate_json(metrics_path.read_text())
+    except Exception as e:
+        logger.warning(
+            "Failed to parse DISPCellMetrics from {}: {}", metrics_path, e
+        )
+        return None
+
+    # --- PQ side (italicised, CALIBRATING) ---
+    pq = m.product_quality
+    coh_med = pq.measurements.get("coherence_median_of_persistent")
+    resid = pq.measurements.get("residual_mm_yr")
+    src = pq.coherence_source  # 'phase3-cached' | 'fresh'
+    attr = m.ramp_attribution.attributed_source
+
+    parts: list[str] = []
+    if coh_med is not None:
+        parts.append(f"coh={float(coh_med):.2f} ([{src}])")
+    else:
+        parts.append("coh=—")
+    if resid is not None:
+        parts.append(f"resid={float(resid):+.1f} mm/yr")
+    else:
+        parts.append("resid=—")
+    parts.append(f"attr={attr}")
+    pq_body = " / ".join(parts)
+
+    # CALIBRATING italics; warning glyph if cell_status == BLOCKER (mirrors
+    # CSLC self-consist any_blocker convention)
+    warn = " ⚠" if m.cell_status == "BLOCKER" else ""
+    pq_col = f"*{pq_body} (CALIBRATING)*{warn}"
+
+    # --- RA side (BINDING, non-italics) ---
+    ra = m.reference_agreement
+    rendered_ra: list[str] = []
+    for cid in ra.criterion_ids:
+        rendered_ra.append(_render_measurement(cid, ra.measurements))
+    ra_col = " / ".join(rendered_ra) if rendered_ra else "—"
+    return pq_col, ra_col
+
+
 def write_matrix(manifest_path: Path, out_path: Path) -> None:
     """Read manifest + sidecars; write a two-column-per-cell Markdown table.
 
@@ -383,6 +472,21 @@ def write_matrix(manifest_path: Path, out_path: Path) -> None:
         metrics_path = _validate_metrics_path(
             str(cell["metrics_file"]), manifest_path
         )
+
+        # Phase 4 DISP branch: metrics.json with a ``ramp_attribution`` key.
+        # Checked BEFORE the cslc_selfconsist (per_aoi) and rtc_eu (per_burst)
+        # branches because the schemas are structurally disjoint -- the DISP
+        # discriminator is unambiguous (RESEARCH lines 593-608).
+        if metrics_path.exists() and _is_disp_cell_shape(metrics_path):
+            cols = _render_disp_cell(metrics_path, region=str(cell["region"]))
+            if cols is not None:
+                pq_col, ra_col = cols
+                lines.append(
+                    f"| {product} | {region} | {_escape_table_cell(pq_col)} | "
+                    f"{_escape_table_cell(ra_col)} |"
+                )
+                continue
+            # Fall through to default rendering on parse failure.
 
         # Phase 3 CSLC self-consistency branch: metrics.json with a ``per_aoi`` key.
         # Checked BEFORE the rtc_eu branch so a file with both keys (defensive)
