@@ -235,7 +235,7 @@ BINDING or has an ADR documenting why the calibration window extends.
 
 | Distinction aspect | Future section (deferred per D-15) |
 |--------------------|-----|
-| DISP ramp-attribution (reference-agreement diagnostic depth) | Phase 4 will append (PHASS N.Am./EU re-runs as authoritative evidence) |
+| DISP ramp-attribution (reference-agreement diagnostic depth) | Phase 4 landed the multilook-method ADR in §3 (this doc); ramp-attribution per-cell evidence lives in CONCLUSIONS_DISP_N_AM.md §13 + CONCLUSIONS_DISP_EU.md §13 |
 | DSWE F1 ≈ 0.92 architectural ceiling (product-quality interpretation) | Phase 5 or 6 will append (DSWX-07 named ML upgrade path is the authoritative evidence) |
 | Cross-sensor precision-first framing (OPERA DIST vs EFFIS) | Phase 5 will append |
 | OPERA frame selection by exact UTC hour (reference-agreement plumbing) | Phase 4 harness-first discipline will document |
@@ -243,5 +243,123 @@ BINDING or has an ADR documenting why the calibration window extends.
 (These sections are appended by later phases per CONTEXT D-15 append-only
 policy. Phase 3 owns only §1 + §2 in this document; no stub headings for
 later sections are pre-created.)
+
+---
+
+## 3. DISP comparison-adapter design — multilook method choice
+
+<a name="multilook-method"></a>
+
+**TL;DR:** `subsideo.validation.compare_disp.prepare_for_reference()` requires
+an explicit `method=` argument selected from
+`Literal["gaussian", "block_mean", "bilinear", "nearest"]`. Phase 4 eval scripts
+pass `method="block_mean"` -- the conservative kernel that doesn't inflate
+reference-agreement r through kernel artefact. Switching the kernel
+post-measurement requires CONCLUSIONS-level documentation per the
+criterion-immutability principle.
+
+### 3.1 Problem statement
+
+subsideo's native DISP velocity is at 5 m × 10 m posting (OPERA CSLC spec).
+The two reference products it must compare against -- OPERA DISP-S1
+(30 m × 30 m) and EGMS L2a PS (point cloud at PS coordinates) -- live on
+different grids. Comparing requires multilooking subsideo's velocity onto the
+reference grid. The multilook method is a comparison-adapter design choice
+that materially changes the reported `correlation` and `bias_mm_yr` values
+(PITFALLS P3.1 warning sign: r differs by > 0.03 when switching between
+kernels on the same data).
+
+Native production output stays at 5×10 m (DISP-05 + ROADMAP key decision
+"Native CSLC/DISP resolution stays production default"). The adapter is
+**validation-only** infrastructure -- it never writes back to the product
+(Phase 4 D-17 + research ARCHITECTURE §3 placement rationale).
+
+### 3.2 PITFALLS P3.1 argument — Gaussian σ=0.5×reference is physically consistent
+
+PITFALLS P3.1 (`.planning/research/PITFALLS.md` §P3.1) argues that OPERA's
+30 m DISP output is itself produced from multilooked interferograms with an
+effective Gaussian smoothing kernel. Multilooking subsideo's 5×10 m output
+to 30 m via `gaussian_filter(σ_pix = 15m / native_spacing)` then nearest-
+sampling onto the reference grid is the apples-to-apples comparison: both
+fields carry the same effective spatial-frequency content. Block-mean (the
+"averaging" rasterio resampler) under-smooths by truncating high frequencies
+discretely rather than rolling them off; bilinear smooths but blurs
+discontinuities; nearest preserves sub-pixel offsets and aliases.
+
+**The argument's strength:** kernel matching is the standard practice in
+remote-sensing validation when the reference is itself a multi-look product
+(SAR / hyperspectral / PSI). The physics of velocity-difference power
+across spatial frequencies says that if our product and the reference both
+carry the same low-pass response, the comparison r is the apples-to-apples
+"how well do these chains agree at the comparison cell size" number.
+
+### 3.3 FEATURES anti-feature argument — block_mean is the kernel-flattery floor
+
+FEATURES (`.planning/research/FEATURES.md` lines 71 + 142-143 anti-feature
+table) argues the inverse: kernel choice can inflate reported r because
+each kernel rolls off velocity-difference power differently. Picking the
+kernel that gives the highest r is a kernel-choice attack surface -- the
+reported r in `results/matrix.md` becomes a function of "we picked the
+nicest kernel" rather than "the chains agree at the comparison cell size."
+Block-mean (`Resampling.average` in rasterio) is the conservative floor:
+it matches what OPERA itself uses for its CSLC multilook, and its
+high-frequency truncation is the most pessimistic of the four kernels for
+reference-agreement r. Anyone arguing Gaussian gives a higher r can rerun
+with `method="gaussian"`; we don't pre-commit to the optimistic kernel for
+the published metric.
+
+**The argument's strength:** as a milestone-publish artifact (not a paper),
+the kernel choice that gives the lower-bound r is the one we ship as the
+official number. The anti-feature framing names this trade-off explicitly
+and resists the M1 target-creep anti-pattern (don't tighten OR relax
+criteria based on the resulting measurement).
+
+### 3.4 Decision: block_mean as the eval-script default
+
+`subsideo.validation.compare_disp.prepare_for_reference()` accepts all four
+kernels -- both arguments above are correct on their own terms; the choice
+is a posture, not a science argument (see Phase 4 04-CONTEXT.md §Specifics).
+The **eval-script default** is `block_mean` because:
+
+1. **Floor behaviour** -- block_mean's reported r is the most pessimistic
+   of the four. If we PASS at block_mean, we PASS at any kernel; if we FAIL
+   at block_mean, the FAIL is unambiguous (not a kernel artefact).
+2. **OPERA parity** -- OPERA's own multilook in the CSLC pipeline is a
+   block-average. Same kernel = same effective smoothing = honest comparison
+   of two block-averaged products.
+3. **No goalpost-moving (M1)** -- switching to Gaussian post-measurement
+   because it gives a higher r is exactly the M1 target-creep anti-pattern
+   `criteria.py` is designed to prevent. A future PR titled "switch to
+   Gaussian for higher r" would be self-evidently wrong.
+
+The eval-script constant `REFERENCE_MULTILOOK_METHOD: Literal["block_mean"] =
+"block_mean"` lives at module top in both `run_eval_disp.py` and
+`run_eval_disp_egms.py` (Phase 4 D-04, mirroring Phase 1 D-11
+`EXPECTED_WALL_S` pattern). The supervisor AST-parses it; switching the
+kernel requires a visible PR diff to the constant, not a silent runtime
+change.
+
+### 3.5 Constraint: kernel choice is comparison-method, not product-quality
+
+The kernel choice is **a comparison-method decision**, NOT a product-quality
+decision. **Native 5×10 m stays the production default** (DISP-05 in
+REQUIREMENTS; ROADMAP key decision; Phase 4 D-17). The eval script's
+`REFERENCE_MULTILOOK_METHOD` constant lives at module top so it's auditable
+in the git diff (mirrors the Phase 1 D-11 `EXPECTED_WALL_S` pattern).
+Switching kernels post-measurement requires:
+
+1. A PR diff to the constant (visible in
+   `git log --grep="REFERENCE_MULTILOOK_METHOD"`).
+2. A CONCLUSIONS sub-section documenting the new kernel's measured r/bias
+   and citing this §3.5 constraint.
+
+There is no env-var override or CLI flag. The kernel is a published-artifact
+parameter; it must be code-visible.
+
+(For the alternative-kernel rerun e.g. `method="gaussian"` for kernel-
+comparison study: it's deferred to the Unwrapper Selection follow-up
+milestone per Phase 4 04-CONTEXT.md §Deferred. CONCLUSIONS may cite
+"block_mean reference shows r=X; the same data with method='gaussian' would
+yield r=Y" as a v1.2/v2 footnote.)
 
 ---
