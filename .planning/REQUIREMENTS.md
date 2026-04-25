@@ -51,8 +51,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### DISP-S1 Comparison Adapter + Honest FAIL
 
 - [ ] **DISP-01**: `subsideo.validation.compare_disp.prepare_for_reference(native_velocity, reference_grid, method=...)` is validation-only infrastructure that multilooks subsideo's native 5×10 m velocity to a reference grid (30 m raster for OPERA DISP OR point coordinates for EGMS L2a PS); `method=` has no default and must be explicit; the function never writes back to the product
-- [ ] **DISP-02**: DISP self-consistency product-quality gate (sequential 12-day coherence > 0.7 and residual mean velocity < 5 mm/yr on stable terrain at native 5×10 m resolution) is computed for both N.Am. (SoCal) and EU (Bologna) from cached CSLC stacks
-- [ ] **DISP-03**: N.Am. and EU DISP re-runs from cached CSLCs report reference-agreement (r vs OPERA DISP-S1 at 30 m; r vs EGMS L2a at PS points) separately from product-quality results; any observed planar ramp is labelled by attributed source (PHASS / tropospheric / orbit / ionospheric) via a ramp-attribution diagnostic (POEORB swap, ERA5 toggle, ramp-direction stability test)
+- [x] **DISP-02
+**: DISP self-consistency product-quality gate (sequential 12-day coherence > 0.7 and residual mean velocity < 5 mm/yr on stable terrain at native 5×10 m resolution) is computed for both N.Am. (SoCal) and EU (Bologna) from cached CSLC stacks
+- [x] **DISP-03
+**: N.Am. and EU DISP re-runs from cached CSLCs report reference-agreement (r vs OPERA DISP-S1 at 30 m; r vs EGMS L2a at PS points) separately from product-quality results; any observed planar ramp is labelled by attributed source (PHASS / tropospheric / orbit / ionospheric) via a ramp-attribution diagnostic (POEORB swap, ERA5 toggle, ramp-direction stability test)
 - [ ] **DISP-04**: A one-page "DISP Unwrapper Selection" follow-up milestone scoping brief is delivered as a Phase artifact, grounded in the fresh FAIL numbers and listing candidate approaches (PHASS+deramping, SPURT native, tophu-SNAPHU tiled, 20×20 m fallback) with a success criterion per approach
 - [ ] **DISP-05**: Native 5×10 m resolution remains the production default for DISP-S1; downsampling to the reference grid lives exclusively in `prepare_for_reference` and is documented as validation-only in both code and methodology doc
 

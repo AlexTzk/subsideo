@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
 status: executing
-stopped_at: Phase 3 ready for transition to Phase 4 (DISP comparison adapter; will append §3 DISP ramp-attribution to docs/validation_methodology.md per D-15)
-last_updated: "2026-04-25T04:50:54.799Z"
-last_activity: 2026-04-25 -- Phase 04 planning complete
+stopped_at: "Completed 04-01-PLAN.md (Phase 4 foundation: 3 ramp helpers + 5 Pydantic types + B1 fix); ready for Wave 1 sibling Plan 04-02 / Wave 2 dependents"
+last_updated: "2026-04-25T07:04:59.065Z"
+last_activity: 2026-04-25
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 24
-  completed_plans: 19
-  percent: 79
+  completed_plans: 20
+  percent: 83
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 04 — disp-s1-comparison-adapter (next; CONTEXT.md not yet created)
+**Current focus:** Phase 04 — disp-s1-comparison-adapter-honest-fail
 
 ## Current Position
 
-Phase: 03 ✅ COMPLETE (user-approved 2026-04-25); next: Phase 04 (DISP comparison adapter + honest FAIL)
-Plan: all 5 Phase 3 plans VERIFIED; Phase 4 planning awaits `/gsd-discuss-phase 4`
+Phase: 04 (disp-s1-comparison-adapter-honest-fail) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-04-25 -- Phase 04 planning complete
+Last activity: 2026-04-25
 
 **Resume path:** `/gsd-discuss-phase 4` to gather Phase 4 context, then `/gsd-plan-phase 4` + `/gsd-execute-phase 4`. Phase 4 (DISP comparison adapter) will append §3 (DISP ramp-attribution) to `docs/validation_methodology.md` per Phase 3 CONTEXT D-15 append-only.
 
@@ -76,6 +76,7 @@ Last activity: 2026-04-25 -- Phase 04 planning complete
 | Phase 07 P01 | 4min | 2 tasks | 4 files |
 | Phase 08 P01 | 2min | 3 tasks | 6 files |
 | Phase 09 P01 | 3min | 3 tasks | 7 files |
+| Phase 04 P01 | 10min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,9 @@ Recent decisions affecting current work (v1.1):
 - [CSLC Eval]: 4 monkey-patches for numpy 2.x compat with compass/s1reader/isce3 pybind11 — scheduled for removal in v1.1 Phase 1 (ENV-02)
 - [CSLC Eval]: Cross-version phase comparison (isce3 0.15 vs 0.25) produces zero coherence; amplitude metrics used instead — consolidated into docs/validation_methodology.md in v1.1 Phase 3 (CSLC-06)
 - [CSLC Eval]: CSLC amplitude correlation 0.79, RMSE 3.77 dB — PASS with amplitude-based criteria
+- [Phase 4 Plan 04-01]: compute_ramp_aggregate returns plain dict (not RampAggregate Pydantic) to avoid circular import between selfconsistency.py and matrix_schema.py; caller (Plan 04-04) converts at metrics.json write time
+- [Phase 4 Plan 04-01]: B1 root-cause fix complete -- _compute_ifg_coherence_stack lifted from inner-scope of run_eval_cslc_selfconsist_nam.py:487 to public selfconsistency.compute_ifg_coherence_stack; nested _load_cslc closure promoted to sibling module-private _load_cslc_hdf5; Plan 04-04 imports the public symbol
+- [Phase 4 Plan 04-01]: 5 Pydantic v2 DISP cell-metrics types appended to matrix_schema.py (PerIFGRamp, RampAggregate, RampAttribution, DISPProductQualityResultJson, DISPCellMetrics) + 3 Literal type aliases; all use ConfigDict(extra=forbid); no edits to existing types per Phase 1 D-09 lock-in
 
 ### Pending Todos
 
@@ -136,6 +140,6 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 ## Session Continuity
 
 Last activity: 2026-04-25 — Phase 3 Plan 03-05 complete (CSLC-06 methodology doc landed). 12 behavior tests green, ruff/mypy clean on touched files (mypy `_load_cslc_complex` annotation issue is pre-existing, out of scope). Commits 5e1dcc0 (RED) + 5cef9dc (GREEN). Plan 03-05 SUMMARY at `.planning/phases/03-cslc-s1-self-consistency-eu-validation/03-05-SUMMARY.md`.
-Last session: 2026-04-25T01:34:18.000Z
-Stopped at: Phase 3 ready for transition to Phase 4 (DISP comparison adapter; will append §3 DISP ramp-attribution to docs/validation_methodology.md per D-15)
-Resume file: invoke `/gsd:transition` for Phase 3 → Phase 4 closeout
+Last session: 2026-04-25T07:04:59.059Z
+Stopped at: Completed 04-01-PLAN.md (Phase 4 foundation: 3 ramp helpers + 5 Pydantic types + B1 fix); ready for Wave 1 sibling Plan 04-02 / Wave 2 dependents
+Resume file: None
