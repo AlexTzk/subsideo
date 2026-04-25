@@ -84,6 +84,7 @@ if __name__ == "__main__":
     )
     from subsideo.validation.selfconsistency import (
         coherence_stats,
+        compute_ifg_coherence_stack,
         compute_residual_velocity,
         residual_mean_velocity,
     )
@@ -201,7 +202,7 @@ if __name__ == "__main__":
     # section anchors MOJAVE_COSO_EPOCHS / MOJAVE_PAHRANAGAT_EPOCHS / etc.).
     # BLOCKER 1 fix: every Mojave fallback uses a 15-epoch stack in the same
     # shape as SoCal — compute_residual_velocity requires >=3 epochs;
-    # _compute_ifg_coherence_stack requires >=2 epochs. The fallback policy
+    # compute_ifg_coherence_stack requires >=2 epochs. The fallback policy
     # (CONTEXT D-11) picks WHICH burst; it does not relax the stack shape.
 
     # All four tuples below were regenerated via asf.search on 2026-04-24
@@ -483,85 +484,6 @@ if __name__ == "__main__":
             ) from err
             safe_path = zips[-1]
         return safe_path
-
-    def _compute_ifg_coherence_stack(
-        hdf5_paths: list[Path],
-        boxcar_px: int = 5,
-    ) -> np.ndarray:
-        """Form N-1 sequential IFGs from HDF5 CSLC stack; compute coherence.
-
-        Forms sequential complex interferograms prod_t * conj(prod_t+1),
-        then estimates pixel-wise coherence via boxcar (multi-look) averaging
-        (PATTERNS Phase 2 formula for stable-terrain coherence estimation).
-
-        Parameters
-        ----------
-        hdf5_paths : list[Path]
-            Sorted HDF5 paths, one per epoch (N epochs -> N-1 IFGs).
-        boxcar_px : int, default 5
-            Half-width of the boxcar window (5 -> 5x5 multi-look).
-
-        Returns
-        -------
-        coherence_stack : (N-1, H, W) float32 np.ndarray
-            Per-IFG coherence in [0, 1].
-        """
-        import h5py  # lazy
-        from scipy.ndimage import uniform_filter  # lazy
-
-        if len(hdf5_paths) < 2:
-            raise ValueError(
-                f"_compute_ifg_coherence_stack requires >=2 epochs; got {len(hdf5_paths)}"
-            )
-
-        def _load_cslc(p: Path) -> np.ndarray:
-            """Load complex CSLC from HDF5; return (H, W) complex64.
-
-            The rectangular CSLC grid has NaN outside the parallelogram burst
-            footprint (~64% of the grid for SoCal t144_308029_iw1). Leaving
-            NaN in place causes scipy.ndimage.uniform_filter to propagate NaN
-            into every 5×5 neighbourhood that touches a NaN pixel — with 64%
-            NaN coverage, that's every output position → denom is NaN
-            globally → np.where(NaN > 0, ...) → coh == 0 everywhere.
-
-            Replace NaN with 0+0j so uniform_filter averages with zeros at the
-            NaN/valid boundary (reducing coherence near the burst edge but
-            preserving interior-valid coherence values).
-            """
-            with h5py.File(p, "r") as f:
-                for dset_path in (
-                    "/data/VV", "/data/HH",
-                    "/science/SENTINEL1/CSLC/grids/VV",
-                    "/science/SENTINEL1/CSLC/grids/HH",
-                ):
-                    if dset_path in f:
-                        arr = f[dset_path][:].astype(np.complex64)
-                        bad = ~(np.isfinite(arr.real) & np.isfinite(arr.imag))
-                        if bad.any():
-                            arr = arr.copy()
-                            arr[bad] = np.complex64(0)
-                        return arr
-            raise RuntimeError(f"No VV/HH CSLC dataset in {p}")
-
-        coherence_ifgs: list[np.ndarray] = []
-        slc_prev = _load_cslc(hdf5_paths[0])
-        for path_next in hdf5_paths[1:]:
-            slc_next = _load_cslc(path_next)
-            # Complex interferogram: prod_t * conj(prod_t+1)
-            ifg = slc_prev * slc_next.conj()
-            # Coherence via boxcar multi-look
-            num = np.abs(uniform_filter(ifg.real, size=boxcar_px)
-                         + 1j * uniform_filter(ifg.imag, size=boxcar_px))
-            denom = np.sqrt(
-                uniform_filter(np.abs(slc_prev)**2, size=boxcar_px)
-                * uniform_filter(np.abs(slc_next)**2, size=boxcar_px)
-            )
-            with np.errstate(invalid="ignore", divide="ignore"):
-                coh = np.where(denom > 0, num / denom, 0.0).astype(np.float32)
-            coherence_ifgs.append(coh)
-            slc_prev = slc_next
-
-        return np.stack(coherence_ifgs, axis=0)  # (N-1, H, W)
 
     def _compute_slope_deg(dem_path: Path) -> tuple[np.ndarray, object, object]:
         """Compute slope in degrees from a DEM GeoTIFF via numpy.gradient.
@@ -1015,7 +937,7 @@ if __name__ == "__main__":
         # compass writes outputs nested as <burst_out>/<burst_id>/<YYYYMMDD>/
         # <burst_id>_<YYYYMMDD>.h5, so use a recursive glob not a flat one.
         sorted_h5 = sorted(burst_out.rglob("*.h5"))
-        ifgrams_stack = _compute_ifg_coherence_stack(sorted_h5, boxcar_px=5)
+        ifgrams_stack = compute_ifg_coherence_stack(sorted_h5, boxcar_px=5)
 
         # Reproject stable_mask (DEM grid, ~30m) onto the CSLC output grid
         # (OPERA 5m range × 10m azimuth per runconfig) so that coherence_stats

@@ -512,3 +512,107 @@ def auto_attribute_ramp(
     if coh_correlated:
         return "phass"
     return "inconclusive"
+
+
+def _load_cslc_hdf5(p: Path) -> np.ndarray:
+    """Load complex CSLC from HDF5; return (H, W) complex64.
+
+    The rectangular CSLC grid has NaN outside the parallelogram burst
+    footprint (~64% of the grid for SoCal t144_308029_iw1). Leaving NaN
+    in place causes ``scipy.ndimage.uniform_filter`` to propagate NaN
+    into every 5x5 neighbourhood that touches a NaN pixel -- with 64%
+    NaN coverage, that's every output position -> denom is NaN globally
+    -> ``np.where(NaN > 0, ...)`` -> coh == 0 everywhere.
+
+    Replace NaN with 0+0j so uniform_filter averages with zeros at the
+    NaN/valid boundary (reducing coherence near the burst edge but
+    preserving interior-valid coherence values).
+
+    Searches the OPERA-canonical dataset paths in this order:
+      ``/data/VV``, ``/data/HH``,
+      ``/science/SENTINEL1/CSLC/grids/VV``,
+      ``/science/SENTINEL1/CSLC/grids/HH``.
+    """
+    import h5py  # lazy
+
+    with h5py.File(p, "r") as f:
+        for dset_path in (
+            "/data/VV",
+            "/data/HH",
+            "/science/SENTINEL1/CSLC/grids/VV",
+            "/science/SENTINEL1/CSLC/grids/HH",
+        ):
+            if dset_path in f:
+                arr = np.asarray(f[dset_path][:], dtype=np.complex64)
+                bad = ~(np.isfinite(arr.real) & np.isfinite(arr.imag))
+                if bad.any():
+                    arr = arr.copy()
+                    arr[bad] = np.complex64(0)
+                return arr
+    raise RuntimeError(f"No VV/HH CSLC dataset in {p}")
+
+
+def compute_ifg_coherence_stack(
+    hdf5_paths: list[Path],
+    boxcar_px: int = 5,
+) -> np.ndarray:
+    """Form N-1 sequential IFGs from an HDF5 CSLC stack; estimate coherence.
+
+    Public Phase 4 promotion of the helper formerly defined inner-scope in
+    ``run_eval_cslc_selfconsist_nam.py``. Now the single source of truth for
+    the sequential-IFG coherence-stack primitive; consumed by both the Phase
+    3 N.Am. CSLC self-consistency eval and the Phase 4 DISP eval scripts
+    (run_eval_disp.py and run_eval_disp_egms.py).
+
+    Forms sequential complex interferograms ``slc_t * conj(slc_t+1)``, then
+    estimates pixel-wise coherence via boxcar (multi-look) averaging
+    (PATTERNS Phase 2 formula for stable-terrain coherence estimation).
+
+    Parameters
+    ----------
+    hdf5_paths : list[Path]
+        Sorted HDF5 paths, one per epoch (N epochs -> N-1 IFGs).
+    boxcar_px : int, default 5
+        Half-width of the boxcar window (5 -> 5x5 multi-look).
+
+    Returns
+    -------
+    coherence_stack : (N-1, H, W) float32 np.ndarray
+        Per-IFG coherence in [0, 1].
+
+    Raises
+    ------
+    ValueError
+        If ``len(hdf5_paths) < 2``.
+    RuntimeError
+        If a file in ``hdf5_paths`` lacks any of the expected VV/HH dataset
+        paths (delegated from ``_load_cslc_hdf5``).
+    """
+    from scipy.ndimage import uniform_filter  # lazy
+
+    if len(hdf5_paths) < 2:
+        raise ValueError(
+            f"compute_ifg_coherence_stack requires >=2 epochs; got {len(hdf5_paths)}"
+        )
+
+    coherence_ifgs: list[np.ndarray] = []
+    slc_prev = _load_cslc_hdf5(hdf5_paths[0])
+    for path_next in hdf5_paths[1:]:
+        slc_next = _load_cslc_hdf5(path_next)
+        # Complex interferogram: prod_t * conj(prod_t+1)
+        ifg = slc_prev * slc_next.conj()
+        # Coherence via boxcar multi-look
+        num = np.abs(
+            uniform_filter(ifg.real, size=boxcar_px)
+            + 1j * uniform_filter(ifg.imag, size=boxcar_px)
+        )
+        denom = np.sqrt(
+            uniform_filter(np.abs(slc_prev) ** 2, size=boxcar_px)
+            * uniform_filter(np.abs(slc_next) ** 2, size=boxcar_px)
+        )
+        with np.errstate(invalid="ignore", divide="ignore"):
+            coh = np.where(denom > 0, num / denom, 0.0).astype(np.float32)
+        coherence_ifgs.append(coh)
+        slc_prev = slc_next
+
+    return np.stack(coherence_ifgs, axis=0)  # (N-1, H, W)
