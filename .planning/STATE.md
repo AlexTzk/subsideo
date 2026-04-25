@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
 status: executing
-stopped_at: "Completed 04-01-PLAN.md (Phase 4 foundation: 3 ramp helpers + 5 Pydantic types + B1 fix); ready for Wave 1 sibling Plan 04-02 / Wave 2 dependents"
-last_updated: "2026-04-25T07:04:59.065Z"
+stopped_at: "Completed 04-02-PLAN.md (prepare_for_reference adapter + ReferenceGridSpec + 17 tests; Wave 1 of Phase 4 done); ready for Wave 2 (04-03 matrix_writer DISP cell render)"
+last_updated: "2026-04-25T07:18:00.000Z"
 last_activity: 2026-04-25
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 24
-  completed_plans: 20
-  percent: 83
+  completed_plans: 21
+  percent: 87
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 04 (disp-s1-comparison-adapter-honest-fail) — EXECUTING
-Plan: 2 of 5
-Status: Ready to execute
+Plan: 3 of 5
+Status: Ready to execute Wave 2 (Plan 04-03 matrix_writer DISP cell render)
 Last activity: 2026-04-25
 
-**Resume path:** `/gsd-discuss-phase 4` to gather Phase 4 context, then `/gsd-plan-phase 4` + `/gsd-execute-phase 4`. Phase 4 (DISP comparison adapter) will append §3 (DISP ramp-attribution) to `docs/validation_methodology.md` per Phase 3 CONTEXT D-15 append-only.
+**Resume path:** Plans 04-01 + 04-02 complete (Wave 1). Plan 04-03 (Wave 2: matrix_writer disp:nam + disp:eu render branches) depends on Plan 04-01's `DISPCellMetrics` + `RampAttribution` Pydantic types — already importable from `subsideo.validation.matrix_schema`. Plan 04-02's `prepare_for_reference` is consumed by Plan 04-04 (Wave 3: eval-script rewire). Phase 4 (DISP comparison adapter) will append §3 (DISP ramp-attribution + multilook ADR) to `docs/validation_methodology.md` per Phase 3 CONTEXT D-15 append-only via Plan 04-05 (Wave 4).
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Last activity: 2026-04-25
 | Phase 08 P01 | 2min | 3 tasks | 6 files |
 | Phase 09 P01 | 3min | 3 tasks | 7 files |
 | Phase 04 P01 | 10min | 3 tasks | 6 files |
+| Phase 04 P02 | 9min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,9 @@ Recent decisions affecting current work (v1.1):
 - [Phase 4 Plan 04-01]: compute_ramp_aggregate returns plain dict (not RampAggregate Pydantic) to avoid circular import between selfconsistency.py and matrix_schema.py; caller (Plan 04-04) converts at metrics.json write time
 - [Phase 4 Plan 04-01]: B1 root-cause fix complete -- _compute_ifg_coherence_stack lifted from inner-scope of run_eval_cslc_selfconsist_nam.py:487 to public selfconsistency.compute_ifg_coherence_stack; nested _load_cslc closure promoted to sibling module-private _load_cslc_hdf5; Plan 04-04 imports the public symbol
 - [Phase 4 Plan 04-01]: 5 Pydantic v2 DISP cell-metrics types appended to matrix_schema.py (PerIFGRamp, RampAggregate, RampAttribution, DISPProductQualityResultJson, DISPCellMetrics) + 3 Literal type aliases; all use ConfigDict(extra=forbid); no edits to existing types per Phase 1 D-09 lock-in
+- [Phase 4 Plan 04-02]: Option A minimal refactor for prepare_for_reference — existing v1.0 compare_disp + compare_disp_egms_l2a top-level functions UNCHANGED; eval scripts (Plan 04-04) call prepare_for_reference BEFORE these v1.0 functions. Resampling.bilinear callsites at compare_disp.py:163 and 175 preserved for v1.0 continuity. CONTEXT D-Claude's-Discretion green-lit Option A or B; A picked for parallelizability and locked-in v1.0 test coverage preservation.
+- [Phase 4 Plan 04-02]: xarray + rioxarray promoted to module-top imports of compare_disp.py (not lazy) because they appear in type annotations + isinstance checks at runtime. rioxarray imported with `# noqa: F401` because it binds via .rio accessor side-effect. scipy.ndimage + pyproj.Transformer + rasterio.io.MemoryFile remain lazy (per-method-branch only).
+- [Phase 4 Plan 04-02]: prepare_for_reference form (b) -> form (c) bridge via rasterio.io.MemoryFile rather than temp-disk write — xr.DataArray native gets wrapped in an in-memory GeoTIFF so _point_sample_from_dataset stays uniform. Zero disk I/O, zero attack surface (MemoryFile cannot be coerced to read attacker-controlled paths per threat T-04-02-05).
 
 ### Pending Todos
 
@@ -139,7 +143,7 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 
 ## Session Continuity
 
-Last activity: 2026-04-25 — Phase 3 Plan 03-05 complete (CSLC-06 methodology doc landed). 12 behavior tests green, ruff/mypy clean on touched files (mypy `_load_cslc_complex` annotation issue is pre-existing, out of scope). Commits 5e1dcc0 (RED) + 5cef9dc (GREEN). Plan 03-05 SUMMARY at `.planning/phases/03-cslc-s1-self-consistency-eu-validation/03-05-SUMMARY.md`.
-Last session: 2026-04-25T07:04:59.059Z
-Stopped at: Completed 04-01-PLAN.md (Phase 4 foundation: 3 ramp helpers + 5 Pydantic types + B1 fix); ready for Wave 1 sibling Plan 04-02 / Wave 2 dependents
+Last activity: 2026-04-25 — Phase 4 Plan 04-02 complete (Wave 1 sibling: prepare_for_reference adapter). 17 unit tests green (3 error-path + 12 method-x-form + 1 DISP-05 no-write-back + 1 block_mean spot-check). Ruff + mypy clean on touched files (compare_disp.py 380 -> 806 LOC; tests/product_quality/test_prepare_for_reference.py new 187 LOC). Commits c58ab99 (Task 1 RED smoke test) + 4bf9922 (Task 1 GREEN feat) + 7f21dbf (Task 2 full test matrix). Plan 04-02 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-02-SUMMARY.md`.
+Last session: 2026-04-25T07:18:00.000Z
+Stopped at: Completed 04-02-PLAN.md (prepare_for_reference adapter + ReferenceGridSpec + 17 tests; Wave 1 of Phase 4 done); ready for Wave 2 (04-03 matrix_writer DISP cell render)
 Resume file: None
