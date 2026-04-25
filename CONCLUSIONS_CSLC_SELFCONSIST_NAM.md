@@ -174,6 +174,22 @@ Per-AOI coherence histograms + stable-mask basemaps written to `eval-cslc-selfco
 
 No bimodal P2.1 contamination was observed.
 
+### 5.4 Methodology cross-references (Phase 3 Plan 03-05 / CSLC-06)
+
+- **Cross-version phase impossibility**: the OPERA amplitude-sanity row
+  (`amp_r=0.982, amp_rmse_db=1.290 dB`) deliberately uses amplitude rather
+  than phase; the rationale lives once in
+  [`docs/validation_methodology.md#cross-version-phase`](docs/validation_methodology.md#cross-version-phase).
+  The structural argument (isce3 SLC-interpolation kernel changed upstream of
+  any phase-screen correction) is the lead; the diagnostic-evidence appendix
+  (carrier/flattening/both removed → coherence ≈ 0.002) lives at section 1.3
+  of that document. This CONCLUSIONS doc does not duplicate the argument.
+- **Product-quality vs reference-agreement distinction**: the per-AOI metrics
+  in §5.1 separate the OPERA amplitude-sanity reference-agreement columns
+  (`amp_r`, `amp_rmse_db`) from the self-consistency product-quality columns
+  (`coh_med_of_persistent`, `residual_mm_yr`). The category framing is
+  documented in [`docs/validation_methodology.md` §2](docs/validation_methodology.md#2-product-quality-vs-reference-agreement-distinction).
+
 ---
 
 ## 6. Output Files

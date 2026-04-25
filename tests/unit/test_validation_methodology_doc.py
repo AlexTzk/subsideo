@@ -17,6 +17,7 @@ Notes on filename discipline:
   tests reference the real on-disk filenames and treat the plan name as
   a documented filename correction.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -102,16 +103,12 @@ def test_section_2_motivating_example_cites_iberian() -> None:
     # The plan literal mentions CONCLUSIONS_CSLC_EU.md but the on-disk
     # filename is CONCLUSIONS_CSLC_SELFCONSIST_EU.md -- accept either.
     assert (
-        "CONCLUSIONS_CSLC_EU.md" in section_2
-        or "CONCLUSIONS_CSLC_SELFCONSIST_EU.md" in section_2
+        "CONCLUSIONS_CSLC_EU.md" in section_2 or "CONCLUSIONS_CSLC_SELFCONSIST_EU.md" in section_2
     ), (
         "Section 2 must cite the EU CSLC CONCLUSIONS doc by filename "
         "(SELFCONSIST_EU is the on-disk name)."
     )
-    assert (
-        "three independent numbers" in section_2
-        or "three independent measurements" in section_2
-    )
+    assert "three independent numbers" in section_2 or "three independent measurements" in section_2
 
 
 def test_section_2_anti_creep_both_directions() -> None:
@@ -145,6 +142,4 @@ def test_no_orphan_todos_in_section_1_or_2() -> None:
     # split that tolerates absence of any "## 3." header.
     s1_s2 = text.split("## 3.")[0]
     for token in ("TBD", "TODO", "STUB", "FIXME"):
-        assert token not in s1_s2, (
-            f"Section 1/2 contains {token!r} -- must be committed content."
-        )
+        assert token not in s1_s2, f"Section 1/2 contains {token!r} -- must be committed content."

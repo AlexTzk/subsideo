@@ -173,6 +173,35 @@ Above the 0.7 coherence gate by 17 % and the 3 mm/yr residual gate by 8.6× — 
 
 OPERA L2 CSLC-S1 V1 has no EU coverage; `compare_cslc` is skipped with the warning "OPERA CSLC-S1 V1 is N.Am. only; EU AOI amplitude sanity is best-effort". `reference_agreement` is null in metrics.json. By design.
 
+### 5.5 Methodology cross-references (Phase 3 Plan 03-05 / CSLC-06)
+
+- **Cross-version phase impossibility**: even if OPERA L2 CSLC-S1 V1 had EU
+  coverage, single-scene phase comparison against a different-isce3-version
+  reference would yield coherence ≈ 0 regardless of the corrections applied.
+  The structural argument (isce3 SLC-interpolation kernel changed upstream of
+  any phase-screen correction) is consolidated in
+  [`docs/validation_methodology.md#cross-version-phase`](docs/validation_methodology.md#cross-version-phase).
+  This CONCLUSIONS doc inherits the argument; PRs adding a new
+  phase-correction branch must address the kernel argument before merge.
+- **Product-quality vs reference-agreement distinction — three-number row**:
+  the per-AOI table in §5.1 is the **motivating example** for
+  [`docs/validation_methodology.md` §2](docs/validation_methodology.md#2-product-quality-vs-reference-agreement-distinction).
+  Three independent numbers coexist as distinct measurements that never
+  collapse into a single `.passed` verdict:
+
+  - **(a)** OPERA CSLC amplitude `amp_r` / `amp_rmse_db` — reference-agreement
+    BINDING. Not applicable for the EU AOI (OPERA L2 CSLC-S1 V1 is N.Am.-only)
+    but the row category exists by design. See SoCal in
+    `CONCLUSIONS_CSLC_SELFCONSIST_NAM.md` §5.1 for the populated form
+    (`amp_r=0.982, amp_rmse_db=1.290 dB`).
+  - **(b)** Self-consistency coherence `coh_med_of_persistent` —
+    product-quality CALIBRATING. Iberian/Meseta-North = 0.891.
+  - **(c)** Self-consistency residual `residual_mm_yr` plus the planned EGMS
+    L2a stable-PS residual `egms_l2a_stable_ps_residual_mm_yr` —
+    product-quality CALIBRATING. Iberian/Meseta-North residual = +0.347 mm/yr.
+    The EGMS L2a third number is deferred this rollout (Bug 8); when populated
+    it joins (c) without changing the category framing.
+
 ---
 
 ## 6. Output Files

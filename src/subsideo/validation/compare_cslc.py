@@ -1,11 +1,30 @@
 """CSLC-S1 product validation against OPERA N.Am. reference.
 
 Uses amplitude-based metrics (correlation, RMSE in dB) rather than
-interferometric phase coherence.  Phase comparison between different
+interferometric phase coherence. Phase comparison between different
 isce3 major versions (e.g. 0.15 vs 0.25) yields random noise because
-the phase reference computation changed.  See CONCLUSIONS_CSLC_N_AM.md
-Section 5 and .planning/research/PITFALLS.md Pitfall 15 for details.
+the SLC interpolation kernel changed upstream of any phase correction.
+
+**Before adding any phase-correction branch to this module**: see
+``docs/validation_methodology.md#cross-version-phase`` (Phase 3 Plan
+03-05, PITFALLS P2.4 mitigation). Any PR layering carrier/flattening/
+tropospheric/ionospheric/solid-Earth-tide corrections on top of an
+existing compare_cslc path MUST address in its PR description why the
+SLC-interpolation-kernel argument there no longer holds. A rerun
+showing coherence 0.0003 -> 0.0015 is NOT progress; both are random
+noise.
+
+Historical evidence: see ``CONCLUSIONS_CSLC_N_AM.md`` Section 5.3 for
+the v1.0 diagnostic table (carrier/flattening/both removed -> coherence
+~ 0.002 everywhere).
+
+For Phase 3 EU: ``compare_cslc_egms_l2a_residual`` participates in the
+product-quality vs reference-agreement distinction documented at
+``docs/validation_methodology.md`` Section 2; see
+``CONCLUSIONS_CSLC_SELFCONSIST_EU.md`` Section 5 for the Iberian
+Meseta three-number row that is the motivating example.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -44,9 +63,7 @@ def _load_cslc_complex(
         if data is None and "data" in f:
             for key in f["data"]:
                 dset = f[f"data/{key}"]
-                if hasattr(dset, "shape") and np.issubdtype(
-                    dset.dtype, np.complexfloating
-                ):
+                if hasattr(dset, "shape") and np.issubdtype(dset.dtype, np.complexfloating):
                     data = dset[:].astype(np.complex128)
                     break
         if data is None:
@@ -56,8 +73,10 @@ def _load_cslc_complex(
         x_coords = y_coords = None
         coord_candidates = [
             ("data/x_coordinates", "data/y_coordinates"),
-            ("science/SENTINEL1/CSLC/grids/x_coordinates",
-             "science/SENTINEL1/CSLC/grids/y_coordinates"),
+            (
+                "science/SENTINEL1/CSLC/grids/x_coordinates",
+                "science/SENTINEL1/CSLC/grids/y_coordinates",
+            ),
         ]
         for x_path, y_path in coord_candidates:
             if x_path in f and y_path in f:
@@ -68,9 +87,7 @@ def _load_cslc_complex(
     return data, x_coords, y_coords
 
 
-def compare_cslc(
-    product_path: Path, reference_path: Path
-) -> CSLCValidationResult:
+def compare_cslc(product_path: Path, reference_path: Path) -> CSLCValidationResult:
     """Compare CSLC-S1 product against OPERA N.Am. reference.
 
     Computes both interferometric phase metrics and amplitude-based metrics.
@@ -96,10 +113,7 @@ def compare_cslc(
         # silently falling through to the mask step (which would either raise
         # an opaque broadcast error or, worse, broadcast incorrectly).
         if not (
-            prod_x is not None
-            and ref_x is not None
-            and prod_y is not None
-            and ref_y is not None
+            prod_x is not None and ref_x is not None and prod_y is not None and ref_y is not None
         ):
             raise ValueError(
                 f"CSLC shape mismatch ({prod_complex.shape} vs "
@@ -109,7 +123,8 @@ def compare_cslc(
         if prod_x is not None and ref_x is not None and prod_y is not None and ref_y is not None:
             logger.info(
                 "Product shape {} != reference shape {}; aligning by coordinates",
-                prod_complex.shape, ref_complex.shape,
+                prod_complex.shape,
+                ref_complex.shape,
             )
             x_overlap_min = max(prod_x[0], ref_x[0])
             x_overlap_max = min(prod_x[-1], ref_x[-1])
@@ -119,14 +134,14 @@ def compare_cslc(
             y_overlap_min = max(prod_y[-1], ref_y[-1])
 
             px0 = int(np.searchsorted(prod_x, x_overlap_min))
-            px1 = int(np.searchsorted(prod_x, x_overlap_max, side='right'))
+            px1 = int(np.searchsorted(prod_x, x_overlap_max, side="right"))
             py0 = int(np.searchsorted(-prod_y, -y_overlap_max))
-            py1 = int(np.searchsorted(-prod_y, -y_overlap_min, side='right'))
+            py1 = int(np.searchsorted(-prod_y, -y_overlap_min, side="right"))
 
             rx0 = int(np.searchsorted(ref_x, x_overlap_min))
-            rx1 = int(np.searchsorted(ref_x, x_overlap_max, side='right'))
+            rx1 = int(np.searchsorted(ref_x, x_overlap_max, side="right"))
             ry0 = int(np.searchsorted(-ref_y, -y_overlap_max))
-            ry1 = int(np.searchsorted(-ref_y, -y_overlap_min, side='right'))
+            ry1 = int(np.searchsorted(-ref_y, -y_overlap_min, side="right"))
 
             prod_complex = prod_complex[py0:py1, px0:px1]
             ref_complex = ref_complex[ry0:ry1, rx0:rx1]
@@ -187,7 +202,7 @@ def compare_cslc(
     # 5. Phase metrics (informational — low coherence expected across isce3 versions)
     ifg = prod_masked * np.conj(ref_masked)
     phase_diff = np.angle(ifg)
-    phase_rms = float(np.sqrt(np.mean(phase_diff ** 2)))
+    phase_rms = float(np.sqrt(np.mean(phase_diff**2)))
 
     # WR-05: pre-mask against |ifg|==0 before normalising. The outer ``mask``
     # in step 3 requires ``|prod|>0`` and ``|ref|>0``, but neither guarantees
@@ -203,7 +218,10 @@ def compare_cslc(
     logger.info(
         "CSLC validation: amp_corr={:.4f}, amp_RMSE={:.2f} dB, "
         "phase_RMS={:.4f} rad, coherence={:.4f}",
-        amp_corr, amp_rmse_db, phase_rms, coherence,
+        amp_corr,
+        amp_rmse_db,
+        phase_rms,
+        coherence,
     )
 
     return CSLCValidationResult(
@@ -305,7 +323,8 @@ def compare_cslc_egms_l2a_residual(
             logger.warning(
                 "compare_cslc_egms_l2a_residual: no stable PS within raster bounds "
                 "(raster={}, n_stable_ps={})",
-                our_velocity_raster.name, len(stable_df),
+                our_velocity_raster.name,
+                len(stable_df),
             )
             return float("nan")
 
@@ -320,16 +339,19 @@ def compare_cslc_egms_l2a_residual(
     n_valid = int(valid.sum())
     n_stable_ps = len(stable_df)
     logger.debug(
-        "compare_cslc_egms_l2a_residual: n_ps_total={}, n_stable_ps={}, "
-        "n_in_raster={}, n_valid={}",
-        len(df), n_stable_ps, len(points_in), n_valid,
+        "compare_cslc_egms_l2a_residual: n_ps_total={}, n_stable_ps={}, n_in_raster={}, n_valid={}",
+        len(df),
+        n_stable_ps,
+        len(points_in),
+        n_valid,
     )
 
     if n_valid < min_valid_points:
         logger.warning(
             "compare_cslc_egms_l2a_residual: only {} valid paired PS < "
             "min_valid_points={}; returning NaN",
-            n_valid, min_valid_points,
+            n_valid,
+            min_valid_points,
         )
         return float("nan")
 
@@ -343,6 +365,7 @@ def compare_cslc_egms_l2a_residual(
 
     logger.info(
         "compare_cslc_egms_l2a_residual: residual={:.3f} mm/yr on {} stable PS",
-        residual, n_valid,
+        residual,
+        n_valid,
     )
     return residual
