@@ -91,11 +91,22 @@ if __name__ == "__main__":
 
     load_dotenv()
 
-    credential_preflight([
-        "CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET",
-        "EARTHDATA_USERNAME", "EARTHDATA_PASSWORD",
-        "EGMS_TOKEN",
-    ])
+    # EGMS_TOKEN is only required when the EGMS L2a CSV cache is empty
+    # (Stage 2 download path). On warm re-runs from cached CSVs the token is
+    # never read; relax the preflight conditionally so the script can be
+    # re-run without re-issuing an EGMS portal token.
+    _required_env = ["CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET",
+                     "EARTHDATA_USERNAME", "EARTHDATA_PASSWORD"]
+    _egms_cache_dir = Path("./eval-disp-egms/egms_reference")
+    _has_egms_csv = bool(
+        _egms_cache_dir.exists() and any(
+            p for p in _egms_cache_dir.rglob("*.csv")
+            if not p.name.startswith("merged_")
+        )
+    )
+    if not _has_egms_csv:
+        _required_env.append("EGMS_TOKEN")
+    credential_preflight(_required_env)
 
     # Phase 4 Stage 12 prerequisite: wall-time + run-start tracking for meta.json
     t_start = time.monotonic()
