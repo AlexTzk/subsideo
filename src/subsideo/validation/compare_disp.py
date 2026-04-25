@@ -745,6 +745,11 @@ def _point_sample_from_dataset(
     if method == "bilinear":
         from scipy.ndimage import map_coordinates  # lazy
 
+        # Phase 4 ME-02: honor nodata sentinel before bilinear interp so
+        # sentinel values (e.g. -9999) don't bleed into valid neighbours.
+        # map_coordinates(mode="constant", cval=np.nan) propagates NaN.
+        if nodata is not None:
+            src_data = np.where(src_data == nodata, np.nan, src_data)
         # map_coordinates expects (rows, cols) stack
         coords = np.vstack([rows, cols])
         sampled_bilinear = np.asarray(
@@ -789,6 +794,10 @@ def _point_sample_from_dataset(
         # Apply a Gaussian smooth on the full raster, then bilinear-sample at the
         # projected (row, col). sigma = 0.5 * (reference cell / native cell);
         # we use radius=6 default (~30 m at 5x10 m) -> sigma ~ 3 px.
+        # Phase 4 ME-02: honor nodata sentinel before fill-with-zero so
+        # sentinel values (e.g. -9999) don't smear into the smoothed output.
+        if nodata is not None:
+            src_data = np.where(src_data == nodata, np.nan, src_data)
         src_filled = np.where(np.isfinite(src_data), src_data, 0.0)
         smoothed = gaussian_filter(src_filled, sigma=3.0)
         coords = np.vstack([rows, cols])
