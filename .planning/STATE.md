@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
-status: executing
-stopped_at: "Completed 04-04-PLAN.md (eval-script rewire + warm re-runs + manifest fix; Wave 3 of Phase 4 done); ready for Wave 4 (04-05 docs+brief)"
-last_updated: "2026-04-25T08:03:34.000Z"
+status: verifying
+stopped_at: Completed 04-05-PLAN.md (Wave 4 of Phase 4 done; all 5 plans complete; Phase 4 ready for verifier)
+last_updated: "2026-04-25T08:26:15.108Z"
 last_activity: 2026-04-25
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 24
-  completed_plans: 23
-  percent: 96
+  completed_plans: 24
+  percent: 100
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 Phase: 04 (disp-s1-comparison-adapter-honest-fail) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute Wave 4 (Plan 04-05 docs + brief)
+Status: Phase complete — ready for verification
 Last activity: 2026-04-25
 
-**Resume path:** Plans 04-01 + 04-02 + 04-03 + 04-04 complete (Waves 1 + 2 + 3). Plan 04-04 produced `eval-disp/metrics.json` (DISPCellMetrics, cell_status=MIXED, coherence_source='phase3-cached', attributed_source='inconclusive', 14 PerIFGRamp records) and `eval-disp-egms/metrics.json` (DISPCellMetrics, cell_status=MIXED, coherence_source='fresh', attributed_source='inconclusive', 9 PerIFGRamp records); both validated as DISPCellMetrics via Pydantic. SoCal RA: r=0.049 / bias=+23.6 mm/yr (FAIL > 0.92 / FAIL < 3 — mirrors v1.0 baseline). Bologna RA: r=0.336 / bias=+3.46 mm/yr (FAIL > 0.92 / FAIL < 3 — mirrors v1.0 baseline). Honest FAIL signal preserved per CONTEXT D-09; block_mean kernel does NOT inflate the metric. Plan 04-05 (Wave 4: docs + brief) is next: git mv CONCLUSIONS_DISP_EGMS.md → CONCLUSIONS_DISP_EU.md; append v1.1 PQ + RA + Ramp Attribution + Brief link sections to both CONCLUSIONS files; write DISP_UNWRAPPER_SELECTION_BRIEF.md (4 candidates × 4 columns) at `.planning/milestones/v1.1-research/`; append §3 multilook ADR to `docs/validation_methodology.md`.
+**Resume path:** All 5 plans complete (Waves 1 + 2 + 3 + 4). Plan 04-05 (Wave 4: docs + brief) renamed `CONCLUSIONS_DISP_EGMS.md` → `CONCLUSIONS_DISP_EU.md` via `git mv` (R100; history preserved via `git log --follow`); appended 4 v1.1 sub-sections (§11 Product Quality / §12 Reference Agreement / §13 Ramp Attribution / §14 Brief link) to both `CONCLUSIONS_DISP_N_AM.md` (258 → 356 LOC) and `CONCLUSIONS_DISP_EU.md` (304 → 404 LOC) with v1.0 baseline numbers preserved as continuity preamble; wrote `.planning/milestones/v1.1-research/DISP_UNWRAPPER_SELECTION_BRIEF.md` (129 LOC) with 4-candidate × 4-column scoping table (PHASS+post-deramping S/SPURT native M/tophu+SNAPHU L/20×20 m fallback L) and attribution-driven prioritisation recommending ERA5 toggle (DISP-V2-02) FIRST in v1.2; appended §3 multilook ADR to `docs/validation_methodology.md` (247 → 365 LOC) with 5-part PITFALLS+FEATURES dialogue and explicit "Native 5×10 m stays production default" per DISP-05; §4 + §5 NOT created per Phase 3 D-15 append-only. **Phase 4 closure complete.** Honest FAIL signal preserved + scoped: SoCal r=0.049 / Bologna r=0.336 (both FAIL > 0.92), both attributed_source='inconclusive', cross-cell pattern flags atmospheric long-wavelength curvature as primary v1.2 candidate. Ready for verifier per `.planning/config.json` `workflow.verifier: true`.
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Last activity: 2026-04-25
 | Phase 09 P01 | 3min | 3 tasks | 7 files |
 | Phase 04 P01 | 10min | 3 tasks | 6 files |
 | Phase 04 P02 | 9min | 2 tasks | 2 files |
+| Phase 04 P05 | 9min | 4 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -129,6 +130,9 @@ Recent decisions affecting current work (v1.1):
 - [Phase 4 Plan 04-04]: Rule 1 bug fix: warm-path velocity_path probe pointed at non-existent `disp/mintpy/velocity.h5` — replaced with `disp/dolphin/timeseries/velocity.tif` (matches DISPResult.velocity_path emitted by products/disp.py:481). Without this fix, every warm invocation forced a full pipeline rerun.
 - [Phase 4 Plan 04-04]: Rule 3 fix: EGMS_TOKEN credential preflight made conditional on egms_reference/ CSV cache emptiness. Token is consumed only by Stage 2 download path; on warm re-runs from cached CSVs the token is never read. Old preflight blocked the script unnecessarily before reaching Stage 9.
 - [Phase 4 Plan 04-04]: W4 supervisor cache_dir divergence acknowledged but not silently bypassed. supervisor._cache_dir_from_script() derives `eval-disp_egms` (underscore) for run_eval_disp_egms.py while on-disk + manifest both use `eval-disp-egms` (hyphen). Watchdog mtime-staleness check looks at the wrong path (which is empty), but abort is gated by `wall > 2 * expected_wall AND stale > GRACE_WINDOW_S`. Bologna eval completed in ~3 minutes — far below the 2*21600s threshold — so the watchdog did not abort. Pre-existing divergence Phase 4 inherits but does not introduce. Phase 4 follow-up todo: reconcile supervisor cache_dir derivation with on-disk hyphen convention.
+- [Phase 4 Plan 04-05]: git mv CONCLUSIONS_DISP_EGMS.md to CONCLUSIONS_DISP_EU.md (R100 rename); 4 v1.1 sub-sections appended to both DISP CONCLUSIONS files (Product Quality / Reference Agreement / Ramp Attribution / Brief link); DISP_UNWRAPPER_SELECTION_BRIEF.md written with 4 candidates x 4 columns at .planning/milestones/v1.1-research/; docs/validation_methodology.md section 3 multilook ADR appended (5-part PITFALLS+FEATURES dialogue); v1.0 baseline numbers preserved as continuity preamble; no section 4/section 5 added per Phase 3 D-15 append-only
+- [Phase 4 Plan 04-05]: Section 3 multilook ADR framed as posture-not-science; PITFALLS P3.1 Gaussian-physics + FEATURES anti-feature block_mean both correct on own terms; ADR resolves by picking lower-bound r kernel (block_mean) for milestone-publish artefacts; eval-script constant REFERENCE_MULTILOOK_METHOD lives at module top in run_eval_disp.py + run_eval_disp_egms.py per D-04; switching kernel post-measurement requires PR diff + CONCLUSIONS sub-section per section 3.5; no env-var override / CLI flag
+- [Phase 4 Plan 04-05]: Brief author recommends activating diagnostic (c) ERA5 toggle FIRST in v1.2 milestone (DISP-V2-02 integration) given Phase 4's both-cells-inconclusive outcome triggers CONTEXT D-14 'diagnostics b+c BEFORE candidate evaluation' branch; cross-cell pattern (SoCal r(mag,coh)=+0.15 near-zero; Bologna r(mag,coh)=-0.52 negative) suggests atmospheric long-wavelength curvature; if ERA5 flips both cells to phass then ordered escalation is candidate 2 (SPURT) -> 1 (PHASS+post-deramping) -> 3 (tophu+SNAPHU) -> 4 (20x20 m fallback)
 
 ### Pending Todos
 
@@ -153,6 +157,6 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 ## Session Continuity
 
 Last activity: 2026-04-25 — Phase 4 Plan 04-04 complete (Wave 3: eval-script rewire + warm re-runs + manifest fix). 5 changes per script landed in run_eval_disp.py + run_eval_disp_egms.py (10 total: REFERENCE_MULTILOOK_METHOD constant + EXPECTED_WALL_S=21600 + prepare_for_reference adapter + product-quality block + ramp-attribution + DISPCellMetrics write); manifest cache_dir aligned with on-disk eval-disp-egms (hyphen); both warm re-runs completed (~6 min SoCal, ~3 min Bologna); both metrics.json files validate as DISPCellMetrics; matrix.md regenerated. Honest FAIL signal preserved: SoCal r=0.049 (v1.0=0.0365), bias=+23.6 (v1.0=+23.62); Bologna r=0.336 (v1.0=0.32), bias=+3.46 (v1.0=+3.35). Both attributed_source=inconclusive. Ruff clean on touched files. Commits 75dea9d (Task 1 SoCal eval) + ec2c07d (Task 2 Bologna eval) + ae2707f (Task 3 manifest fix) + 709c0c0 (Task 4 Rule 3 EGMS_TOKEN preflight relaxation) + 0d0df63 (Task 4 matrix.md regen). Plan 04-04 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-04-SUMMARY.md`.
-Last session: 2026-04-25T08:03:34.000Z
-Stopped at: Completed 04-04-PLAN.md (eval-script rewire + warm re-runs + manifest fix; Wave 3 of Phase 4 done); ready for Wave 4 (04-05 docs+brief)
+Last session: 2026-04-25T08:25:53.699Z
+Stopped at: Completed 04-05-PLAN.md (Wave 4 of Phase 4 done; all 5 plans complete; Phase 4 ready for verifier)
 Resume file: None

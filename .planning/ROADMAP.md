@@ -34,7 +34,7 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 - [ ] **Phase 1: Environment Hygiene, Framework Consolidation & Guardrail Scaffolding** — pin numpy<2, centralise `_cog`/`_mp`, build `validation.harness` + shared stable-terrain/self-consistency modules, land `criteria.py` CALIBRATING/BINDING, split result dataclasses, split tests dir, Makefile + manifest + env lockfile
 - [x] **Phase 2: RTC-S1 EU Validation** — 3-5 EU RTC bursts PASS across ≥3 terrain regimes (≥1 with >1000 m relief AND ≥1 >55°N); per-burst reporting; proves Phase 1 harness end-to-end
 - [x] **Phase 3: CSLC-S1 Self-Consistency + EU Validation** (5/5 plans, complete 2026-04-25) — SoCal / Mojave / Iberian Meseta self-consistency coherence > 0.7 and residual < 5 mm/yr (CALIBRATING); OPERA CSLC amplitude sanity r > 0.6 / RMSE < 4 dB; cross-version-phase methodology consolidated
-- [ ] **Phase 4: DISP-S1 Comparison Adapter + Honest FAIL** — `prepare_for_reference` adapter (explicit `method=`); self-consistency at native 5×10 m; N.Am./EU re-runs with ramp-attribution diagnostic; DISP Unwrapper Selection scoping brief delivered
+- [x] **Phase 4: DISP-S1 Comparison Adapter + Honest FAIL** (5/5 plans, complete 2026-04-25) — `prepare_for_reference` adapter (explicit `method=`); self-consistency at native 5×10 m; N.Am./EU re-runs with ramp-attribution diagnostic; DISP Unwrapper Selection scoping brief delivered
 - [ ] **Phase 5: DIST-S1 OPERA v0.1 + EFFIS EU** — T11SLT v0.1 comparison (or config-drift deferral) with block-bootstrap CI; CMR probe auto-supersede; EFFIS recall+precision cross-val; 3 EU events; optional chained `prior_dist_s1_product` run
 - [ ] **Phase 6: DSWx-S2 N.Am. + EU Recalibration** — N.Am. positive control; AOI research notebook; 12-pair fit set across 6 biomes (Balaton held-out); joint grid search over WIGT/AWGT/PSWT2_MNDWI; typed thresholds module with provenance; EU re-run (F1 > 0.90 bar does not move)
 - [ ] **Phase 7: Results Matrix + Release Readiness** — `make eval-all` writes `results/matrix.md` (product-quality / reference-agreement columns); manifest-driven matrix writer; `docs/validation_methodology.md`; TrueNAS Linux pre-release audit; env lockfile + Dockerfile/Apptainer recipe
@@ -149,7 +149,7 @@ Plans:
 - [x] 04-02-PLAN.md — compare_disp.py prepare_for_reference adapter (4 methods × 3 reference_grid forms; explicit method=, no default per DISP-01) + ReferenceGridSpec + 12-cell unit test matrix + DISP-05 no-write-back audit [Wave 1] [DISP-01, DISP-05]
 - [x] 04-03-PLAN.md — matrix_writer.py disp:nam + disp:eu render branches (CALIBRATING italics on PQ + non-italics PASS/FAIL on RA + attributed_source label inline; DISP dispatch BEFORE CSLC self-consist) + tests [Wave 2] [DISP-03]
 - [x] 04-04-PLAN.md — run_eval_disp.py + run_eval_disp_egms.py 5 changes per script (REFERENCE_MULTILOOK_METHOD constant, EXPECTED_WALL_S=21600, Stage 9 adapter, Stage 10 PQ block w/ cross-cell coherence read for SoCal, Stage 11 ramp-attribution, Stage 12 DISPCellMetrics write); manifest cache_dir fix; warm re-runs produce metrics.json + meta.json for both cells [Wave 3] [DISP-01, DISP-02, DISP-03, DISP-05]
-- [ ] 04-05-PLAN.md — Docs+brief: git mv CONCLUSIONS_DISP_EGMS.md → CONCLUSIONS_DISP_EU.md; append v1.1 Product Quality / Reference Agreement / Ramp Attribution / Brief link sections to both CONCLUSIONS files; write DISP_UNWRAPPER_SELECTION_BRIEF.md (4 candidates × 4 columns); append §3 multilook ADR to docs/validation_methodology.md (5-part PITFALLS+FEATURES dialogue) [Wave 4] [DISP-03, DISP-04, DISP-05]
+- [x] 04-05-PLAN.md — Docs+brief: git mv CONCLUSIONS_DISP_EGMS.md → CONCLUSIONS_DISP_EU.md; append v1.1 Product Quality / Reference Agreement / Ramp Attribution / Brief link sections to both CONCLUSIONS files; write DISP_UNWRAPPER_SELECTION_BRIEF.md (4 candidates × 4 columns); append §3 multilook ADR to docs/validation_methodology.md (5-part PITFALLS+FEATURES dialogue) [Wave 4] [DISP-03, DISP-04, DISP-05]
 
 **Requirements coverage audit** (all 5 Phase 4 requirement IDs):
 DISP-01 (02, 04), DISP-02 (01, 04), DISP-03 (01, 03, 04, 05), DISP-04 (05), DISP-05 (02, 04, 05). Every requirement appears in at least one plan.
@@ -226,7 +226,7 @@ DISP-01 (02, 04), DISP-02 (01, 04), DISP-03 (01, 03, 04, 05), DISP-04 (05), DISP
 | 1. Environment Hygiene, Framework Consolidation & Guardrail Scaffolding | v1.1 | 0/9 | Planned | - |
 | 2. RTC-S1 EU Validation | v1.1 | 5/5 | Complete (3/5 PASS w/ investigation) | 2026-04-23 |
 | 3. CSLC-S1 Self-Consistency + EU Validation | v1.1 | 0/0 | Not started | - |
-| 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 4/5 | In progress | - |
+| 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 5/5 | Complete (honest FAIL on r > 0.92 + bias < 3 mm/yr; cells MIXED with attributed_source=inconclusive; v1.2 follow-up scoped via DISP_UNWRAPPER_SELECTION_BRIEF.md) | 2026-04-25 |
 | 5. DIST-S1 OPERA v0.1 + EFFIS EU | v1.1 | 0/0 | Not started | - |
 | 6. DSWx-S2 N.Am. + EU Recalibration | v1.1 | 0/0 | Not started | - |
 | 7. Results Matrix + Release Readiness | v1.1 | 0/0 | Not started | - |
