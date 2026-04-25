@@ -46,7 +46,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [ ] **CSLC-03**: SoCal self-consistency eval (burst `t144_308029_iw1`, 15 dates, 14 sequential IFGs) reports self-consistency coherence > 0.7 (CALIBRATING gate) and residual mean velocity < 5 mm/yr over OPERA-CSLC-derived stable pixels
 - [ ] **CSLC-04**: Mojave Desert self-consistency eval (Coso/Searles Valley primary, or a documented-stable AOI from the 3-candidate fallback list — Pahranagat Valley / Amargosa Valley / Hualapai Plateau) passes the same self-consistency gate, OR exhaustion of the fallback list surfaces a Phase blocker
 - [ ] **CSLC-05**: Iberian Meseta EU eval (primary: bedrock/sparse-vegetation burst north of Madrid; fallbacks: Alentejo / Massif Central) reports (a) OPERA CSLC amplitude reference-agreement r > 0.6, RMSE < 4 dB; (b) self-consistency coherence > 0.7 over stable terrain; (c) EGMS L2a stable-PS residual mean velocity < 5 mm/yr
-- [ ] **CSLC-06**: Cross-version phase comparison methodology is consolidated in `docs/validation_methodology.md` with the diagnostic evidence (removal of carrier, flattening, both — still yields zero coherence across isce3 major versions)
+- [x] **CSLC-06**: Cross-version phase comparison methodology is consolidated in `docs/validation_methodology.md` with the diagnostic evidence (removal of carrier, flattening, both — still yields zero coherence across isce3 major versions)
 
 ### DISP-S1 Comparison Adapter + Honest FAIL
 
@@ -180,7 +180,7 @@ Which phases cover which requirements. Populated by roadmapper.
 | CSLC-03 | Phase 3 | Pending |
 | CSLC-04 | Phase 3 | Pending |
 | CSLC-05 | Phase 3 | Pending |
-| CSLC-06 | Phase 3 | Pending |
+| CSLC-06 | Phase 3 | Validated (Plan 03-05) |
 | DISP-01 | Phase 4 | Pending |
 | DISP-02 | Phase 4 | Pending |
 | DISP-03 | Phase 4 | Pending |

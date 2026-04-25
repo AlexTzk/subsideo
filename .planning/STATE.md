@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
-status: executing-partial
-stopped_at: "Phase 3 partial: Wave 1 (03-01, 03-02) complete; Wave 2 Task 1 (03-03, 03-04 code) complete; Wave 2 Task 2 compute (14-16h/cell) + Wave 3 (03-05 methodology) deferred to user. See 03-VERIFICATION.md."
-last_updated: "2026-04-24T05:15:00.000Z"
-last_activity: "2026-04-24 -- Phase 03 partial execution: scaffolding + probe + eval scripts landed; compute + methodology deferred"
+status: executing
+stopped_at: "Phase 3 Plan 03-05 complete (CSLC-06 methodology doc landed). Phase 3 ready for transition once Wave 2 Task 2 compute write-ups (Plans 03-03/04) are signed off."
+last_updated: "2026-04-25T01:34:18.000Z"
+last_activity: "2026-04-25 -- Phase 03 Plan 05 complete: docs/validation_methodology.md sections 1+2 landed (CSLC-06)"
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 19
-  completed_plans: 16
-  percent: 84
+  completed_plans: 17
+  percent: 89
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 ## Current Position
 
-Phase: 03 (cslc-s1-self-consistency-eu-validation) — PARTIAL (user-deferred compute)
-Plan: 2 of 5 fully complete + 2 partial (Task 1 only) + 1 deferred
-Status: Wave 1 ✅ done, Wave 2 Task 1 ✅ done, Wave 2 Task 2 + Wave 3 ❌ deferred to user
-Last activity: 2026-04-24 -- VERIFICATION.md committed, phase paused awaiting user compute runs
+Phase: 03 (cslc-s1-self-consistency-eu-validation) — Wave 3 ✅ complete; phase ready for transition
+Plan: 03-05 ✅ complete (CSLC-06 methodology doc); 03-03/04 Task 2 user compute write-ups already in place via f6d5492
+Status: Wave 1 ✅ done, Wave 2 ✅ done (compute write-ups landed user-side), Wave 3 ✅ done (this session — Plan 03-05)
+Last activity: 2026-04-25 -- Plan 03-05 commits 5e1dcc0 (RED tests) + 5cef9dc (GREEN methodology doc); 03-05-SUMMARY.md written
 
-**Resume path:** User runs `make eval-cslc-nam` (~12h) + `make eval-cslc-eu` (~12h), populates `CONCLUSIONS_CSLC_SELFCONSIST_NAM.md` + `CONCLUSIONS_CSLC_EU.md`, then invokes `/gsd-execute-phase 3` to pick up Plan 03-05 (methodology doc).
+**Resume path:** Phase 3 closeout — invoke `/gsd:transition` from Phase 3 to Phase 4. Phase 4 (DISP comparison adapter) will append §3 (DISP ramp-attribution) to `docs/validation_methodology.md` per CONTEXT D-15 append-only.
 
 ## Performance Metrics
 
@@ -102,6 +102,7 @@ Recent decisions affecting current work (v1.1):
 - [Phase 2 CONTEXT]: `run_eval_rtc_eu.py` is a single script with declarative `BURSTS: list[BurstConfig]` looping sequentially, per-burst try/except isolation (one failure doesn't block matrix cell), per-burst whole-pipeline skip + per-stage `ensure_resume_safe`. Supervisor wraps as outer boundary; `_mp.configure_multiprocessing()` fires once per cell.
 - [Phase 2 CONTEXT]: Single aggregate `eval-rtc-eu/metrics.json` with nested `per_burst: [...]` list (new `RTCEUCellMetrics` Pydantic extension of base `CellMetrics`); top-level aggregates include pass_count/total, reference_agreement.worst_rmse_db/worst_r/worst_burst_id, any_investigation_required. Single cell-level `meta.json` with nested per-burst input hashes. Matrix row renders as single `X/N PASS` + link to CONCLUSIONS_RTC_EU.md.
 - [Phase 2 CONTEXT]: RTC-03 investigation trigger is RMSE >= 0.15 dB (~3× N.Am. baseline) OR r < 0.999; dual trigger (RMSE catches bias, r catches structure). Triggers live in `criteria.py` as new `type='INVESTIGATION_TRIGGER'` entries (extending Phase 1 D-01 Literal) — non-gate, do NOT tighten pass criteria (RTC-02 explicit). Eval script auto-flags `per_burst[i].investigation_required` + reason; human writes structured observation + hypothesis + evidence sub-section in CONCLUSIONS_RTC_EU.md per flagged burst.
+- [Phase 3 Plan 03-05]: `docs/validation_methodology.md` lands as a new artifact under a new `docs/` directory with §1 (CSLC cross-version phase impossibility) + §2 (product-quality vs reference-agreement distinction) ONLY; per CONTEXT D-15 append-only, §3 DISP ramp-attribution / §4 DSWE F1 ceiling / §5 cross-sensor precision-first / top-level ToC are deferred to Phase 4 / 5-6 / 7 REL-03. §1 leads with the structural isce3 SLC-interpolation-kernel argument (PITFALLS P2.4 mitigation) BEFORE the diagnostic-evidence appendix (carrier/flattening table). compare_cslc.py docstring cross-links the doc anchor at module level. Filename correction noted: plan said CONCLUSIONS_CSLC_EU.md; on-disk file is CONCLUSIONS_CSLC_SELFCONSIST_EU.md (committed under SELFCONSIST_ prefix in f6d5492).
 
 **v1.0 decisions (reference):** see PROJECT.md Key Decisions table + historical log below for ordering context.
 
@@ -134,7 +135,7 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 
 ## Session Continuity
 
-Last activity: 2026-04-23 — Phase 3 planned (5 plans, 3 waves; 14 checker findings resolved in revision 1 — no regression); Phase 3 CONTEXT gathered 2026-04-23; Phase 2 complete 2026-04-23
-Last session: 2026-04-23T20:30:00.000Z
-Stopped at: Phase 3 planned — ready to execute
-Resume file: .planning/phases/03-cslc-s1-self-consistency-eu-validation/03-01-PLAN.md
+Last activity: 2026-04-25 — Phase 3 Plan 03-05 complete (CSLC-06 methodology doc landed). 12 behavior tests green, ruff/mypy clean on touched files (mypy `_load_cslc_complex` annotation issue is pre-existing, out of scope). Commits 5e1dcc0 (RED) + 5cef9dc (GREEN). Plan 03-05 SUMMARY at `.planning/phases/03-cslc-s1-self-consistency-eu-validation/03-05-SUMMARY.md`.
+Last session: 2026-04-25T01:34:18.000Z
+Stopped at: Phase 3 ready for transition to Phase 4 (DISP comparison adapter; will append §3 DISP ramp-attribution to docs/validation_methodology.md per D-15)
+Resume file: invoke `/gsd:transition` for Phase 3 → Phase 4 closeout
