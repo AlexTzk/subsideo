@@ -61,9 +61,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### DIST-S1 OPERA v0.1 Sample Comparison + EU Tightening
 
-- [ ] **DIST-01**: The OPERA DIST v0.1 sample for MGRS tile T11SLT is fetched via CloudFront direct-download with exponential-backoff retry (via harness) and cached under `eval-dist/opera_reference/v0.1_T11SLT/` (the sample is preserved on disk regardless of downstream comparison outcome)
-- [ ] **DIST-02**: Before running the T11SLT quantitative comparison, a config-drift gate extracts the OPERA v0.1 sample's 7 key processing parameters (confirmation-count threshold, pre-image strategy, post-date buffer, baseline window length, despeckle settings + 2 further) and compares against dist-s1 2.0.14 defaults; material deltas cause skip-and-defer (matrix cell reads "deferred pending operational reference publication")
-- [ ] **DIST-03**: When the config-drift gate passes, T11SLT comparison computes F1 / precision / recall / accuracy with block-bootstrap confidence interval (1 km blocks, B=500); matrix cell reports point estimate AND CI; criteria remain F1 > 0.80 and accuracy > 0.85 without tightening toward v0.1's own score
+- [ ] **DIST-01**: [deferred to v1.2 — see Scope amendment in ROADMAP.md Phase 5; OPERA v0.1 sample has no canonical CloudFront URL per RESEARCH Probe 1] The OPERA DIST v0.1 sample for MGRS tile T11SLT is fetched via CloudFront direct-download with exponential-backoff retry (via harness) and cached under `eval-dist/opera_reference/v0.1_T11SLT/` (the sample is preserved on disk regardless of downstream comparison outcome).
+- [ ] **DIST-02**: [deferred to v1.2 — operational reference not yet published per RESEARCH Probe 6 + DIST-01 deferral] Before running the T11SLT quantitative comparison, a config-drift gate extracts the OPERA v0.1 sample's 7 key processing parameters (confirmation-count threshold, pre-image strategy, post-date buffer, baseline window length, despeckle settings + 2 further) and compares against dist-s1 2.0.14 defaults; material deltas cause skip-and-defer (matrix cell reads "deferred pending operational reference publication").
+- [ ] **DIST-03**: [deferred to v1.2 — F1+CI vs operational reference is moot until reference exists per RESEARCH Probe 6] When the config-drift gate passes, T11SLT comparison computes F1 / precision / recall / accuracy with block-bootstrap confidence interval (1 km blocks, B=500); matrix cell reports point estimate AND CI; criteria remain F1 > 0.80 and accuracy > 0.85 without tightening toward v0.1's own score.
 - [ ] **DIST-04**: `make eval-dist-nam` includes a CMR probe for operational `OPERA_L3_DIST-ALERT-S1_V1` publication; on discovery, the operational reference supersedes the v0.1 result in the matrix without manual intervention
 - [ ] **DIST-05**: EFFIS same-resolution-optical cross-validation runs against cached Aveiro/Viseu 2024 subsideo output via `owslib` WFS and reports precision > 0.70 AND recall > 0.50 against EFFIS burnt-area perimeters
 - [ ] **DIST-06**: EU DIST coverage expands from 1 event to 3 (2024 Portuguese wildfires + 2023 Evros Greece EMSR649 + 2022 Romanian forest clear-cuts) with aggregate results in `CONCLUSIONS_DIST_EU.md`
@@ -117,6 +117,7 @@ Deferred to future releases. Tracked but not in this milestone.
 - **DIST-V2-02**: Upstream `post_date_buffer_days` default PR to dist-s1 (changed from 1 to 5)
 - **DIST-V2-03**: Raise `validate_dist_product` bar via full OPERA product-spec metadata validation through `dist_s1.data_models.output_models.DistS1ProductDirectory`
 - **DIST-V2-04**: Re-run against operational OPERA DIST-S1 reference when it ships (CMR-monitored in v1.1 Phase 4)
+- **DIST-V2-05**: Re-evaluate DIST-01 / DIST-02 / DIST-03 against operational `OPERA_L3_DIST-ALERT-S1_V1` once the collection publishes in CMR. Inherits the bootstrap CI methodology (`validation/bootstrap.py`) and matrix schema scaffolding shipped in v1.1 Phase 5; only the eval-script Stage 1+2 (regenerate-sample / config-drift / F1+CI) is new work. The CMR auto-supersede probe in `run_eval_dist.py` Stage 0 (DIST-04, shipped in v1.1) makes this a "next eval invocation" event, not a re-planning event. The Phase 5 D-16 archival hook (Plan 05-06: rename existing `eval-dist/metrics.json` → `eval-dist/archive/v0.1_metrics_<mtime>.json` before writing fresh sidecars) is already in place; v1.2 only adds the post-archival population code path.
 
 ### DSWx Future Work
 
@@ -189,9 +190,9 @@ Which phases cover which requirements. Populated by roadmapper.
 | DISP-03 | Phase 4 | Validated (Plan 04-04 — RA reported separately from PQ for both cells; per-IFG planar ramp + auto_attribute_ramp diagnostic populated; both cells attributed_source='inconclusive' under deterministic rule with diagnostics b+c deferred per D-09) |
 | DISP-04 | Phase 4 | Pending (Plan 04-05 Wave 4) |
 | DISP-05 | Phase 4 | Validated (Plan 04-02 + Plan 04-04 — `prepare_for_reference` is validation-only with SHA256 byte-equal pre/post test; products/disp.py:481 `velocity_path` remains native 5x10 m; eval scripts call adapter for comparison only) |
-| DIST-01 | Phase 5 | Pending |
-| DIST-02 | Phase 5 | Pending |
-| DIST-03 | Phase 5 | Pending |
+| DIST-01 | Phase 5 | Deferred to v1.2 |
+| DIST-02 | Phase 5 | Deferred to v1.2 |
+| DIST-03 | Phase 5 | Deferred to v1.2 |
 | DIST-04 | Phase 5 | Pending |
 | DIST-05 | Phase 5 | Pending |
 | DIST-06 | Phase 5 | Pending |
@@ -220,10 +221,10 @@ Which phases cover which requirements. Populated by roadmapper.
 - Phase 2 (RTC-S1 EU Validation): 3 (RTC-01..03)
 - Phase 3 (CSLC-S1 Self-Consistency + EU Validation): 4 (CSLC-03..06)
 - Phase 4 (DISP-S1 Comparison Adapter + Honest FAIL): 5 (DISP-01..05)
-- Phase 5 (DIST-S1 OPERA v0.1 + EFFIS EU): 7 (DIST-01..07)
+- Phase 5 (DIST-S1 OPERA v0.1 + EFFIS EU): 7 (DIST-01..07; DIST-01/02/03 deferred to v1.2 per scope amendment 2026-04-25 — see ROADMAP.md Phase 5 scope amendment block)
 - Phase 6 (DSWx-S2 N.Am. + EU Recalibration): 7 (DSWX-01..07)
 - Phase 7 (Results Matrix + Release Readiness): 6 (REL-01..06)
 
 ---
 *Requirements defined: 2026-04-20*
-*Last updated: 2026-04-20 after roadmap creation — CSLC-01 and CSLC-02 moved to Phase 1 (shared stable_terrain.py + selfconsistency.py per research SUMMARY §0.5.5); 49/49 mapped, 0 orphans*
+*Last updated: 2026-04-20 after roadmap creation — CSLC-01 and CSLC-02 moved to Phase 1 (shared stable_terrain.py + selfconsistency.py per research SUMMARY §0.5.5); 49/49 mapped, 0 orphans; 2026-04-25 DIST-01/02/03 marked Deferred to v1.2 per Phase 5 scope amendment (RESEARCH Probes 1 + 6)*
