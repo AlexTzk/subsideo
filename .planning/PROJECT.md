@@ -69,6 +69,8 @@ Shipped v1.0 with 4,914 LOC Python (source) + 4,209 LOC Python (tests) across 88
 
 All five product pipelines functional with lazy imports for conda-forge deps. Full CLI with 7 subcommands. Validation framework covers RTC (OPERA N.Am.), CSLC (OPERA N.Am.), DISP (EGMS EU), and DSWx (JRC GSW).
 
+**v1.1 progress**: Phases 1, 2, 3, 4 of 7 complete. Phase 4 (DISP-S1 comparison adapter + honest FAIL) shipped 2026-04-25 — `prepare_for_reference` adapter with explicit `method=` (DISP-01); SoCal r=0.049 / Bologna r=0.336 honest-FAIL signal preserved with ramp-attribution diagnostic; `DISP_UNWRAPPER_SELECTION_BRIEF.md` queued for v1.2 follow-up; `docs/validation_methodology.md` §3 multilook ADR appended.
+
 ## Context
 
 - **Algorithm stack**: ISCE3 (RTC, CSLC), dolphin (phase linking for DISP), tophu (tile-based unwrapping), SNAPHU (unwrapping binary), MintPy (time-series inversion + tropospheric correction)
