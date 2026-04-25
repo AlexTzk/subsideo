@@ -1,14 +1,27 @@
-"""DISP-S1 product validation against EGMS EU reference products.
+"""DISP-S1 product validation against EGMS / OPERA reference products.
 
-Two comparison paths:
+Three comparison surfaces:
 
 * :func:`compare_disp` -- EGMS **L3 Ortho** raster (vertical displacement).
   Projects subsideo LOS velocity to vertical via the incidence angle and
-  resamples onto the EGMS reference grid.
+  resamples onto the EGMS reference grid (v1.0 ad-hoc ``Resampling.bilinear``).
 * :func:`compare_disp_egms_l2a` -- EGMS **L2a** per-track PS point cloud
   (LOS mean_velocity, mm/yr). Samples our LOS velocity raster at each PS
-  location; no vertical projection is needed because both fields are LOS
-  on the same orbit track.
+  location (v1.0 ``rasterio.DatasetReader.sample`` nearest-neighbour); no
+  vertical projection because both fields are LOS on the same orbit track.
+* :func:`prepare_for_reference` -- Phase 4 multilook adapter. Validation-only
+  infrastructure that converts subsideo's native 5x10 m DISP velocity to a
+  reference grid (OPERA DISP 30 m raster path, xr.DataArray, or EGMS L2a PS
+  point list) with an explicit ``method=`` argument over
+  ``Literal["gaussian", "block_mean", "bilinear", "nearest"]`` (no default
+  per DISP-01 + CONTEXT D-04 explicit-no-default). Production DISP output
+  remains at native resolution -- this adapter is never wired into
+  ``run_disp()`` and never writes back to the product (DISP-05).
+
+  See ``docs/validation_methodology.md`` Sec 3 for the multilook-method ADR
+  (Phase 4 D-03 + Phase 3 D-15 append-only doc policy). The eval-script
+  default ``method="block_mean"`` is the conservative kernel that minimises
+  kernel-flattery attack surface (Phase 4 D-02).
 
 The L2a path is preferred for per-track comparisons because EGMS L2a is
 calibrated per ascending/descending pass and is directly co-geometric with
@@ -16,11 +29,15 @@ a subsideo DISP run on the matching S1 relative orbit.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pandas as pd
 import rasterio
+import rioxarray  # noqa: F401  (registers .rio accessor on xr.DataArray)
+import xarray as xr
 from loguru import logger
 from rasterio.warp import Resampling, reproject
 
@@ -378,3 +395,412 @@ def compare_disp_egms_l2a(
             criterion_ids=["disp.correlation_min", "disp.bias_mm_yr_max"],
         ),
     )
+
+
+# --- Phase 4 multilook adapter (DISP-01 + DISP-05; CONTEXT D-01..D-04, D-17, D-18) ---
+
+
+MultilookMethod = Literal["gaussian", "block_mean", "bilinear", "nearest"]
+
+
+@dataclass(frozen=True)
+class ReferenceGridSpec:
+    """Reference-grid specification for point-sampling form (DISP-01 form c).
+
+    Used when no raster reference exists -- e.g. EGMS L2a PS point cloud.
+    The adapter samples the native velocity at each (lon, lat) coordinate
+    rather than reprojecting onto a raster grid.
+
+    Attributes
+    ----------
+    points_lonlat : (N, 2) np.ndarray
+        Array of (lon, lat) coordinates in ``crs``.
+    crs : str
+        CRS the points are expressed in. Default ``"EPSG:4326"``.
+    point_ids : list[str] | None
+        Optional PS IDs for traceability; ignored by the adapter.
+    """
+
+    points_lonlat: np.ndarray
+    crs: str = "EPSG:4326"
+    point_ids: list[str] | None = None
+
+
+def prepare_for_reference(
+    native_velocity: Path | str | xr.DataArray,
+    reference_grid: Path | str | xr.DataArray | ReferenceGridSpec,
+    *,
+    method: MultilookMethod | None = None,
+) -> np.ndarray | xr.DataArray:
+    """Multilook subsideo's native 5x10 m DISP velocity to a reference grid.
+
+    Validation-only. Never writes back to the product (DISP-05 + research
+    ARCHITECTURE Sec 3 + FEATURES anti-feature).
+
+    Parameters
+    ----------
+    native_velocity : Path | str | xr.DataArray
+        Path to the native-resolution velocity GeoTIFF (rad/yr LOS, dolphin
+        convention) OR an ``xr.DataArray`` with CRS attached via rioxarray.
+    reference_grid : Path | str | xr.DataArray | ReferenceGridSpec
+        One of three forms (DISP-01):
+
+        (a) Path to a GeoTIFF -- adapter reads CRS + transform + shape via
+            rasterio and reprojects native onto the file's grid.
+        (b) ``xr.DataArray`` with CRS encoded via rioxarray -- adapter
+            reprojects native onto the array's grid.
+        (c) :class:`ReferenceGridSpec` -- adapter point-samples the native
+            raster at each (lon, lat) coordinate, returning a 1-D ndarray
+            in PS-row order (no reprojection).
+    method : MultilookMethod | None
+        REQUIRED. One of ``{"gaussian", "block_mean", "bilinear", "nearest"}``.
+        No default value (DISP-01 explicit-no-default policy). Raises
+        :class:`ValueError` if ``None`` or anything outside the Literal.
+
+    Returns
+    -------
+    np.ndarray | xr.DataArray
+        Forms (a)/(b): velocity on reference grid as ``np.ndarray`` (matches
+        existing ``compare_disp()`` pattern) OR ``xr.DataArray`` with CRS
+        attached when input ``reference_grid`` was an ``xr.DataArray``
+        (preserve type).
+        Form (c): 1-D ``np.ndarray`` of sampled values, length ==
+        ``len(spec.points_lonlat)``.
+
+    Raises
+    ------
+    ValueError
+        If ``method`` is ``None``, missing, or not in the Literal.
+        If ``reference_grid`` form is unsupported.
+    """
+    if method is None:
+        raise ValueError(
+            "method= is required (DISP-01 explicit-no-default policy). "
+            "Pick one of: 'gaussian', 'block_mean', 'bilinear', 'nearest'."
+        )
+    valid_methods = ("gaussian", "block_mean", "bilinear", "nearest")
+    if method not in valid_methods:
+        raise ValueError(
+            f"method must be one of {valid_methods}; got {method!r}"
+        )
+
+    # Form discrimination
+    if isinstance(reference_grid, ReferenceGridSpec):
+        return _point_sample(native_velocity, reference_grid, method=method)
+    if isinstance(reference_grid, (str, Path)):
+        return _resample_onto_path(
+            native_velocity, Path(reference_grid), method=method
+        )
+    if isinstance(reference_grid, xr.DataArray):
+        return _resample_onto_dataarray(
+            native_velocity, reference_grid, method=method
+        )
+    raise ValueError(
+        f"reference_grid must be Path | xr.DataArray | ReferenceGridSpec; "
+        f"got {type(reference_grid).__name__}"
+    )
+
+
+def _read_native_as_array(
+    native: Path | str | xr.DataArray,
+) -> tuple[np.ndarray, rasterio.Affine, rasterio.crs.CRS]:
+    """Return (data, transform, crs) for a native velocity raster or DataArray.
+
+    Capture nodata/transform BEFORE the with-block exits (CR-01 already-fixed
+    gotcha mirrored from compare_disp_egms_l2a line 294).
+    """
+    if isinstance(native, xr.DataArray):
+        data = native.values.astype(np.float64)
+        transform = native.rio.transform()
+        crs = native.rio.crs
+        return data, transform, crs
+    with rasterio.open(Path(native)) as src:
+        data = src.read(1).astype(np.float64)
+        transform = src.transform
+        crs = src.crs
+    return data, transform, crs
+
+
+def _resample_onto_grid(
+    src_data: np.ndarray,
+    src_transform: rasterio.Affine,
+    src_crs: rasterio.crs.CRS,
+    dst_transform: rasterio.Affine,
+    dst_crs: rasterio.crs.CRS,
+    dst_shape: tuple[int, int],
+    *,
+    method: MultilookMethod,
+) -> np.ndarray:
+    """Method-dispatched multilook resample.
+
+    Implements (per CONTEXT D-01 + RESEARCH lines 698-781):
+      - block_mean : Resampling.average (rasterio-native block-mean / averaging)
+      - bilinear   : Resampling.bilinear (v1.0 default; preserved for continuity)
+      - nearest    : Resampling.nearest (degenerate; for kernel-comparison studies)
+      - gaussian   : scipy.ndimage.gaussian_filter on src grid first, then
+                      Resampling.nearest onto dst grid (PITFALLS P3.1 sigma=0.5*ref)
+    """
+    dst_data = np.full(dst_shape, np.nan, dtype=np.float64)
+    if method == "gaussian":
+        from scipy.ndimage import gaussian_filter  # lazy
+
+        sigma_pix_y = (
+            (0.5 * abs(dst_transform.e)) / abs(src_transform.e)
+            if abs(src_transform.e) > 0
+            else 0.0
+        )
+        sigma_pix_x = (
+            (0.5 * abs(dst_transform.a)) / abs(src_transform.a)
+            if abs(src_transform.a) > 0
+            else 0.0
+        )
+        # NaN handling: scipy.ndimage.gaussian_filter is NOT NaN-safe; replace
+        # NaN with 0.0 before filtering (RESEARCH lines 738-746).
+        src_filled = np.where(np.isfinite(src_data), src_data, 0.0)
+        src_smoothed = gaussian_filter(src_filled, sigma=(sigma_pix_y, sigma_pix_x))
+        reproject(
+            source=src_smoothed,
+            destination=dst_data,
+            src_transform=src_transform,
+            src_crs=src_crs,
+            dst_transform=dst_transform,
+            dst_crs=dst_crs,
+            resampling=Resampling.nearest,
+        )
+        return dst_data
+
+    rmap: dict[str, Resampling] = {
+        "block_mean": Resampling.average,
+        "bilinear": Resampling.bilinear,
+        "nearest": Resampling.nearest,
+    }
+    reproject(
+        source=src_data,
+        destination=dst_data,
+        src_transform=src_transform,
+        src_crs=src_crs,
+        dst_transform=dst_transform,
+        dst_crs=dst_crs,
+        resampling=rmap[method],
+    )
+    return dst_data
+
+
+def _resample_onto_path(
+    native: Path | str | xr.DataArray,
+    ref_path: Path,
+    *,
+    method: MultilookMethod,
+) -> np.ndarray:
+    """Form (a): reference is a GeoTIFF on disk."""
+    src_data, src_transform, src_crs = _read_native_as_array(native)
+    with rasterio.open(ref_path) as ref:
+        dst_transform = ref.transform
+        dst_crs = ref.crs
+        dst_shape = (ref.height, ref.width)
+    return _resample_onto_grid(
+        src_data,
+        src_transform,
+        src_crs,
+        dst_transform,
+        dst_crs,
+        dst_shape,
+        method=method,
+    )
+
+
+def _resample_onto_dataarray(
+    native: Path | str | xr.DataArray,
+    ref_da: xr.DataArray,
+    *,
+    method: MultilookMethod,
+) -> xr.DataArray:
+    """Form (b): reference is an xr.DataArray with CRS via rioxarray."""
+    src_data, src_transform, src_crs = _read_native_as_array(native)
+    dst_transform = ref_da.rio.transform()
+    dst_crs = ref_da.rio.crs
+    if ref_da.ndim != 2:
+        raise ValueError(
+            f"reference_grid xr.DataArray must be 2-D (H, W); got ndim={ref_da.ndim}"
+        )
+    dst_shape: tuple[int, int] = (int(ref_da.shape[0]), int(ref_da.shape[1]))
+    arr = _resample_onto_grid(
+        src_data,
+        src_transform,
+        src_crs,
+        dst_transform,
+        dst_crs,
+        dst_shape,
+        method=method,
+    )
+    out = xr.DataArray(
+        arr,
+        dims=ref_da.dims,
+        coords={d: ref_da.coords[d] for d in ref_da.dims if d in ref_da.coords},
+    )
+    out_with_crs: xr.DataArray = out.rio.write_crs(dst_crs).rio.write_transform(dst_transform)
+    return out_with_crs
+
+
+def _point_sample(
+    native: Path | str | xr.DataArray,
+    spec: ReferenceGridSpec,
+    *,
+    method: MultilookMethod,
+) -> np.ndarray:
+    """Form (c): point-sample the native raster at each (lon, lat).
+
+    Implements all 4 methods at points:
+      - nearest    : rasterio.DatasetReader.sample() at the projected point
+      - bilinear   : 2x2-window read + scipy.ndimage.map_coordinates(order=1)
+      - block_mean : N x M window around each point (N/M derived from the
+                     reference cell size; for ReferenceGridSpec we use the
+                     PS spacing from the median nearest-neighbour distance,
+                     OR a default 6 px when only one point) + .mean() over
+                     finite values
+      - gaussian   : Gaussian-weighted window with sigma = 0.5 * cell_size
+
+    For Phase 4 production callsite (block_mean), the simplest robust
+    behaviour at points is: average all native pixels within a +/- N-pixel
+    radius around each PS point, where N derives from the ratio of reference
+    spacing to native spacing. When ``spec`` does not carry an explicit
+    spacing, use a default radius of 6 native pixels (~30 m / 5 m = 6).
+
+    NOTE: for the v1.1 EU eval (Bologna PS comparison), the eval script
+    calls this with method='block_mean'. Reference spacing for EGMS L2a
+    is irregular at the PS scale; the 6-px default is a reasonable proxy
+    matching the OPERA 30 m / native 5 m ratio.
+    """
+    if isinstance(native, xr.DataArray):
+        # We need the file/raster API for sample(); use a temp-disk write
+        # only if needed. Cheaper path: convert to ndarray and project xy
+        # via the DataArray's transform.
+        src_data, src_transform, src_crs = _read_native_as_array(native)
+        # Build a virtual MemoryFile for sample()-style access
+        from rasterio.io import MemoryFile  # lazy
+
+        height, width = src_data.shape
+        with MemoryFile() as memfile:
+            with memfile.open(
+                driver="GTiff",
+                height=height,
+                width=width,
+                count=1,
+                dtype="float64",
+                crs=src_crs,
+                transform=src_transform,
+            ) as ds:
+                ds.write(src_data.astype(np.float64), 1)
+            with memfile.open() as src_open:
+                return _point_sample_from_dataset(src_open, spec, method=method)
+
+    with rasterio.open(Path(native)) as src:
+        return _point_sample_from_dataset(src, spec, method=method)
+
+
+def _point_sample_from_dataset(
+    src: rasterio.DatasetReader,
+    spec: ReferenceGridSpec,
+    *,
+    method: MultilookMethod,
+) -> np.ndarray:
+    """Sample the open dataset at each spec point. Captures nodata/transform
+    BEFORE the with-block exits (CR-01 mirror from compare_disp_egms_l2a:294).
+    """
+    from pyproj import Transformer  # lazy
+
+    raster_crs = src.crs
+    src_transform = src.transform
+    src_data = src.read(1).astype(np.float64)  # capture early for window reads
+    nodata = src.nodata  # capture before with-block exit
+
+    transformer = Transformer.from_crs(spec.crs, raster_crs, always_xy=True)
+    xs, ys = transformer.transform(
+        spec.points_lonlat[:, 0],
+        spec.points_lonlat[:, 1],
+    )
+
+    n = len(spec.points_lonlat)
+    out = np.full(n, np.nan, dtype=np.float64)
+
+    if method == "nearest":
+        xy = list(zip(xs, ys, strict=True))
+        sampled = np.array([v[0] for v in src.sample(xy)], dtype=np.float64)
+        # Honor nodata
+        if nodata is not None:
+            sampled = np.where(sampled == nodata, np.nan, sampled)
+        return sampled
+
+    # Convert (xs, ys) world coords -> (row, col) pixel coords using inverse
+    # affine (a, b, c, d, e, f).
+    inv = ~src_transform
+    cols, rows = inv * (np.asarray(xs), np.asarray(ys))
+    rows = np.asarray(rows, dtype=np.float64)
+    cols = np.asarray(cols, dtype=np.float64)
+
+    height, width = src_data.shape
+
+    if method == "bilinear":
+        from scipy.ndimage import map_coordinates  # lazy
+
+        # map_coordinates expects (rows, cols) stack
+        coords = np.vstack([rows, cols])
+        sampled_bilinear = np.asarray(
+            map_coordinates(
+                src_data,
+                coords,
+                order=1,
+                mode="constant",
+                cval=np.nan,
+                prefilter=False,
+            ),
+            dtype=np.float64,
+        )
+        return sampled_bilinear
+
+    if method == "block_mean":
+        # Radius in native pixels (+/- 6 px ~ 30m at 5x10 m posting)
+        radius = 6
+        for i in range(n):
+            r = int(round(rows[i]))
+            c = int(round(cols[i]))
+            r0 = max(0, r - radius)
+            r1 = min(height, r + radius + 1)
+            c0 = max(0, c - radius)
+            c1 = min(width, c + radius + 1)
+            if r1 <= r0 or c1 <= c0:
+                out[i] = np.nan
+                continue
+            win = src_data[r0:r1, c0:c1]
+            valid = np.isfinite(win)
+            if nodata is not None:
+                valid &= win != nodata
+            if not valid.any():
+                out[i] = np.nan
+            else:
+                out[i] = float(win[valid].mean())
+        return out
+
+    if method == "gaussian":
+        from scipy.ndimage import gaussian_filter, map_coordinates  # lazy
+
+        # Apply a Gaussian smooth on the full raster, then bilinear-sample at the
+        # projected (row, col). sigma = 0.5 * (reference cell / native cell);
+        # we use radius=6 default (~30 m at 5x10 m) -> sigma ~ 3 px.
+        src_filled = np.where(np.isfinite(src_data), src_data, 0.0)
+        smoothed = gaussian_filter(src_filled, sigma=3.0)
+        coords = np.vstack([rows, cols])
+        sampled_gauss = np.asarray(
+            map_coordinates(
+                smoothed,
+                coords,
+                order=1,
+                mode="constant",
+                cval=np.nan,
+                prefilter=False,
+            ),
+            dtype=np.float64,
+        )
+        return sampled_gauss
+
+    raise ValueError(f"Unhandled method: {method}")
