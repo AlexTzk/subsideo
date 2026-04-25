@@ -73,7 +73,7 @@ if __name__ == "__main__":
     import sqlite3
     import sys
     import time
-    from datetime import datetime
+    from datetime import datetime, timezone
     from pathlib import Path
 
     import numpy as np
@@ -109,8 +109,10 @@ if __name__ == "__main__":
     credential_preflight(_required_env)
 
     # Phase 4 Stage 12 prerequisite: wall-time + run-start tracking for meta.json
+    # Phase 4 ME-03: datetime.utcnow() is deprecated in 3.12+; use the
+    # timezone-aware now(timezone.utc) alternative and emit a 'Z' suffix.
     t_start = time.monotonic()
-    run_start_iso = datetime.utcnow().isoformat() + "Z"
+    run_start_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # ── Configuration ────────────────────────────────────────────────────────
     BURST_ID = "t117_249422_iw2"
