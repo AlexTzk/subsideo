@@ -743,9 +743,12 @@ if __name__ == "__main__":
         # These names feed Stage 12 directly. NO dir() introspection — undefined
         # names must surface as NameError, not silently zero out (which would
         # corrupt the FAIL signal we are trying to report).
-        correlation = float(r_val)
-        bias = float(b_mm)        # mm/yr (existing v1.0 conversion)
-        rmse = float(e_mm)        # mm/yr
+        # Phase 4 ME-01: avoid shadowing the imported `bias`/`rmse` callables
+        # (line 700) by using disambiguated _val-suffixed names that flow into
+        # Stage 12 (lines 1024-1027) verbatim.
+        correlation_val = float(r_val)
+        bias_mm_yr = float(b_mm)        # mm/yr (existing v1.0 conversion)
+        rmse_mm_yr = float(e_mm)        # mm/yr
         sample_count = int(n_valid)
 
         # Skip the old remote-access code path
@@ -1015,15 +1018,16 @@ if __name__ == "__main__":
         coherence_source=coherence_source,
     )
     # W3 -- explicit references to the canonical names assigned in Edit 2
-    # (correlation, bias, rmse, sample_count). NO dir() introspection. If any
-    # name is undefined here, NameError surfaces loudly, which is the desired
-    # behaviour per the plan's explicit "do NOT silently set them to 0"
-    # requirement.
+    # (correlation_val, bias_mm_yr, rmse_mm_yr, sample_count -- renamed per
+    # Phase 4 ME-01 to disambiguate from the imported `bias`/`rmse` callables
+    # at line 700). NO dir() introspection. If any name is undefined here,
+    # NameError surfaces loudly, which is the desired behaviour per the
+    # plan's explicit "do NOT silently set them to 0" requirement.
     ra = ReferenceAgreementResultJson(
         measurements={
-            "correlation": correlation,
-            "bias_mm_yr": bias,
-            "rmse_mm_yr": rmse,
+            "correlation": correlation_val,
+            "bias_mm_yr": bias_mm_yr,
+            "rmse_mm_yr": rmse_mm_yr,
             "sample_count": float(sample_count),
         },
         criterion_ids=["disp.correlation_min", "disp.bias_mm_yr_max"],
@@ -1086,6 +1090,9 @@ if __name__ == "__main__":
         f"(coherence_source={coherence_source}) / "
         f"residual={residual:+.2f} mm/yr (CALIBRATING)"
     )
-    print(f"  RA: r={correlation:.3f} (>0.92 BINDING) / bias={bias:+.2f} mm/yr (<3.0 BINDING)")
+    print(
+        f"  RA: r={correlation_val:.3f} (>0.92 BINDING) / "
+        f"bias={bias_mm_yr:+.2f} mm/yr (<3.0 BINDING)"
+    )
     print(f"  Ramp: attr={attributed_source}, mean_mag={agg_dict['mean_magnitude_rad']:.2f} rad")
     print("=" * 70)
