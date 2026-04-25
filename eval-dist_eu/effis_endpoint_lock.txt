@@ -7,3 +7,96 @@ probe_date_iso: 2026-04-25T23:03:38Z
 owslib_version: 0.35.0
 subsideo_env: subsideo (micromamba)
 probe_executor: gsd-executor under Plan 05-02
+
+# Probe run at: 2026-04-25T23:04:44.719212+00:00
+
+## Candidate A: https://maps.effis.emergency.copernicus.eu/effis
+### GetCapabilities
+GetCapabilities FAILED: ReadTimeout: HTTPSConnectionPool(host='maps.effis.emergency.copernicus.eu', port=443): Read timed out. (read timeout=30)
+# Retry with 60s timeout (WFS 1.1.0): also ReadTimeout
+# Retry with 90s streaming parse: also ReadTimeout
+# HEAD request to GetCapabilities URL returns HTTP 200 -- server accepts connections
+# but GetCapabilities XML body exceeds timeout threshold (server-side slow response)
+
+## Candidate B: http://geohub.jrc.ec.europa.eu/effis/wfs
+### GetCapabilities
+GetCapabilities FAILED: ConnectionError: HTTPConnectionPool(host='geohub.jrc.ec.europa.eu', port=80): Max retries exceeded with url: /effis/wfs?service=WFS&request=GetCapabilities&version=2.0.0 (Caused by NameResolutionError("HTTPConnection(host='geohub.jrc.ec.europa.eu', port=80): Failed to resolve 'geohub.jrc.ec.europa.eu' ([Errno 8] nodename nor servname provided, or not known)"))
+# DNS resolution fails -- geohub.jrc.ec.europa.eu is no longer a valid hostname (JRC decommissioned)
+
+## EFFIS REST API (Fallback -- adopted as primary after WFS failures)
+### Endpoint: https://api.effis.emergency.copernicus.eu/rest/2/burntareas/current/
+# GET https://api.effis.emergency.copernicus.eu/rest/2/burntareas/current/ : HTTP 200, Content-Type application/json
+# Total record count: 117,334 burntarea polygons
+# Supported query parameters (from OPTIONS response):
+#   - country: ISO-3166 2-letter code (NOTE: Greece=EL not GR; Spain=ES; Portugal=PT)
+#   - ordering: field name with optional '-' prefix (e.g., firedate, lastupdate, -area_ha)
+#   - firedate__gte: ISO-8601 datetime string with timezone (e.g., 2024-09-15T00:00:00Z)
+#   - firedate__lte: ISO-8601 datetime string with timezone
+#   - intersects: WKT/GeoJSON geometry (returns 403 Forbidden -- WAF-blocked for complex geometries)
+# Feature fields: id, centroid, bbox, shape, country, countryful, province, commune, firedate,
+#                 area_ha, broadlea, conifer, mixed, scleroph, transit, othernatlc, agriareas,
+#                 artifsurf, otherlc, percna2k, lastupdate, lastfiredate, noneu
+# Date property confirmed: firedate (ISO-8601 datetime with local TZ offset, e.g. 2023-08-19T00:00:00+02:00)
+
+## Event smoke tests via REST API
+# Extended date windows used (event start -7 days, end +7 days) to handle MODIS detection lag
+
+# aveiro_2024 (PT 2024-09-08..2024-10-02): count=231 features
+#   Top feature: country=PT, firedate=2024-09-16, area_ha=35523, province=Viseu Dão Lafões
+#   Second:      country=PT, firedate=2024-09-15, area_ha=23318, province=Região de Aveiro
+#   SMOKE TEST: PASS (231 features, Aveiro region confirmed)
+
+# evros_2023 (EL 2023-08-12..2023-09-15): count=36 features
+#   Top feature: country=EL, firedate=2023-08-19, area_ha=96610, province=Έβρος
+#   (96,610 ha -- consistent with documented Evros 2023 as largest EU wildfire in recorded history)
+#   SMOKE TEST: PASS (36 features, Evros province confirmed)
+
+# spain_culebra_2022 (ES 2022-06-08..2022-06-30): count=86 features
+#   Top feature: country=ES, firedate=2022-06-16, area_ha=28046, province=Zamora
+#   (Culebra fire was in Zamora province -- confirmed)
+#   SMOKE TEST: PASS (86 features, Zamora province confirmed)
+
+## Probe summary
+
+candidate_chosen: REST_API
+chosen_url: https://api.effis.emergency.copernicus.eu/rest/2/burntareas/current/
+chosen_version: REST (not WFS; WFS candidates both failed)
+chosen_typename: burntareas/current (REST resource, no WFS typename)
+chosen_date_property: firedate
+chosen_filter_namespace: DRF_QueryParam (country=<ISO2>, firedate__gte=<ISO-8601>, firedate__lte=<ISO-8601>)
+get_capabilities_outcome: BOTH_FAILED (Candidate A: ReadTimeout; Candidate B: DNS NXDOMAIN)
+smoke_test_aveiro_features: 231
+smoke_test_evros_features: 36
+smoke_test_spain_features: 86
+
+# At least ONE of the smoke tests MUST return >= 1 feature for the lock to be valid.
+# All three smoke tests pass with substantial feature counts.
+
+## Downstream constants (copy verbatim into effis.py Plan 05-05)
+
+EFFIS_REST_URL = "https://api.effis.emergency.copernicus.eu/rest/2/burntareas/current/"
+EFFIS_DATE_PROPERTY = "firedate"
+EFFIS_DATE_GTE_PARAM = "firedate__gte"
+EFFIS_DATE_LTE_PARAM = "firedate__lte"
+EFFIS_COUNTRY_PARAM = "country"
+EFFIS_COUNTRY_PT = "PT"   # Portugal
+EFFIS_COUNTRY_EL = "EL"   # Greece (NOT "GR" -- confirmed by REST API)
+EFFIS_COUNTRY_ES = "ES"   # Spain
+EFFIS_ORDERING_PARAM = "ordering"
+
+## Security notes (per threat model T-05-02-01)
+# Candidate A uses HTTPS -- no cleartext transit concern.
+# Candidate B was HTTP and is now moot (DNS resolution failure, JRC decommissioned).
+# REST API endpoint uses HTTPS -- no cleartext transit risk.
+# intersects geometry filter returns 403 (WAF); use country + date range filter instead.
+# No auth required -- public open-data endpoint (Copernicus Emergency Management Service).
+
+## WFS fallback ADR (recorded even though REST API works)
+# If REST API becomes unavailable:
+# Option 1: Retry WFS Candidate A (maps.effis.emergency.copernicus.eu/effis)
+#   -- HEAD requests succeed; GetCapabilities XML too slow; consider owslib timeout=300s
+#   -- layer: ms:modis.ba.poly
+# Option 2: Copernicus EMS Vector Mapping products (static per-event GeoJSON)
+#   EMSR686 covers Evros 2023; similar EMSRs exist for Aveiro/Spain.
+#   See: https://emergency.copernicus.eu/mapping/list-of-activations-rapid
+# Option 3: Defer DIST-05/DIST-06 to v1.2 with NotImplementedError stub
