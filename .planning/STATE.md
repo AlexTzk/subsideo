@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
 status: executing
-stopped_at: "Completed 04-03-PLAN.md (matrix_writer DISP cell render branch + 13 tests; Wave 2 of Phase 4 done); ready for Wave 3 (04-04 eval-script rewire)"
-last_updated: "2026-04-25T07:29:36.000Z"
+stopped_at: "Completed 04-04-PLAN.md (eval-script rewire + warm re-runs + manifest fix; Wave 3 of Phase 4 done); ready for Wave 4 (04-05 docs+brief)"
+last_updated: "2026-04-25T08:03:34.000Z"
 last_activity: 2026-04-25
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 24
-  completed_plans: 22
-  percent: 92
+  completed_plans: 23
+  percent: 96
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 04 (disp-s1-comparison-adapter-honest-fail) — EXECUTING
-Plan: 4 of 5
-Status: Ready to execute Wave 3 (Plan 04-04 eval-script rewire)
+Plan: 5 of 5
+Status: Ready to execute Wave 4 (Plan 04-05 docs + brief)
 Last activity: 2026-04-25
 
-**Resume path:** Plans 04-01 + 04-02 + 04-03 complete (Waves 1 + 2). Plan 04-04 (Wave 3: run_eval_disp.py + run_eval_disp_egms.py rewire — REFERENCE_MULTILOOK_METHOD constant + EXPECTED_WALL_S=21600 + Stage 9 adapter call + Stage 10 PQ block + Stage 11 ramp-attribution + Stage 12 DISPCellMetrics write) depends on Plan 04-01's `compute_ifg_coherence_stack` + `fit_planar_ramp` + `compute_ramp_aggregate` + `auto_attribute_ramp` + `DISPCellMetrics` schema (all importable from `subsideo.validation.selfconsistency` and `subsideo.validation.matrix_schema`) AND Plan 04-02's `prepare_for_reference` adapter (importable from `subsideo.validation.compare_disp`). Plan 04-03 (Wave 2: matrix_writer DISP render) ready to render the metrics.json once Plan 04-04 lands them. Phase 4 will append §3 (DISP ramp-attribution + multilook ADR) to `docs/validation_methodology.md` per Phase 3 CONTEXT D-15 append-only via Plan 04-05 (Wave 4).
+**Resume path:** Plans 04-01 + 04-02 + 04-03 + 04-04 complete (Waves 1 + 2 + 3). Plan 04-04 produced `eval-disp/metrics.json` (DISPCellMetrics, cell_status=MIXED, coherence_source='phase3-cached', attributed_source='inconclusive', 14 PerIFGRamp records) and `eval-disp-egms/metrics.json` (DISPCellMetrics, cell_status=MIXED, coherence_source='fresh', attributed_source='inconclusive', 9 PerIFGRamp records); both validated as DISPCellMetrics via Pydantic. SoCal RA: r=0.049 / bias=+23.6 mm/yr (FAIL > 0.92 / FAIL < 3 — mirrors v1.0 baseline). Bologna RA: r=0.336 / bias=+3.46 mm/yr (FAIL > 0.92 / FAIL < 3 — mirrors v1.0 baseline). Honest FAIL signal preserved per CONTEXT D-09; block_mean kernel does NOT inflate the metric. Plan 04-05 (Wave 4: docs + brief) is next: git mv CONCLUSIONS_DISP_EGMS.md → CONCLUSIONS_DISP_EU.md; append v1.1 PQ + RA + Ramp Attribution + Brief link sections to both CONCLUSIONS files; write DISP_UNWRAPPER_SELECTION_BRIEF.md (4 candidates × 4 columns) at `.planning/milestones/v1.1-research/`; append §3 multilook ADR to `docs/validation_methodology.md`.
 
 ## Performance Metrics
 
@@ -122,6 +122,13 @@ Recent decisions affecting current work (v1.1):
 - [Phase 4 Plan 04-02]: prepare_for_reference form (b) -> form (c) bridge via rasterio.io.MemoryFile rather than temp-disk write — xr.DataArray native gets wrapped in an in-memory GeoTIFF so _point_sample_from_dataset stays uniform. Zero disk I/O, zero attack surface (MemoryFile cannot be coerced to read attacker-controlled paths per threat T-04-02-05).
 - [Phase 4 Plan 04-03]: matrix_writer DISP dispatch inserted BEFORE CSLC self-consist (per_aoi) and RTC-EU (per_burst) branches at lines 476-489 (CSLC at line 491, RTC-EU at line 506). DISP discriminator (top-level ramp_attribution key) is structurally disjoint from per_aoi and per_burst — order is invariant per RESEARCH lines 593-608. _render_disp_cell single branch handles both region='nam' and region='eu' because DISPCellMetrics schema is symmetric across SoCal and Bologna. PQ column italicised whole-body with attributed_source label inline ('attr=phass'); RA column reuses _render_measurement helper for each criterion ID — no per-DISP RA renderer.
 - [Phase 4 Plan 04-03]: Single `_render_disp_cell` branch routes BOTH region='nam' and region='eu' through same DISPCellMetrics schema (locked-in via Plan 04-01 D-Claude's-Discretion). Region parameter passed through for symmetry with `_render_cslc_selfconsist_cell` (which forks between NAM/EU subclasses) but currently unused in the body — kept for forward-compat in case Phase 4 D-08-style regional divergence ever needs to fork the render later. Test 6 in test_matrix_writer_disp.py pins this invariant.
+- [Phase 4 Plan 04-04]: Inline `_slope_from_dem` closure (mirroring Phase 3 NAM eval `_compute_slope_deg` at run_eval_cslc_selfconsist_nam.py:488) and module-level `_reproject_mask_to_grid` helper (one per script) — public symbol promotion to `stable_terrain.py` deferred to v1.2 unless a 3rd consumer needs it (current 2 consumers: NAM + EU DISP scripts).
+- [Phase 4 Plan 04-04]: Bologna 12-day IFG count = 9 (not 18 as plan predicted). Cross-constellation S1A+S1B 2021 stack has effective 6-day cadence; only 9 sequential pairs fall on the 11-13 day window per `_is_sequential_12day(...) <= 1 day` tolerance. Methodologically consistent with D-07's "sequential 12-day pairs for cross-cell consistency" framing — 6-day pairs would couple the EU coherence statistic to a different baseline than the SoCal cell.
+- [Phase 4 Plan 04-04]: Bologna persistently_coherent_fraction = 0.000 is a real signal — mean coh 0.219, p75 0.316, both below 0.6 threshold; no pixel exceeded coherence in EVERY one of the 9 IFGs. Po plain has lower stable-terrain coherence than SoCal Mediterranean. NOT a bug.
+- [Phase 4 Plan 04-04]: Both cells produce attributed_source='inconclusive' from the deterministic auto-attribute rule (sigma_dir < 30 deg AND r(mag,coh) > 0.5 cutoffs not met on either cell). This mixed-signal informs Plan 04-05 brief: diagnostics (b) POEORB swap and (c) ERA5 toggle are needed before tightening attribution — exactly the deferred-diagnostic disposition per D-09.
+- [Phase 4 Plan 04-04]: Rule 1 bug fix: warm-path velocity_path probe pointed at non-existent `disp/mintpy/velocity.h5` — replaced with `disp/dolphin/timeseries/velocity.tif` (matches DISPResult.velocity_path emitted by products/disp.py:481). Without this fix, every warm invocation forced a full pipeline rerun.
+- [Phase 4 Plan 04-04]: Rule 3 fix: EGMS_TOKEN credential preflight made conditional on egms_reference/ CSV cache emptiness. Token is consumed only by Stage 2 download path; on warm re-runs from cached CSVs the token is never read. Old preflight blocked the script unnecessarily before reaching Stage 9.
+- [Phase 4 Plan 04-04]: W4 supervisor cache_dir divergence acknowledged but not silently bypassed. supervisor._cache_dir_from_script() derives `eval-disp_egms` (underscore) for run_eval_disp_egms.py while on-disk + manifest both use `eval-disp-egms` (hyphen). Watchdog mtime-staleness check looks at the wrong path (which is empty), but abort is gated by `wall > 2 * expected_wall AND stale > GRACE_WINDOW_S`. Bologna eval completed in ~3 minutes — far below the 2*21600s threshold — so the watchdog did not abort. Pre-existing divergence Phase 4 inherits but does not introduce. Phase 4 follow-up todo: reconcile supervisor cache_dir derivation with on-disk hyphen convention.
 
 ### Pending Todos
 
@@ -145,7 +152,7 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 
 ## Session Continuity
 
-Last activity: 2026-04-25 — Phase 4 Plan 04-03 complete (Wave 2: matrix_writer DISP cell render branch). 13 unit tests green (4 _is_disp_cell_shape + 8 _render_disp_cell + 1 end-to-end via write_matrix). Ruff + mypy clean on touched files (matrix_writer.py 475 -> 579 LOC; tests/reference_agreement/test_matrix_writer_disp.py new 257 LOC). Commits e5b5361 (Task 1 RED smoke test) + 488282e (Task 1 GREEN feat) + 7d6e178 (Task 2 full test matrix). Plan 04-03 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-03-SUMMARY.md`. DISP dispatch ordering invariant confirmed: DISP=476 < CSLC=491.
-Last session: 2026-04-25T07:29:36.000Z
-Stopped at: Completed 04-03-PLAN.md (matrix_writer DISP cell render branch + 13 tests; Wave 2 of Phase 4 done); ready for Wave 3 (04-04 eval-script rewire)
+Last activity: 2026-04-25 — Phase 4 Plan 04-04 complete (Wave 3: eval-script rewire + warm re-runs + manifest fix). 5 changes per script landed in run_eval_disp.py + run_eval_disp_egms.py (10 total: REFERENCE_MULTILOOK_METHOD constant + EXPECTED_WALL_S=21600 + prepare_for_reference adapter + product-quality block + ramp-attribution + DISPCellMetrics write); manifest cache_dir aligned with on-disk eval-disp-egms (hyphen); both warm re-runs completed (~6 min SoCal, ~3 min Bologna); both metrics.json files validate as DISPCellMetrics; matrix.md regenerated. Honest FAIL signal preserved: SoCal r=0.049 (v1.0=0.0365), bias=+23.6 (v1.0=+23.62); Bologna r=0.336 (v1.0=0.32), bias=+3.46 (v1.0=+3.35). Both attributed_source=inconclusive. Ruff clean on touched files. Commits 75dea9d (Task 1 SoCal eval) + ec2c07d (Task 2 Bologna eval) + ae2707f (Task 3 manifest fix) + 709c0c0 (Task 4 Rule 3 EGMS_TOKEN preflight relaxation) + 0d0df63 (Task 4 matrix.md regen). Plan 04-04 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-04-SUMMARY.md`.
+Last session: 2026-04-25T08:03:34.000Z
+Stopped at: Completed 04-04-PLAN.md (eval-script rewire + warm re-runs + manifest fix; Wave 3 of Phase 4 done); ready for Wave 4 (04-05 docs+brief)
 Resume file: None

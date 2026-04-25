@@ -50,13 +50,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### DISP-S1 Comparison Adapter + Honest FAIL
 
-- [ ] **DISP-01**: `subsideo.validation.compare_disp.prepare_for_reference(native_velocity, reference_grid, method=...)` is validation-only infrastructure that multilooks subsideo's native 5×10 m velocity to a reference grid (30 m raster for OPERA DISP OR point coordinates for EGMS L2a PS); `method=` has no default and must be explicit; the function never writes back to the product
+- [x] **DISP-01**: `subsideo.validation.compare_disp.prepare_for_reference(native_velocity, reference_grid, method=...)` is validation-only infrastructure that multilooks subsideo's native 5×10 m velocity to a reference grid (30 m raster for OPERA DISP OR point coordinates for EGMS L2a PS); `method=` has no default and must be explicit; the function never writes back to the product
 - [x] **DISP-02
 **: DISP self-consistency product-quality gate (sequential 12-day coherence > 0.7 and residual mean velocity < 5 mm/yr on stable terrain at native 5×10 m resolution) is computed for both N.Am. (SoCal) and EU (Bologna) from cached CSLC stacks
 - [x] **DISP-03
 **: N.Am. and EU DISP re-runs from cached CSLCs report reference-agreement (r vs OPERA DISP-S1 at 30 m; r vs EGMS L2a at PS points) separately from product-quality results; any observed planar ramp is labelled by attributed source (PHASS / tropospheric / orbit / ionospheric) via a ramp-attribution diagnostic (POEORB swap, ERA5 toggle, ramp-direction stability test)
 - [ ] **DISP-04**: A one-page "DISP Unwrapper Selection" follow-up milestone scoping brief is delivered as a Phase artifact, grounded in the fresh FAIL numbers and listing candidate approaches (PHASS+deramping, SPURT native, tophu-SNAPHU tiled, 20×20 m fallback) with a success criterion per approach
-- [ ] **DISP-05**: Native 5×10 m resolution remains the production default for DISP-S1; downsampling to the reference grid lives exclusively in `prepare_for_reference` and is documented as validation-only in both code and methodology doc
+- [x] **DISP-05**: Native 5×10 m resolution remains the production default for DISP-S1; downsampling to the reference grid lives exclusively in `prepare_for_reference` and is documented as validation-only in both code and methodology doc
 
 ### DIST-S1 OPERA v0.1 Sample Comparison + EU Tightening
 
@@ -183,11 +183,11 @@ Which phases cover which requirements. Populated by roadmapper.
 | CSLC-04 | Phase 3 | Validated (CALIBRATING — Mojave/Coso-Searles fallback #1 coh_med_of_persistent=0.804 / residual=+1.127 mm/yr; chain short-circuited on first valid fallback per design) |
 | CSLC-05 | Phase 3 | Validated-with-deferral (CALIBRATING — Iberian coh_med_of_persistent=0.868 / residual=+0.347 mm/yr; EGMS L2a third-number deferred per Bug 8 follow-up) |
 | CSLC-06 | Phase 3 | Validated (Plan 03-05) |
-| DISP-01 | Phase 4 | Pending |
-| DISP-02 | Phase 4 | Pending |
-| DISP-03 | Phase 4 | Pending |
-| DISP-04 | Phase 4 | Pending |
-| DISP-05 | Phase 4 | Pending |
+| DISP-01 | Phase 4 | Validated (Plan 04-02 prepare_for_reference adapter; Plan 04-04 callsites in run_eval_disp.py form (b) xr.DataArray + run_eval_disp_egms.py form (c) ReferenceGridSpec; v1.0 Resampling.bilinear callsites removed; explicit method= no default per DISP-01) |
+| DISP-02 | Phase 4 | Validated (Plan 04-04 — coherence + residual computed for both cells: SoCal coh_med_of_persistent=0.887 [phase3-cached] / residual=-0.030 mm/yr; Bologna coh_med_of_persistent=0.000 [fresh] / residual=+0.117 mm/yr — both CALIBRATING) |
+| DISP-03 | Phase 4 | Validated (Plan 04-04 — RA reported separately from PQ for both cells; per-IFG planar ramp + auto_attribute_ramp diagnostic populated; both cells attributed_source='inconclusive' under deterministic rule with diagnostics b+c deferred per D-09) |
+| DISP-04 | Phase 4 | Pending (Plan 04-05 Wave 4) |
+| DISP-05 | Phase 4 | Validated (Plan 04-02 + Plan 04-04 — `prepare_for_reference` is validation-only with SHA256 byte-equal pre/post test; products/disp.py:481 `velocity_path` remains native 5x10 m; eval scripts call adapter for comparison only) |
 | DIST-01 | Phase 5 | Pending |
 | DIST-02 | Phase 5 | Pending |
 | DIST-03 | Phase 5 | Pending |

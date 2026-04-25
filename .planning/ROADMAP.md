@@ -148,7 +148,7 @@ Plans:
 - [x] 04-01-PLAN.md — Schema + selfconsistency ramp helpers: matrix_schema.py adds DISPCellMetrics + RampAttribution + RampAggregate + PerIFGRamp + DISPProductQualityResultJson; selfconsistency.py adds fit_planar_ramp + compute_ramp_aggregate + auto_attribute_ramp; unit tests [Wave 1] [DISP-02, DISP-03]
 - [x] 04-02-PLAN.md — compare_disp.py prepare_for_reference adapter (4 methods × 3 reference_grid forms; explicit method=, no default per DISP-01) + ReferenceGridSpec + 12-cell unit test matrix + DISP-05 no-write-back audit [Wave 1] [DISP-01, DISP-05]
 - [x] 04-03-PLAN.md — matrix_writer.py disp:nam + disp:eu render branches (CALIBRATING italics on PQ + non-italics PASS/FAIL on RA + attributed_source label inline; DISP dispatch BEFORE CSLC self-consist) + tests [Wave 2] [DISP-03]
-- [ ] 04-04-PLAN.md — run_eval_disp.py + run_eval_disp_egms.py 5 changes per script (REFERENCE_MULTILOOK_METHOD constant, EXPECTED_WALL_S=21600, Stage 9 adapter, Stage 10 PQ block w/ cross-cell coherence read for SoCal, Stage 11 ramp-attribution, Stage 12 DISPCellMetrics write); manifest cache_dir fix; warm re-runs produce metrics.json + meta.json for both cells [Wave 3] [DISP-01, DISP-02, DISP-03, DISP-05]
+- [x] 04-04-PLAN.md — run_eval_disp.py + run_eval_disp_egms.py 5 changes per script (REFERENCE_MULTILOOK_METHOD constant, EXPECTED_WALL_S=21600, Stage 9 adapter, Stage 10 PQ block w/ cross-cell coherence read for SoCal, Stage 11 ramp-attribution, Stage 12 DISPCellMetrics write); manifest cache_dir fix; warm re-runs produce metrics.json + meta.json for both cells [Wave 3] [DISP-01, DISP-02, DISP-03, DISP-05]
 - [ ] 04-05-PLAN.md — Docs+brief: git mv CONCLUSIONS_DISP_EGMS.md → CONCLUSIONS_DISP_EU.md; append v1.1 Product Quality / Reference Agreement / Ramp Attribution / Brief link sections to both CONCLUSIONS files; write DISP_UNWRAPPER_SELECTION_BRIEF.md (4 candidates × 4 columns); append §3 multilook ADR to docs/validation_methodology.md (5-part PITFALLS+FEATURES dialogue) [Wave 4] [DISP-03, DISP-04, DISP-05]
 
 **Requirements coverage audit** (all 5 Phase 4 requirement IDs):
@@ -226,7 +226,7 @@ DISP-01 (02, 04), DISP-02 (01, 04), DISP-03 (01, 03, 04, 05), DISP-04 (05), DISP
 | 1. Environment Hygiene, Framework Consolidation & Guardrail Scaffolding | v1.1 | 0/9 | Planned | - |
 | 2. RTC-S1 EU Validation | v1.1 | 5/5 | Complete (3/5 PASS w/ investigation) | 2026-04-23 |
 | 3. CSLC-S1 Self-Consistency + EU Validation | v1.1 | 0/0 | Not started | - |
-| 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 3/5 | In progress | - |
+| 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 4/5 | In progress | - |
 | 5. DIST-S1 OPERA v0.1 + EFFIS EU | v1.1 | 0/0 | Not started | - |
 | 6. DSWx-S2 N.Am. + EU Recalibration | v1.1 | 0/0 | Not started | - |
 | 7. Results Matrix + Release Readiness | v1.1 | 0/0 | Not started | - |
