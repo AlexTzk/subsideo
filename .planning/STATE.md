@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
 status: executing
-stopped_at: "Completed 04-02-PLAN.md (prepare_for_reference adapter + ReferenceGridSpec + 17 tests; Wave 1 of Phase 4 done); ready for Wave 2 (04-03 matrix_writer DISP cell render)"
-last_updated: "2026-04-25T07:18:00.000Z"
+stopped_at: "Completed 04-03-PLAN.md (matrix_writer DISP cell render branch + 13 tests; Wave 2 of Phase 4 done); ready for Wave 3 (04-04 eval-script rewire)"
+last_updated: "2026-04-25T07:29:36.000Z"
 last_activity: 2026-04-25
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 24
-  completed_plans: 21
-  percent: 87
+  completed_plans: 22
+  percent: 92
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 04 (disp-s1-comparison-adapter-honest-fail) — EXECUTING
-Plan: 3 of 5
-Status: Ready to execute Wave 2 (Plan 04-03 matrix_writer DISP cell render)
+Plan: 4 of 5
+Status: Ready to execute Wave 3 (Plan 04-04 eval-script rewire)
 Last activity: 2026-04-25
 
-**Resume path:** Plans 04-01 + 04-02 complete (Wave 1). Plan 04-03 (Wave 2: matrix_writer disp:nam + disp:eu render branches) depends on Plan 04-01's `DISPCellMetrics` + `RampAttribution` Pydantic types — already importable from `subsideo.validation.matrix_schema`. Plan 04-02's `prepare_for_reference` is consumed by Plan 04-04 (Wave 3: eval-script rewire). Phase 4 (DISP comparison adapter) will append §3 (DISP ramp-attribution + multilook ADR) to `docs/validation_methodology.md` per Phase 3 CONTEXT D-15 append-only via Plan 04-05 (Wave 4).
+**Resume path:** Plans 04-01 + 04-02 + 04-03 complete (Waves 1 + 2). Plan 04-04 (Wave 3: run_eval_disp.py + run_eval_disp_egms.py rewire — REFERENCE_MULTILOOK_METHOD constant + EXPECTED_WALL_S=21600 + Stage 9 adapter call + Stage 10 PQ block + Stage 11 ramp-attribution + Stage 12 DISPCellMetrics write) depends on Plan 04-01's `compute_ifg_coherence_stack` + `fit_planar_ramp` + `compute_ramp_aggregate` + `auto_attribute_ramp` + `DISPCellMetrics` schema (all importable from `subsideo.validation.selfconsistency` and `subsideo.validation.matrix_schema`) AND Plan 04-02's `prepare_for_reference` adapter (importable from `subsideo.validation.compare_disp`). Plan 04-03 (Wave 2: matrix_writer DISP render) ready to render the metrics.json once Plan 04-04 lands them. Phase 4 will append §3 (DISP ramp-attribution + multilook ADR) to `docs/validation_methodology.md` per Phase 3 CONTEXT D-15 append-only via Plan 04-05 (Wave 4).
 
 ## Performance Metrics
 
@@ -120,6 +120,8 @@ Recent decisions affecting current work (v1.1):
 - [Phase 4 Plan 04-02]: Option A minimal refactor for prepare_for_reference — existing v1.0 compare_disp + compare_disp_egms_l2a top-level functions UNCHANGED; eval scripts (Plan 04-04) call prepare_for_reference BEFORE these v1.0 functions. Resampling.bilinear callsites at compare_disp.py:163 and 175 preserved for v1.0 continuity. CONTEXT D-Claude's-Discretion green-lit Option A or B; A picked for parallelizability and locked-in v1.0 test coverage preservation.
 - [Phase 4 Plan 04-02]: xarray + rioxarray promoted to module-top imports of compare_disp.py (not lazy) because they appear in type annotations + isinstance checks at runtime. rioxarray imported with `# noqa: F401` because it binds via .rio accessor side-effect. scipy.ndimage + pyproj.Transformer + rasterio.io.MemoryFile remain lazy (per-method-branch only).
 - [Phase 4 Plan 04-02]: prepare_for_reference form (b) -> form (c) bridge via rasterio.io.MemoryFile rather than temp-disk write — xr.DataArray native gets wrapped in an in-memory GeoTIFF so _point_sample_from_dataset stays uniform. Zero disk I/O, zero attack surface (MemoryFile cannot be coerced to read attacker-controlled paths per threat T-04-02-05).
+- [Phase 4 Plan 04-03]: matrix_writer DISP dispatch inserted BEFORE CSLC self-consist (per_aoi) and RTC-EU (per_burst) branches at lines 476-489 (CSLC at line 491, RTC-EU at line 506). DISP discriminator (top-level ramp_attribution key) is structurally disjoint from per_aoi and per_burst — order is invariant per RESEARCH lines 593-608. _render_disp_cell single branch handles both region='nam' and region='eu' because DISPCellMetrics schema is symmetric across SoCal and Bologna. PQ column italicised whole-body with attributed_source label inline ('attr=phass'); RA column reuses _render_measurement helper for each criterion ID — no per-DISP RA renderer.
+- [Phase 4 Plan 04-03]: Single `_render_disp_cell` branch routes BOTH region='nam' and region='eu' through same DISPCellMetrics schema (locked-in via Plan 04-01 D-Claude's-Discretion). Region parameter passed through for symmetry with `_render_cslc_selfconsist_cell` (which forks between NAM/EU subclasses) but currently unused in the body — kept for forward-compat in case Phase 4 D-08-style regional divergence ever needs to fork the render later. Test 6 in test_matrix_writer_disp.py pins this invariant.
 
 ### Pending Todos
 
@@ -143,7 +145,7 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 
 ## Session Continuity
 
-Last activity: 2026-04-25 — Phase 4 Plan 04-02 complete (Wave 1 sibling: prepare_for_reference adapter). 17 unit tests green (3 error-path + 12 method-x-form + 1 DISP-05 no-write-back + 1 block_mean spot-check). Ruff + mypy clean on touched files (compare_disp.py 380 -> 806 LOC; tests/product_quality/test_prepare_for_reference.py new 187 LOC). Commits c58ab99 (Task 1 RED smoke test) + 4bf9922 (Task 1 GREEN feat) + 7f21dbf (Task 2 full test matrix). Plan 04-02 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-02-SUMMARY.md`.
-Last session: 2026-04-25T07:18:00.000Z
-Stopped at: Completed 04-02-PLAN.md (prepare_for_reference adapter + ReferenceGridSpec + 17 tests; Wave 1 of Phase 4 done); ready for Wave 2 (04-03 matrix_writer DISP cell render)
+Last activity: 2026-04-25 — Phase 4 Plan 04-03 complete (Wave 2: matrix_writer DISP cell render branch). 13 unit tests green (4 _is_disp_cell_shape + 8 _render_disp_cell + 1 end-to-end via write_matrix). Ruff + mypy clean on touched files (matrix_writer.py 475 -> 579 LOC; tests/reference_agreement/test_matrix_writer_disp.py new 257 LOC). Commits e5b5361 (Task 1 RED smoke test) + 488282e (Task 1 GREEN feat) + 7d6e178 (Task 2 full test matrix). Plan 04-03 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-03-SUMMARY.md`. DISP dispatch ordering invariant confirmed: DISP=476 < CSLC=491.
+Last session: 2026-04-25T07:29:36.000Z
+Stopped at: Completed 04-03-PLAN.md (matrix_writer DISP cell render branch + 13 tests; Wave 2 of Phase 4 done); ready for Wave 3 (04-04 eval-script rewire)
 Resume file: None
