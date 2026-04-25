@@ -1,0 +1,9 @@
+# EFFIS WFS Endpoint Lock — Phase 5 (subsideo v1.1)
+# Written by Plan 05-02. Read by Plans 05-04, 05-05, 05-07.
+# DO NOT EDIT MANUALLY — re-run Plan 05-02 if the endpoint changes.
+
+## Probe metadata
+probe_date_iso: 2026-04-25T23:03:38Z
+owslib_version: 0.35.0
+subsideo_env: subsideo (micromamba)
+probe_executor: gsd-executor under Plan 05-02
