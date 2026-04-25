@@ -771,6 +771,13 @@ def _point_sample_from_dataset(
         for i in range(n):
             r = int(round(rows[i]))
             c = int(round(cols[i]))
+            # Phase 4 ME-04: reject PS points whose CENTRE falls outside the
+            # raster bounds. Without this check, a point a few metres outside
+            # the raster still produces a non-empty clipped window (the edge
+            # rows/cols) and out[i] gets the edge mean instead of NaN.
+            if not (0 <= r < height and 0 <= c < width):
+                out[i] = np.nan
+                continue
             r0 = max(0, r - radius)
             r1 = min(height, r + radius + 1)
             c0 = max(0, c - radius)
@@ -812,6 +819,17 @@ def _point_sample_from_dataset(
             ),
             dtype=np.float64,
         )
+        # Phase 4 ME-04: reject PS points whose CENTRE falls outside the
+        # raster bounds. map_coordinates already NaN-masks strictly-OOB
+        # coords, but be explicit to make the contract symmetric with the
+        # block_mean branch and defensive against future refactors.
+        rounded_r = np.rint(rows).astype(np.int64)
+        rounded_c = np.rint(cols).astype(np.int64)
+        oob = (
+            (rounded_r < 0) | (rounded_r >= height)
+            | (rounded_c < 0) | (rounded_c >= width)
+        )
+        sampled_gauss[oob] = np.nan
         return sampled_gauss
 
     raise ValueError(f"Unhandled method: {method}")
