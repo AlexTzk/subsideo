@@ -1056,4 +1056,55 @@ This is **advisory** — planner makes the final call on grouping/sequencing.
 **Research date:** 2026-04-25
 **Valid until:** 2026-05-25 (30 days for stable; longer is fine — none of the dependencies are in fast-iteration windows)
 
+## Resolution Log
+
+This section maps every Open Risk + Open Question surfaced in the probes
+and discussion above to a final disposition for Phase 5. Dim 11 of the
+verifier protocol treats any unresolved question as a BLOCKER; the table
+below makes each disposition explicit so the verifier can cross-check
+against the plan-set.
+
+**Disposition vocabulary:**
+- `resolved` — the question has a concrete answer surfaced in the cited
+  plan or amendment.
+- `accepted-as-narrative` — the risk is real but mitigated only via
+  narrative caveat in CONCLUSIONS / docs (no code-level gate).
+- `accepted-as-blocker` — the question depends on an external event
+  (e.g. operational publication); Phase 5 ships the auto-detection
+  scaffolding and the human-readable signal when the event lands.
+- `deferred-to-v1.2` — explicitly out of scope for Phase 5; the v1.2
+  follow-up plan is named in REQUIREMENTS.md DIST-V2-05.
+- `mitigated-via-amendment` — the original framing was structurally
+  inapplicable; the resolution is an amendment to the binding decision
+  (D-XX) recorded in ROADMAP Phase 5 scope-amendment block.
+
+### Open Risks A-M (from Probes 1-9 prose)
+
+| ID | Description | Disposition | Resolved by |
+|---|---|---|---|
+| Risk A | OPERA-ADT notebook commit drift (kwargs change in future commits silently invalidate the gate-key list) | accepted-as-narrative | Plan 05-01 amendment cites notebook SHA; CONCLUSIONS_DIST_N_AM.md v1.1 narrative records it. Operationally moot under scope amendment (DIST-02 deferred to v1.2). |
+| Risk B | dist-s1 operational ATBD drift (v2.x defaults differ from 2.0.14 once operational publishes) | deferred-to-v1.2 | DIST-V2-05 re-derives the gate-key list from operational ATBD; v1.1 ships against 2.0.14 baseline. |
+| Risk C | Tag-level extraction not useful for drift detection (rasterio tags round-trip subsideo's own metadata, not OPERA-ADT's) | resolved | Direct-kwargs comparison adopted as the only mechanism (D-01..D-04 then deferred to v1.2 entirely under scope amendment). |
+| Risk D | Plan-phase may re-derive 7-key list differently from a deeper algoconfig_model.py inspection | deferred-to-v1.2 | DIST-V2-05 re-validates the 7-key list against operational ATBD; v1.1 doesn't ship the gate at all. |
+| Risk E | Operational v2.x defaults drifting from 2.0.14 makes the gate meaningful | accepted-as-blocker | Stage 0 CMR probe in Plan 05-06 raises NotImplementedError on operational_found; signal triggers v1.2 re-plan. |
+| Risk F | EFFIS rate-limits the getfeature endpoint | resolved | Plan 05-04 lands `RETRY_POLICY['EFFIS']` with 429 / 503 / 504 / ConnectionError / TimeoutError retryable + 401 / 403 / 404 abortable; D-18 amendment routes the dispatch through `effis.py` consulting the policy via tenacity/urllib3 wrapper. |
+| Risk G | EFFIS may return GML rather than SHAPEZIP (geopandas parser ambiguity) | resolved | Plan 05-05 `effis.py` uses `geopandas.read_file(BytesIO(raw))` which auto-detects GML / SHAPEZIP / SPATIALITEZIP via pyogrio. |
+| Risk H | Romania 2022 clear-cuts not covered by EFFIS → recall ~0 → false-FAIL on class mismatch | resolved | Plan 05-01 amendment substitutes Spain Sierra de la Culebra (RESEARCH Probe 4 ADR); Romania removed from EVENTS list in Plan 05-07. |
+| Risk I | ±7 days CMR temporal tolerance may be too narrow if operational granule's BeginningDateTime is offset | accepted-as-narrative | Plan 05-06 hardcodes ±7 days (matches T11SLT 12-day Sentinel-1 cycle + 1 day slop); CONCLUSIONS narrates the choice. v1.2 may widen if operational hits surface this. |
+| Risk J | DIST-01 reframing (CloudFront URL → notebook recipe) needs explicit milestone-close surfacing | resolved | Plan 05-01 scope-amendment block in ROADMAP makes the reframing the canonical reading; REL-05 closure reads it directly. |
+| Risk K | Evros 2023 specific MGRS+track+post_date triple needs `dist_s1_enumerator` probe at plan-phase | resolved | Plan 05-07 adds a Wave-3-internal probe task (track_number resolution via `dist_s1_enumerator.get_mgrs_tiles_overlapping_geometry` over the AOI bbox + date range) before the EVENTS list locks; the speculative `track_number=29` value gets verified at runtime. |
+| Risk L | Romania substitution choice (Spain Culebra) needs DIST-runnable + EFFIS-covered cross-check | resolved | RESEARCH Probe 4 ADR confirms Spain Culebra is fire-only EFFIS-covered + has S1 ascending+descending pass coverage in the post-fire window. Plan 05-07 EVENTS list locks the Spain Culebra entry with citations. |
+| Risk M | block_bootstrap_ci concatenate inner loop is O(B × n_blocks × pixels²) ≈ ~3min/call | accepted-as-narrative | Plan 05-03's bootstrap.py docstring cites the runtime; `docs/validation_methodology.md §4.1` (Plan 05-09) records the optimisation hook (numba / vectorised gather) for a 2nd consumer. Acceptable for one-shot Phase 5 use. |
+
+### Open Questions Q1-Q5 (from `## Open Questions` block)
+
+| ID | Description | Disposition | Resolved by |
+|---|---|---|---|
+| Q1 | EFFIS `firedate` property semantic (ignition vs first-detection) | resolved | Plan 05-02 GetCapabilities + smoke-test probes against known fires (Aveiro 2024 Sept 15-16 ignition window) and locks the property semantic by inspecting returned dates against published ignition events. |
+| Q2 | Operational `OPERA_L3_DIST-ALERT-S1_V1` first-publication timing | accepted-as-blocker | Phase 5 ships scaffolding (CMR Stage 0 + DEFERRED metrics.json + auto-supersede `NotImplementedError` trigger); Plan 05-06's run_eval_dist.py auto-fills the cell when operational publishes. |
+| Q3 | Romania-vs-Spain substitution: hard requirement? | resolved | User-approved Spain Sierra de la Culebra (Plan 05-01 scope amendment + EVENTS list in Plan 05-07). |
+| Q4 | Cache-dir consolidation underscore vs hyphen | resolved | `eval-dist_eu` (underscore) is canonical per matrix_manifest.yml line 79; Plan 05-08 git-mv consolidates the v1.0 hyphenated directories. |
+| Q5 | Aveiro Oct 10 dist-s1 invocation missing from v1.0 cache (chained_retry middle stage) | resolved | Plan 05-07 EVENTS list aveiro entry has `post_dates=[date(2024, 9, 28), date(2024, 10, 10), date(2024, 11, 15)]`; the missing Oct 10 invocation runs BEFORE the chained_retry sub-stage produces the threaded Nov 15 final output. |
+
+
 ## RESEARCH COMPLETE
