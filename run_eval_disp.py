@@ -14,35 +14,74 @@
 # Compute estimate: 3-6 hours depending on hardware
 #
 # Resume-safe: each stage skips work if outputs already exist.
-import warnings; warnings.filterwarnings("ignore")
+import warnings; warnings.filterwarnings("ignore")  # noqa: E702, I001
 
-EXPECTED_WALL_S = 5400   # Plan 01-07 supervisor AST-parses this constant (D-11)
+from typing import Literal  # noqa: E402
+
+# Phase 4 D-Claude's-Discretion: 6h cap (warm re-run + ramp fit + adapter ~30 min/cell;
+# cold full-pipeline ~3 h/cell + safety margin). 21600s expressed as 60*60*6 because
+# supervisor AST-parser whitelists nested BinOp of literal Constants (Plan 01-07 T-07-06).
+EXPECTED_WALL_S = 60 * 60 * 6   # 21600 -- Plan 01-07 supervisor AST-parses this
+REFERENCE_MULTILOOK_METHOD: Literal["block_mean"] = "block_mean"  # Phase 4 D-04
+
+
+def _reproject_mask_to_grid(
+    mask: "object",  # numpy ndarray; use object to satisfy ruff ANN401
+    src_transform: "object",  # rasterio Affine
+    src_crs: "object",  # rasterio CRS
+    target_shape: tuple[int, int],
+) -> "object":
+    """Reproject a (H, W) bool stable_mask onto a target raster grid via nearest-neighbour.
+
+    Phase 4 helper: re-grids a stable-terrain mask (built on the DEM grid) onto
+    the CSLC / velocity raster grid before feeding `coherence_stats` /
+    `residual_mean_velocity`. Uses rasterio.warp.reproject in nearest mode to
+    preserve boolean class labels.
+    """
+    import numpy as np
+    import rasterio as _rio
+    from rasterio.warp import Resampling as _Resampling
+    from rasterio.warp import reproject as _reproject
+
+    h_src, w_src = mask.shape
+    h_tgt, w_tgt = target_shape
+    sx = w_src / w_tgt
+    sy = h_src / h_tgt
+    target_transform = src_transform * _rio.Affine(sx, 0, 0, 0, sy, 0)
+    out = np.zeros(target_shape, dtype=np.float32)
+    _reproject(
+        source=mask.astype(np.float32),
+        destination=out,
+        src_transform=src_transform,
+        src_crs=src_crs,
+        dst_transform=target_transform,
+        dst_crs=src_crs,
+        resampling=_Resampling.nearest,
+    )
+    return out.astype(bool)
+
 
 if __name__ == "__main__":
     import os
+    import sqlite3
     import sys
     import time
-    import sqlite3
-    from pathlib import Path
     from datetime import datetime
-    from dotenv import load_dotenv
+    from pathlib import Path
 
     import asf_search as asf
     import earthaccess
-    import numpy as np
     import h5py
+    import numpy as np
+    from dotenv import load_dotenv
 
-    from subsideo.products.cslc import run_cslc
-    from subsideo.products.disp import run_disp
     from subsideo.data.dem import fetch_dem
     from subsideo.data.orbits import fetch_orbit
+    from subsideo.products.cslc import run_cslc
+    from subsideo.products.disp import run_disp
     from subsideo.validation.harness import (
         bounds_for_burst,
-        bounds_for_mgrs_tile,
         credential_preflight,
-        download_reference_with_retry,
-        ensure_resume_safe,
-        select_opera_frame_by_utc_hour,
     )
 
     load_dotenv()
@@ -51,6 +90,10 @@ if __name__ == "__main__":
         "CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET",
         "EARTHDATA_USERNAME", "EARTHDATA_PASSWORD",
     ])
+
+    # Phase 4 Stage 12 prerequisite: wall-time + run-start tracking for meta.json
+    t_start = time.monotonic()
+    run_start_iso = datetime.utcnow().isoformat() + "Z"
 
     # ── Configuration ────────────────────────────────────────────────────────
     BURST_ID = "t144_308029_iw1"
@@ -141,7 +184,7 @@ if __name__ == "__main__":
 
         print(f"  Found {len(opera_disp_results)} product(s):")
         for f in sorted(frame_counts):
-            print(f"    {f}: {frame_counts[f]} products, acquisition hour ~{frame_hours[f]:02d} UTC")
+            print(f"    {f}: {frame_counts[f]} products, acquisition hour ~{frame_hours[f]:02d} UTC")  # noqa: E501
 
         # Prefer exact UTC hour match, fall back to ±1 hour.  Frame numbers
         # differ by 1 within a single orbit pass, so exact hour match is the
@@ -156,7 +199,7 @@ if __name__ == "__main__":
 
         if not matching_frames:
             print(f"  WARNING: No frames matching UTC hour ~{BURST_HOUR}")
-            print(f"  Falling back to all frames -- correlation may fail")
+            print("  Falling back to all frames -- correlation may fail")
             matching_frames = list(frame_counts.keys())
 
         # Among matching frames, pick the one with most products
@@ -165,7 +208,7 @@ if __name__ == "__main__":
             r for r in opera_disp_results
             if target_frame in r["umm"].get("GranuleUR", "")
         ]
-        print(f"  Using frame {target_frame} (UTC {frame_hours[target_frame]:02d}): {len(opera_disp_results)} product(s)")
+        print(f"  Using frame {target_frame} (UTC {frame_hours[target_frame]:02d}): {len(opera_disp_results)} product(s)")  # noqa: E501
         for r in opera_disp_results[:5]:
             print(f"    {r['umm'].get('GranuleUR', '?')}")
         if len(opera_disp_results) > 5:
@@ -202,11 +245,11 @@ if __name__ == "__main__":
     for r in slc_results:
         date_key = r.properties["startTime"][:10]  # YYYY-MM-DD
         start_dt = datetime.fromisoformat(r.properties["startTime"][:19])
-        stop_dt = datetime.fromisoformat(r.properties.get("stopTime", r.properties["startTime"])[:19])
+        stop_dt = datetime.fromisoformat(r.properties.get("stopTime", r.properties["startTime"])[:19])  # noqa: E501
         start_sec = start_dt.hour * 3600 + start_dt.minute * 60 + start_dt.second
         stop_sec = stop_dt.hour * 3600 + stop_dt.minute * 60 + stop_dt.second
         contains_burst = start_sec <= BURST_UTC_SECONDS <= stop_sec
-        margin = min(BURST_UTC_SECONDS - start_sec, stop_sec - BURST_UTC_SECONDS) if contains_burst else -1
+        margin = min(BURST_UTC_SECONDS - start_sec, stop_sec - BURST_UTC_SECONDS) if contains_burst else -1  # noqa: E501
 
         if date_key not in by_date:
             by_date[date_key] = (r, contains_burst, margin)
@@ -217,10 +260,10 @@ if __name__ == "__main__":
                (contains_burst and prev_contains and margin > prev_margin):
                 by_date[date_key] = (r, contains_burst, margin)
 
-    slc_results = sorted([r for r, _, _ in by_date.values()], key=lambda r: r.properties["startTime"])
+    slc_results = sorted([r for r, _, _ in by_date.values()], key=lambda r: r.properties["startTime"])  # noqa: E501
     print(f"  Found {len(slc_results)} unique SLC date(s) on orbit {RELATIVE_ORBIT}")
     for i, r in enumerate(slc_results):
-        print(f"    [{i+1:2d}] {r.properties['startTime'][:19]}  {r.properties['fileID'][:55]}")
+        print(f"    [{i+1:2d}] {r.properties['startTime'][:19]}  {r.properties['fileID'][:55]}")  # noqa: E501
 
     if not slc_results:
         raise SystemExit("No S1 SLC scenes found -- check date range and orbit number.")
@@ -246,8 +289,8 @@ if __name__ == "__main__":
     print("\n-- Stage 5: Burst database --")
     burst_db = OUT / "burst_db.sqlite3"
     if not burst_db.exists():
-        from pyproj import Transformer
         from opera_utils.burst_frame_db import get_burst_id_geojson
+        from pyproj import Transformer
 
         geojson = get_burst_id_geojson(BURST_ID)
         feat = geojson["features"][0]
@@ -401,7 +444,11 @@ if __name__ == "__main__":
     # ── Stage 7: Run DISP pipeline ───────────────────────────────────────────
     print("\n-- Stage 7: DISP Pipeline (dolphin -> tophu -> MintPy) --")
     disp_dir = OUT / "disp"
-    velocity_path = disp_dir / "mintpy" / "velocity.h5"
+    # Phase 4 Rule 1 bug fix: dolphin 0.42+ produces velocity.tif under
+    # `dolphin/timeseries/`, not `mintpy/velocity.h5`. The previous warm-path
+    # probe pointed at a path that never exists, forcing a full re-run on
+    # every invocation. Use the actual dolphin output for the warm probe.
+    velocity_path = disp_dir / "dolphin" / "timeseries" / "velocity.tif"
 
     if velocity_path.exists():
         print(f"  Velocity already exists: {velocity_path}")
@@ -409,7 +456,7 @@ if __name__ == "__main__":
     else:
         print(f"  Input  : {len(cslc_paths)} CSLCs")
         print(f"  Output : {disp_dir}")
-        print(f"  Running full DISP pipeline -- this may take several hours...")
+        print("  Running full DISP pipeline -- this may take several hours...")
         print()
 
         t0 = time.time()
@@ -460,7 +507,7 @@ if __name__ == "__main__":
 
     valid = np.isfinite(our_velocity) & (our_velocity != 0)
     if valid.any():
-        print(f"\n  velocity stats (non-zero):")
+        print("\n  velocity stats (non-zero):")
         print(f"    valid pixels : {valid.sum():,}")
         print(f"    min          : {np.nanmin(our_velocity[valid]):.4f}")
         print(f"    max          : {np.nanmax(our_velocity[valid]):.4f}")
@@ -484,10 +531,11 @@ if __name__ == "__main__":
         print(f"\n  Our velocity: {velocity_path}")
 
     else:
-        import requests
-        import h5py
-        from datetime import datetime as _dt
         import re as _re
+        from datetime import datetime as _dt
+
+        import h5py
+        import requests
 
         # Download OPERA DISP NetCDF files directly via HTTPS + Earthdata basic auth.
         # earthaccess.download() tries .zarr links which fail with 500 errors,
@@ -519,7 +567,7 @@ if __name__ == "__main__":
                 print(f"  [{j+1}/{len(opera_disp_results)}] {granule[:60]}: no .nc link")
                 continue
 
-            print(f"  [{j+1}/{len(opera_disp_results)}] downloading {granule[:55]}...", end="", flush=True)
+            print(f"  [{j+1}/{len(opera_disp_results)}] downloading {granule[:55]}...", end="", flush=True)  # noqa: E501
             try:
                 r = session.get(nc_url, stream=True, allow_redirects=True)
                 if r.status_code != 200:
@@ -566,7 +614,7 @@ if __name__ == "__main__":
             except Exception as exc:
                 print(f"    {nc_path.name}: read error: {exc}")
 
-        print(f"  Loaded {len(opera_data)} epochs, shape={opera_data[0][1].shape if opera_data else '?'}")
+        print(f"  Loaded {len(opera_data)} epochs, shape={opera_data[0][1].shape if opera_data else '?'}")  # noqa: E501
 
         if len(opera_data) < 3:
             print("  Too few epochs to derive velocity")
@@ -606,30 +654,42 @@ if __name__ == "__main__":
         np.save(opera_vel_path, opera_velocity)
         print(f"  Saved: {opera_vel_path}")
 
-        # Compare against our velocity by reprojecting our output to OPERA grid
-        print("\n  Reprojecting our velocity to OPERA grid...")
-        from rasterio.warp import Resampling, reproject
+        # --- Phase 4 D-01 + D-02: prepare_for_reference adapter ---
+        print(
+            "\n  [Phase 4 Stage 9] Multilooking native velocity onto OPERA "
+            "grid via prepare_for_reference(method='block_mean')..."
+        )
+        import rioxarray  # noqa: F401  (registers .rio accessor)
+        import xarray as xr
         from rasterio.transform import from_origin
 
-        # Build OPERA grid transform from x/y coordinates
+        from subsideo.validation.compare_disp import prepare_for_reference
+
         opera_dx = float(opera_x[1] - opera_x[0])
-        opera_dy = float(opera_y[1] - opera_y[0])  # typically negative
+        opera_dy = float(opera_y[1] - opera_y[0])
         opera_transform = from_origin(
-            opera_x[0] - opera_dx / 2,
-            opera_y[0] - opera_dy / 2,
+            float(opera_x[0]) - 0.5 * opera_dx,
+            float(opera_y[0]) - 0.5 * opera_dy,
             abs(opera_dx),
             abs(opera_dy),
         )
+        opera_da = xr.DataArray(
+            opera_velocity.astype(np.float64),
+            dims=("y", "x"),
+            coords={"y": opera_y, "x": opera_x},
+        ).rio.write_crs(f"EPSG:{opera_crs_epsg}").rio.write_transform(opera_transform)
 
-        our_on_opera = np.full(opera_velocity.shape, np.nan, dtype=np.float32)
-        with rasterio.open(velocity_path) as src:
-            reproject(
-                source=rasterio.band(src, 1),
-                destination=our_on_opera,
-                dst_transform=opera_transform,
-                dst_crs=f"EPSG:{opera_crs_epsg}",
-                resampling=Resampling.bilinear,
-            )
+        our_on_opera = prepare_for_reference(
+            native_velocity=velocity_path,
+            reference_grid=opera_da,
+            method=REFERENCE_MULTILOOK_METHOD,
+        )
+        if isinstance(our_on_opera, xr.DataArray):
+            our_on_opera = our_on_opera.values
+        print(
+            f"  Multilooked velocity: shape={our_on_opera.shape}, "
+            f"finite={int(np.isfinite(our_on_opera).sum()):,}"
+        )
 
         # Compute metrics on valid-pixel intersection
         valid = np.isfinite(opera_velocity) & np.isfinite(our_on_opera) & (our_on_opera != 0)
@@ -637,7 +697,7 @@ if __name__ == "__main__":
         print(f"  Valid intersection: {n_valid:,} pixels")
 
         if n_valid > 100:
-            from subsideo.validation.metrics import spatial_correlation, bias, rmse
+            from subsideo.validation.metrics import bias, rmse, spatial_correlation
 
             # Convert our velocity from rad/year to m/year using Sentinel-1 wavelength
             # lambda_s1 = 0.0555 m; LOS displacement = -lambda * phase / (4*pi)
@@ -667,193 +727,365 @@ if __name__ == "__main__":
             print(f"  Overall             : {'PASS' if overall else 'FAIL'}")
             print(f"  {'='*60}")
         else:
-            print("  Not enough valid pixels for comparison")
+            # Phase 4 W3: honest BLOCKER path -- emit NaN reference-agreement
+            # so the canonical-name assignment below does NOT hit NameError on
+            # the small-sample branch. cell_status will be inferred 'BLOCKER'
+            # in Stage 10 from the stable_mask_pixels < 100 criterion.
+            print("  Not enough valid pixels for comparison -- emitting NaN reference-agreement.")
+            r_val = float("nan")
+            b_val = float("nan")
+            e_val = float("nan")
+            b_mm = float("nan")
+            e_mm = float("nan")
+            # n_valid was already computed above (= int(valid.sum()))
+
+        # Phase 4 W3: canonical Stage 9 outputs (DISP-05 honest-FAIL discipline).
+        # These names feed Stage 12 directly. NO dir() introspection — undefined
+        # names must surface as NameError, not silently zero out (which would
+        # corrupt the FAIL signal we are trying to report).
+        correlation = float(r_val)
+        bias = float(b_mm)        # mm/yr (existing v1.0 conversion)
+        rmse = float(e_mm)        # mm/yr
+        sample_count = int(n_valid)
 
         # Skip the old remote-access code path
         opera_disp_results = None  # prevent fall-through
 
-    if opera_disp_results:
-        import xarray as xr
+    # --- Phase 4 Stage 10: product-quality block (CONTEXT D-05..D-08) ---
+    print(
+        "\n  [Phase 4 Stage 10] Computing product-quality (coherence + "
+        "residual) on stable terrain..."
+    )
+    from pathlib import Path as _PhasePath
 
-        # OPERA DISP-S1 products are Zarr stores — open remotely via
-        # earthaccess (S3/HTTPS) without downloading.
-        print(f"  Opening {len(opera_disp_results)} OPERA DISP product(s) remotely...")
+    from rasterio.warp import Resampling as _Resampling
+    from rasterio.warp import reproject as _reproject
 
-        # Collect displacement values at each epoch from OPERA products
-        opera_displacements: dict[str, np.ndarray] = {}
-        opera_crs = None
-        opera_transform = None
+    from subsideo.data.natural_earth import load_coastline_and_waterbodies
+    from subsideo.data.worldcover import fetch_worldcover_class60, load_worldcover_for_bbox
+    from subsideo.validation.selfconsistency import (
+        coherence_stats,
+        compute_ifg_coherence_stack,
+        residual_mean_velocity,
+    )
+    from subsideo.validation.stable_terrain import build_stable_mask
 
+    # Phase 4 B2 acknowledgement: `dem_path` is pre-bound at Stage 4 and
+    # reachable here; do NOT re-bind. Slope-from-DEM is computed inline
+    # because the existing `compute_slope_from_dem` analog lives in
+    # run_eval_cslc_selfconsist_nam.py as a closure (Phase 3 D-Claude's-
+    # Discretion). Same algorithm, kept colocated for Phase 4.
+    def _slope_from_dem(p):  # noqa: ANN001, ANN202 — inline helper closure
+        import rasterio as _rio_local
+        with _rio_local.open(p) as _src:
+            dem = _src.read(1).astype(np.float32)
+            pixel_m = abs(_src.transform.a)
+            dem_transform = _src.transform
+            dem_crs = _src.crs
+        dz_dy, dz_dx = np.gradient(dem, pixel_m)
+        slope_rad = np.arctan(np.sqrt(dz_dx**2 + dz_dy**2))
+        return np.degrees(slope_rad).astype(np.float32), dem_transform, dem_crs
+
+    # 10.1 Build stable mask (CONTEXT D-06: identical params to Phase 3 SoCal)
+    worldcover_dir = _PhasePath("eval-disp/worldcover")
+    fetch_worldcover_class60(BURST_BBOX, out_dir=worldcover_dir)
+    wc_data, wc_transform, wc_crs = load_worldcover_for_bbox(
+        BURST_BBOX, tiles_dir=worldcover_dir
+    )
+    slope_deg, dem_transform, dem_crs = _slope_from_dem(dem_path)
+    coastline, waterbodies = load_coastline_and_waterbodies(BURST_BBOX)
+    wc_on_dem = np.empty(slope_deg.shape, dtype=wc_data.dtype)
+    _reproject(
+        source=wc_data, destination=wc_on_dem,
+        src_transform=wc_transform, src_crs=wc_crs,
+        dst_transform=dem_transform, dst_crs=dem_crs,
+        resampling=_Resampling.nearest,
+    )
+    stable_mask = build_stable_mask(
+        wc_on_dem, slope_deg, coastline=coastline, waterbodies=waterbodies,
+        transform=dem_transform, crs=dem_crs,
+        coast_buffer_m=5000, water_buffer_m=500, slope_max_deg=10,
+    )
+    n_stable = int(stable_mask.sum())
+    print(f"  stable_mask pixels: {n_stable:,}")
+    cell_status = "BLOCKER" if n_stable < 100 else "MIXED"
+
+    # 10.2 Coherence: cross-cell read for SoCal (CONTEXT D-08)
+    phase3_metrics_path = _PhasePath("eval-cslc-selfconsist-nam/metrics.json")
+    coherence_source = "fresh"
+    coh_stats: dict[str, float] = {}
+    if phase3_metrics_path.exists():
+        import json as _json
         try:
-            # earthaccess.open() returns file-like objects for remote access
-            file_handles = earthaccess.open(opera_disp_results[:20])
-            print(f"  Opened {len(file_handles)} remote file handle(s)")
+            phase3 = _json.loads(phase3_metrics_path.read_text())
+            socal = next(a for a in phase3.get("per_aoi", []) if a.get("aoi_name") == "SoCal")
+            m = socal.get("product_quality", {}).get("measurements", {})
+            if m and "coherence_median_of_persistent" in m:
+                # Strip residual_mm_yr -- DISP residual is fresh (D-08)
+                coh_stats = {
+                    k: float(v) for k, v in m.items() if k != "residual_mm_yr"
+                }
+                coherence_source = "phase3-cached"
+                _coh_med = coh_stats.get("coherence_median_of_persistent")
+                print(
+                    f"  coherence: phase3-cached "
+                    f"coh_med_of_persistent={_coh_med:.3f}"
+                )
+        except (StopIteration, KeyError, ValueError) as _err:
+            print(
+                f"  coherence: phase3 cache present but unreadable "
+                f"({_err}) -- falling back to fresh"
+            )
+            coherence_source = "fresh"
+            coh_stats = {}
 
-            # Open first product to explore structure
-            print("\n  Exploring OPERA DISP-S1 product structure...")
-            ds = xr.open_dataset(file_handles[0], engine="h5netcdf")
-            print(f"  Variables: {list(ds.data_vars)}")
-            print(f"  Coords  : {list(ds.coords)}")
-            print(f"  Dims    : {dict(ds.dims)}")
-            for var in ds.data_vars:
-                print(f"    {var}: shape={ds[var].shape}, dtype={ds[var].dtype}")
-            ds.close()
+    if coherence_source == "fresh":
+        # B1 root-cause fix: import the PUBLIC compute_ifg_coherence_stack from
+        # selfconsistency.py (Plan 04-01 Task 3 promotion). Do NOT import from
+        # run_eval_cslc_selfconsist_nam -- that symbol is now removed and only
+        # exists at module level via the public selfconsistency.py promotion.
+        print("  coherence: fresh-computing from cached CSLCs (boxcar 5x5)...")
+        sorted_h5 = sorted(_PhasePath("eval-disp/cslc").rglob("*.h5"))
+        sorted_h5 = [p for p in sorted_h5 if "runconfig" not in p.name.lower()]
+        ifgrams_stack = compute_ifg_coherence_stack(sorted_h5, boxcar_px=5)
+        stable_mask_cslc = _reproject_mask_to_grid(
+            stable_mask, dem_transform, dem_crs, ifgrams_stack.shape[1:]
+        )
+        coh_stats = coherence_stats(ifgrams_stack, stable_mask_cslc, coherence_threshold=0.6)
 
-            # Try to read displacement from each product
-            for j, fh in enumerate(file_handles):
-                try:
-                    ds = xr.open_dataset(fh, engine="h5netcdf")
-                    # Look for displacement variable
-                    disp_var = None
-                    for candidate in ["displacement", "short_wavelength_displacement",
-                                      "unwrapped_phase", "recommended_displacement"]:
-                        if candidate in ds.data_vars:
-                            disp_var = candidate
-                            break
-                    if disp_var is None:
-                        # Fallback: first 2D float variable
-                        for var in ds.data_vars:
-                            if ds[var].ndim >= 2 and np.issubdtype(ds[var].dtype, np.floating):
-                                disp_var = var
-                                break
+    # 10.3 Residual: ALWAYS fresh from dolphin output (CONTEXT D-08)
+    print("  residual: fresh from dolphin velocity.tif...")
+    import rasterio as _rio
+    with _rio.open(velocity_path) as _src:
+        v_rad_per_year = _src.read(1).astype(np.float64)
+        velocity_transform = _src.transform
+    SENTINEL1_WAVELENGTH_M = 0.05546576
+    v_mm_yr = -v_rad_per_year * SENTINEL1_WAVELENGTH_M / (4.0 * np.pi) * 1000.0
+    stable_mask_vel = _reproject_mask_to_grid(
+        stable_mask, dem_transform, dem_crs, v_mm_yr.shape
+    )
+    if int(stable_mask_vel.sum()) > 0:
+        residual = residual_mean_velocity(v_mm_yr, stable_mask_vel, frame_anchor="median")
+    else:
+        residual = float("nan")
+    print(f"  residual_mm_yr: {residual:+.2f}")
 
-                    if disp_var:
-                        data = ds[disp_var].values
-                        if data.ndim == 3:
-                            data = data[0]  # Take first band if 3D
-                        granule = opera_disp_results[j]["umm"].get("GranuleUR", f"product_{j}")
-                        opera_displacements[granule] = data
-                        if j == 0:
-                            print(f"\n  Using variable: '{disp_var}', shape={data.shape}")
+    # --- Phase 4 Stage 11: ramp-attribution diagnostic (CONTEXT D-09..D-12) ----
+    print("\n  [Phase 4 Stage 11] Per-IFG planar ramp fit + attribution...")
+    import re as _re_phase4
 
-                    ds.close()
-                except Exception as e:
-                    print(f"  Product {j}: read error: {e}")
-                    continue
+    from subsideo.validation.matrix_schema import (
+        DISPCellMetrics,
+        DISPProductQualityResultJson,
+        MetaJson,
+        PerIFGRamp,
+        RampAggregate,
+        RampAttribution,
+        ReferenceAgreementResultJson,
+    )
+    from subsideo.validation.selfconsistency import (
+        auto_attribute_ramp,
+        compute_ramp_aggregate,
+        fit_planar_ramp,
+    )
 
-        except Exception as e:
-            print(f"  Remote access failed: {e}")
-            print("  Trying alternative access via Zarr...")
+    unwrapped_dir = _PhasePath("eval-disp/disp/dolphin/unwrapped")
+    unw_files = sorted(unwrapped_dir.glob("*.unw.tif"))
+    date_pat = _re_phase4.compile(r"^(\d{8})_(\d{8})\.unw\.tif$")
+    def _is_sequential_12day(ref_iso: str, sec_iso: str) -> bool:
+        from datetime import datetime as _dt
+        return abs((_dt.fromisoformat(sec_iso) - _dt.fromisoformat(ref_iso)).days - 12) <= 1
 
-            # Alternative: try opening as Zarr store via HTTPS
-            try:
-                import zarr
-                import fsspec
+    sequential_unw: list[tuple[Path, str, str]] = []
+    for f in unw_files:
+        mt = date_pat.match(f.name)
+        if mt is None:
+            continue
+        ref_iso = f"{mt.group(1)[0:4]}-{mt.group(1)[4:6]}-{mt.group(1)[6:8]}"
+        sec_iso = f"{mt.group(2)[0:4]}-{mt.group(2)[4:6]}-{mt.group(2)[6:8]}"
+        if _is_sequential_12day(ref_iso, sec_iso):
+            sequential_unw.append((f, ref_iso, sec_iso))
+    print(f"  sequential 12-day IFGs found: {len(sequential_unw)}")
 
-                for j, result in enumerate(opera_disp_results[:5]):
-                    # Get data URLs from granule metadata
-                    links = result.data_links()
-                    zarr_urls = [l for l in links if "zarr" in l.lower() or ".nc" in l.lower()]
-                    if zarr_urls:
-                        print(f"  Product {j} URLs: {zarr_urls[:2]}")
-                    else:
-                        all_urls = result.data_links()
-                        print(f"  Product {j} all URLs: {all_urls[:3]}")
-            except Exception as e2:
-                print(f"  Zarr fallback also failed: {e2}")
+    ifgrams_unw_stack_list = []
+    for f, _, _ in sequential_unw:
+        with _rio.open(f) as _src:
+            ifgrams_unw_stack_list.append(_src.read(1).astype(np.float32))
+    ifgrams_unw_stack = (
+        np.stack(ifgrams_unw_stack_list, axis=0)
+        if ifgrams_unw_stack_list
+        else np.zeros((0, 1, 1), dtype=np.float32)
+    )
 
-        if opera_displacements:
-            print(f"\n  Read {len(opera_displacements)} OPERA displacement field(s)")
+    ifg_coh_means: list[float] = []
+    cor_dir = _PhasePath("eval-disp/disp/dolphin/interferograms")
+    for f, _, _ in sequential_unw:
+        cor_file = cor_dir / f.name.replace(".unw.tif", ".int.cor.tif")
+        if not cor_file.exists():
+            ifg_coh_means.append(float("nan"))
+            continue
+        with _rio.open(cor_file) as _src:
+            cor = _src.read(1).astype(np.float64)
+        valid_cor = np.isfinite(cor) & (cor > 0)
+        ifg_coh_means.append(float(cor[valid_cor].mean()) if valid_cor.any() else float("nan"))
+    ifg_coh_per_ifg = np.array(ifg_coh_means, dtype=np.float64)
 
-            # Compute OPERA velocity via linear fit (displacement vs time)
-            # Extract dates from granule names:
-            # OPERA_L3_DISP-S1_IW_F38503_VV_<ref_date>_<secondary_date>_...
-            import re
-            from datetime import datetime as dt
+    if ifgrams_unw_stack.shape[0] > 0:
+        ramp_data = fit_planar_ramp(ifgrams_unw_stack, mask=None)
+        agg_dict = compute_ramp_aggregate(ramp_data, ifg_coh_per_ifg)
+    else:
+        ramp_data = {
+            "ramp_magnitude_rad": np.zeros((0,), dtype=np.float64),
+            "ramp_direction_deg": np.zeros((0,), dtype=np.float64),
+            "slope_x": np.zeros((0,), dtype=np.float64),
+            "slope_y": np.zeros((0,), dtype=np.float64),
+            "intercept_rad": np.zeros((0,), dtype=np.float64),
+        }
+        agg_dict = {
+            "mean_magnitude_rad": float("nan"),
+            "direction_stability_sigma_deg": float("nan"),
+            "magnitude_vs_coherence_pearson_r": float("nan"),
+            "n_ifgs": 0,
+        }
+    attributed_source = auto_attribute_ramp(
+        direction_stability_sigma_deg=agg_dict["direction_stability_sigma_deg"],
+        magnitude_vs_coherence_pearson_r=agg_dict["magnitude_vs_coherence_pearson_r"],
+    )
+    print(f"  ramp aggregate: mean_mag={agg_dict['mean_magnitude_rad']:.2f} rad, "
+          f"sigma_dir={agg_dict['direction_stability_sigma_deg']:.1f} deg, "
+          f"r(mag,coh)={agg_dict['magnitude_vs_coherence_pearson_r']:.2f}")
+    print(f"  auto-attributed source: {attributed_source}")
 
-            date_pattern = re.compile(r"_(\d{8}T\d{6}Z)_(\d{8}T\d{6}Z)_v")
-            epoch_data: list[tuple[float, np.ndarray]] = []
+    per_ifg_records: list[PerIFGRamp] = []
+    for k, (_f, ref_iso, sec_iso) in enumerate(sequential_unw):
+        per_ifg_records.append(PerIFGRamp(
+            ifg_idx=k,
+            ref_date_iso=ref_iso,
+            sec_date_iso=sec_iso,
+            ramp_magnitude_rad=float(ramp_data["ramp_magnitude_rad"][k]),
+            ramp_direction_deg=float(ramp_data["ramp_direction_deg"][k]),
+            ifg_coherence_mean=(
+                float(ifg_coh_per_ifg[k])
+                if not np.isnan(ifg_coh_per_ifg[k])
+                else None
+            ),
+        ))
+    ramp_attribution_obj = RampAttribution(
+        per_ifg=per_ifg_records,
+        aggregate=RampAggregate(**agg_dict),
+        attributed_source=attributed_source,
+        attribution_note="Automated; human review pending in CONCLUSIONS",
+    )
 
-            for granule, disp in opera_displacements.items():
-                m = date_pattern.search(granule)
-                if m:
-                    ref_date = dt.strptime(m.group(1), "%Y%m%dT%H%M%SZ")
-                    sec_date = dt.strptime(m.group(2), "%Y%m%dT%H%M%SZ")
-                    dt_years = (sec_date - ref_date).total_seconds() / (365.25 * 86400)
-                    epoch_data.append((dt_years, disp))
-                    if len(epoch_data) <= 3:
-                        print(f"    {sec_date.strftime('%Y-%m-%d')}: dt={dt_years:.3f} yr")
+    # --- Phase 4 Stage 12: write metrics.json + meta.json --------------------
+    print("\n  [Phase 4 Stage 12] Writing eval-disp/metrics.json + meta.json...")
+    import hashlib as _hash
+    import platform as _platform
+    import subprocess as _sp
+    import sys as _sys
+    import time as _time
 
-            if len(epoch_data) >= 3:
-                print(f"\n  Computing OPERA velocity from {len(epoch_data)} epochs...")
+    OUT_DIR = _PhasePath("eval-disp")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-                # Stack and fit velocity per pixel
-                times = np.array([t for t, _ in epoch_data])
-                stack = np.stack([d for _, d in epoch_data], axis=0)  # (n_epochs, rows, cols)
-                rows, cols = stack.shape[1], stack.shape[2]
+    def _coh(*keys, default=float("nan")):  # noqa: ANN001, ANN002, ANN202
+        for k in keys:
+            if k in coh_stats:
+                return float(coh_stats[k])
+        return float(default)
 
-                # Linear fit: displacement = velocity * time + offset
-                # Vectorised per-pixel least-squares
-                opera_velocity = np.full((rows, cols), np.nan, dtype=np.float64)
-                for r_idx in range(rows):
-                    for c_idx in range(cols):
-                        pixel_ts = stack[:, r_idx, c_idx]
-                        valid_mask = np.isfinite(pixel_ts)
-                        if valid_mask.sum() >= 3:
-                            A = np.column_stack([times[valid_mask], np.ones(valid_mask.sum())])
-                            coeffs, _, _, _ = np.linalg.lstsq(A, pixel_ts[valid_mask], rcond=None)
-                            opera_velocity[r_idx, c_idx] = coeffs[0]
+    pq = DISPProductQualityResultJson(
+        measurements={
+            "coherence_median_of_persistent": _coh(
+                "coherence_median_of_persistent", "median_of_persistent"
+            ),
+            "residual_mm_yr": float(residual),
+            "coherence_mean": _coh("coherence_mean", "mean"),
+            "coherence_median": _coh("coherence_median", "median"),
+            "coherence_p25": _coh("coherence_p25", "p25"),
+            "coherence_p75": _coh("coherence_p75", "p75"),
+            "persistently_coherent_fraction": _coh(
+                "persistently_coherent_fraction"
+            ),
+        },
+        criterion_ids=[
+            "disp.selfconsistency.coherence_min",
+            "disp.selfconsistency.residual_mm_yr_max",
+        ],
+        coherence_source=coherence_source,
+    )
+    # W3 -- explicit references to the canonical names assigned in Edit 2
+    # (correlation, bias, rmse, sample_count). NO dir() introspection. If any
+    # name is undefined here, NameError surfaces loudly, which is the desired
+    # behaviour per the plan's explicit "do NOT silently set them to 0"
+    # requirement.
+    ra = ReferenceAgreementResultJson(
+        measurements={
+            "correlation": correlation,
+            "bias_mm_yr": bias,
+            "rmse_mm_yr": rmse,
+            "sample_count": float(sample_count),
+        },
+        criterion_ids=["disp.correlation_min", "disp.bias_mm_yr_max"],
+    )
+    metrics = DISPCellMetrics(
+        schema_version=1,
+        product_quality=pq,
+        reference_agreement=ra,
+        ramp_attribution=ramp_attribution_obj,
+        cell_status=cell_status,
+        criterion_ids_applied=[
+            "disp.selfconsistency.coherence_min",
+            "disp.selfconsistency.residual_mm_yr_max",
+            "disp.correlation_min",
+            "disp.bias_mm_yr_max",
+        ],
+        runtime_conda_list_hash=None,
+    )
+    (OUT_DIR / "metrics.json").write_text(metrics.model_dump_json(indent=2))
+    print(f"  Wrote {OUT_DIR / 'metrics.json'}")
 
-                valid_opera = np.isfinite(opera_velocity)
-                print(f"  OPERA velocity: {valid_opera.sum():,} valid pixels")
-                print(f"    mean: {np.nanmean(opera_velocity):.4f}")
-                print(f"    std : {np.nanstd(opera_velocity):.4f}")
+    try:
+        git_sha = _sp.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+        git_dirty = bool(_sp.check_output(["git", "status", "--porcelain"], text=True).strip())
+    except Exception:
+        git_sha, git_dirty = "unknown", False
 
-                # Save OPERA velocity for inspection
-                opera_vel_path = ref_dir / "opera_velocity_derived.npy"
-                np.save(opera_vel_path, opera_velocity)
-                print(f"  Saved: {opera_vel_path}")
+    def _sha256_file(p: Path) -> str:
+        h = _hash.sha256()
+        with open(p, "rb") as fh:
+            for block in iter(lambda: fh.read(65536), b""):
+                h.update(block)
+        return h.hexdigest()
 
-                # Compare against our velocity
-                if our_velocity is not None:
-                    from subsideo.validation.metrics import spatial_correlation, bias, rmse
+    input_hashes: dict[str, str] = {"velocity_tif": _sha256_file(velocity_path)}
+    if phase3_metrics_path.exists():
+        input_hashes["phase3_cslc_metrics"] = _sha256_file(phase3_metrics_path)
 
-                    # Shapes will likely differ — OPERA frame vs our single burst.
-                    # Crop to overlapping region based on shape.
-                    if opera_velocity.shape == our_velocity.shape:
-                        valid = np.isfinite(opera_velocity) & np.isfinite(our_velocity)
-                        n_valid = valid.sum()
-                        print(f"\n  Comparison ({n_valid:,} valid pixels):")
-                        if n_valid > 10:
-                            r_val = spatial_correlation(our_velocity, opera_velocity)
-                            b_val = bias(our_velocity, opera_velocity)
-                            e_val = rmse(our_velocity, opera_velocity)
-                            print(f"    Correlation  : {r_val:.4f}  (criterion: > 0.92)")
-                            print(f"    Bias         : {b_val:.4f} mm/yr  (criterion: < 3)")
-                            print(f"    RMSE         : {e_val:.4f} mm/yr")
-                            pass_corr = r_val > 0.92
-                            pass_bias = abs(b_val) < 3.0
-                            overall = pass_corr and pass_bias
-                            print(f"\n  {'='*50}")
-                            print(f"  correlation > 0.92 : {'PASS' if pass_corr else 'FAIL'}")
-                            print(f"  |bias| < 3 mm/yr   : {'PASS' if pass_bias else 'FAIL'}")
-                            print(f"  Overall            : {'PASS' if overall else 'FAIL'}")
-                            print(f"  {'='*50}")
-                    else:
-                        print(f"\n  Shape mismatch: ours={our_velocity.shape}, OPERA={opera_velocity.shape}")
-                        print("  OPERA covers full frame; our output is single-burst.")
-                        print("  Spatial subsetting needed -- extracting burst footprint from OPERA frame...")
+    meta = MetaJson(
+        schema_version=1,
+        git_sha=git_sha,
+        git_dirty=git_dirty,
+        run_started_iso=run_start_iso,
+        run_duration_s=_time.monotonic() - t_start,
+        python_version=_sys.version.split()[0],
+        platform=_platform.platform(),
+        input_hashes=input_hashes,
+    )
+    (OUT_DIR / "meta.json").write_text(meta.model_dump_json(indent=2))
+    print(f"  Wrote {OUT_DIR / 'meta.json'}")
 
-                        # Attempt: if OPERA is larger, try to find our burst region
-                        # within the OPERA frame by cross-correlation on valid-pixel patterns
-                        print("  NOTE: Georeferenced comparison requires CRS/transform metadata")
-                        print("  from both products. This will be implemented once product")
-                        print("  structure is confirmed. Saving both arrays for manual analysis.")
-                        np.save(ref_dir / "our_velocity.npy", our_velocity)
-                        print(f"  Saved: {ref_dir / 'our_velocity.npy'}")
-            else:
-                print(f"  Only {len(epoch_data)} epoch(s) with parseable dates -- need >= 3 for velocity fit")
-        else:
-            print("  No displacement data read from OPERA products.")
-
-    # ── Summary ──────────────────────────────────────────────────────────────
-    ts_path = disp_dir / "mintpy" / "timeSeries.h5"
-    print(f"\n{'='*70}")
-    print("DISP-S1 Pipeline Completed")
-    print(f"{'='*70}")
-    print(f"  CSLC stack  : {len(cslc_paths)} files")
-    print(f"  Velocity    : {velocity_path}")
-    print(f"  Time-series : {ts_path if ts_path.exists() else 'N/A'}")
-    print(f"  OPERA ref   : {len(opera_disp_results) if opera_disp_results else 0} product(s)")
-    print(f"  Output dir  : {OUT}")
-    print(f"{'='*70}")
+    print("\n" + "=" * 70)
+    print(f"eval-disp (SoCal): cell_status={cell_status}")
+    coh_med_disp = coh_stats.get(
+        "coherence_median_of_persistent",
+        coh_stats.get("median_of_persistent", float("nan")),
+    )
+    print(
+        f"  PQ: coh_med_of_persistent={coh_med_disp:.3f} "
+        f"(coherence_source={coherence_source}) / "
+        f"residual={residual:+.2f} mm/yr (CALIBRATING)"
+    )
+    print(f"  RA: r={correlation:.3f} (>0.92 BINDING) / bias={bias:+.2f} mm/yr (<3.0 BINDING)")
+    print(f"  Ramp: attr={attributed_source}, mean_mag={agg_dict['mean_magnitude_rad']:.2f} rad")
+    print("=" * 70)
