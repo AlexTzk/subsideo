@@ -60,9 +60,9 @@ cells:
   - product: disp
     region: eu
     eval_script: run_eval_disp_egms.py
-    cache_dir: eval-disp_egms
-    metrics_file: eval-disp_egms/metrics.json
-    meta_file: eval-disp_egms/meta.json
+    cache_dir: eval-disp-egms
+    metrics_file: eval-disp-egms/metrics.json
+    meta_file: eval-disp-egms/meta.json
     conclusions_doc: CONCLUSIONS_DISP_EU.md
 
   # --- DIST ---
