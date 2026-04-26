@@ -437,6 +437,106 @@ def _render_disp_cell(
     return pq_col, ra_col
 
 
+# --- Phase 5 DIST rendering (CONTEXT D-24 + scope amendment 2026-04-25) ---
+# Dispatch ordering invariant: DIST branches insert AFTER disp:* per the
+# D-24 amendment in ROADMAP Phase 5 scope-amendment block. The BEFORE-cslc/
+# dswx part of the original D-24 is a contemporary observation, not a
+# forward lock; future phases may legitimately re-order new schemas.
+
+
+def _is_dist_eu_shape(metrics_path: Path) -> bool:
+    """Return True when metrics.json has a top-level ``per_event`` key.
+
+    Phase 5 D-25 schema discriminator. ``per_event`` is structurally disjoint
+    from ``ramp_attribution`` (DISP), ``per_aoi`` (CSLC self-consist), and
+    ``per_burst`` (RTC-EU); checked AFTER disp:* per Phase 4 D-08 ordering.
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.debug("_is_dist_eu_shape: cannot read {}: {}", metrics_path, e)
+        return False
+    return isinstance(raw, dict) and "per_event" in raw
+
+
+def _is_dist_nam_shape(metrics_path: Path) -> bool:
+    """Return True when metrics.json has cell_status='DEFERRED' + reference_source key.
+
+    Phase 5 deferred-cell discriminator (scope amendment 2026-04-25). The
+    dist:nam cell ships as DEFERRED until OPERA_L3_DIST-ALERT-S1_V1 publishes
+    operationally; the auto-supersede CMR probe in run_eval_dist.py Stage 0
+    will repopulate the cell when operational appears (auto-detection
+    happens at the next ``make eval-dist-nam`` invocation; no re-planning).
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.debug("_is_dist_nam_shape: cannot read {}: {}", metrics_path, e)
+        return False
+    return (
+        isinstance(raw, dict)
+        and raw.get("cell_status") == "DEFERRED"
+        and "reference_source" in raw
+    )
+
+
+def _render_dist_eu_cell(metrics_path: Path) -> tuple[str, str] | None:
+    """Render Phase 5 DIST-EU multi-event aggregate as (pq_col, ra_col).
+
+    pq_col: '—' (DIST has no product-quality gate; CONTEXT "Not this phase").
+    ra_col format: 'X/3 PASS' or 'X/3 PASS (Y FAIL)' + worst F1 + chained-retry
+    warning glyph when any_chained_run_failed is True.
+    """
+    from subsideo.validation.matrix_schema import DistEUCellMetrics
+
+    try:
+        m = DistEUCellMetrics.model_validate_json(metrics_path.read_text())
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Failed to parse DistEUCellMetrics from {}: {}", metrics_path, e)
+        return None
+
+    fail_count = m.total - m.pass_count
+    if fail_count > 0:
+        base = f"{m.pass_count}/{m.total} PASS ({fail_count} FAIL)"
+    else:
+        base = f"{m.pass_count}/{m.total} PASS"
+    base += f" | worst f1={m.worst_f1:.3f} ({m.worst_event_id})"
+    warn = " ⚠" if m.any_chained_run_failed else ""
+    ra_col = f"{base}{warn}"
+    pq_col = "—"
+    return pq_col, ra_col
+
+
+def _render_dist_nam_deferred_cell(metrics_path: Path) -> tuple[str, str] | None:
+    """Render the deferred dist:nam cell (Phase 5 scope amendment).
+
+    pq_col: '—' (no product-quality gate in v1.1; full schema lands in v1.2).
+    ra_col format: 'DEFERRED (CMR: <cmr_probe_outcome>)' -- e.g.
+    'DEFERRED (CMR: operational_not_found)' on miss; if Stage 0 in v1.2 ever
+    finds operational the cell shape is no longer DEFERRED so this renderer
+    is bypassed (the discriminator returns False) and the v1.2 full-schema
+    DistNamCellMetrics renderer takes over.
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.warning(
+            "Failed to read deferred dist:nam metrics from {}: {}", metrics_path, e
+        )
+        return None
+
+    cmr_outcome = raw.get("cmr_probe_outcome", "probe_failed")
+    pq_col = "—"
+    ra_col = f"DEFERRED (CMR: {cmr_outcome})"
+    return pq_col, ra_col
+
+
 def write_matrix(manifest_path: Path, out_path: Path) -> None:
     """Read manifest + sidecars; write a two-column-per-cell Markdown table.
 
@@ -479,6 +579,38 @@ def write_matrix(manifest_path: Path, out_path: Path) -> None:
         # discriminator is unambiguous (RESEARCH lines 593-608).
         if metrics_path.exists() and _is_disp_cell_shape(metrics_path):
             cols = _render_disp_cell(metrics_path, region=str(cell["region"]))
+            if cols is not None:
+                pq_col, ra_col = cols
+                lines.append(
+                    f"| {product} | {region} | {_escape_table_cell(pq_col)} | "
+                    f"{_escape_table_cell(ra_col)} |"
+                )
+                continue
+            # Fall through to default rendering on parse failure.
+
+        # Phase 5 DIST-EU branch: metrics.json with a ``per_event`` key.
+        # Inserted AFTER disp:* per CONTEXT D-24 + the D-24 amendment in
+        # ROADMAP Phase 5 scope-amendment block (the structurally meaningful
+        # invariant is AFTER-disp; the relative ordering against cslc:* /
+        # dswx:* is a contemporary observation, not a forward lock).
+        if metrics_path.exists() and _is_dist_eu_shape(metrics_path):
+            cols = _render_dist_eu_cell(metrics_path)
+            if cols is not None:
+                pq_col, ra_col = cols
+                lines.append(
+                    f"| {product} | {region} | {_escape_table_cell(pq_col)} | "
+                    f"{_escape_table_cell(ra_col)} |"
+                )
+                continue
+            # Fall through to default rendering on parse failure.
+
+        # Phase 5 DIST-NAM deferred-cell branch: metrics.json with
+        # cell_status='DEFERRED' + reference_source key. Renders
+        # 'DEFERRED (CMR: <outcome>)'. Auto-supersede in v1.2 will replace
+        # this branch (different schema) once OPERA_L3_DIST-ALERT-S1_V1
+        # publishes operationally.
+        if metrics_path.exists() and _is_dist_nam_shape(metrics_path):
+            cols = _render_dist_nam_deferred_cell(metrics_path)
             if cols is not None:
                 pq_col, ra_col = cols
                 lines.append(
