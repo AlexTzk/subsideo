@@ -238,3 +238,65 @@ Including label 1 (first-detection provisional) raises recall from 6.3% to 31.0%
 - **EFFIS / dNBR cross-validation:** Compare DIST-S1 output against EFFIS burnt area products or Sentinel-2 dNBR to add an optical cross-sensor reference that doesn't require VHR imagery.
 - **Later post_dates with more observations:** A post_date of 2025-01-15 or later would give 4+ months of post-fire data. With the anniversary baseline, the burn-scar contrast should be even stronger.
 - **Fix multiprocessing reliability:** Investigate whether setting `multiprocessing.set_start_method('fork')` before the dist_s1 call resolves the macOS deadlock. The `spawn` method (macOS default) requires careful handling of module-level state that dist_s1's internal workers may not account for.
+
+---
+
+## v1.1 Phase 5 Update (2026-04-25): 3-event aggregate ships honest FAIL
+
+The above v1.0 narrative remains the historical baseline (Aveiro Sept 28 + Nov 15 single-event explorations). v1.1 builds the 3-event aggregate infrastructure called for in the ROADMAP Phase 5 success criteria and reports an **honest FAIL** outcome consistent with Phase 4's pattern.
+
+### What changed
+
+- **3-event aggregate**: Aveiro (Portuguese wildfires) + Evros (Greek wildfires, EMSR686 — corrected from EMSR649 per RESEARCH Probe 8) + Spain Sierra de la Culebra (substituted for Romania 2022 clear-cuts per RESEARCH Probe 4 — EFFIS is fire-only and Romania clear-cuts have no EFFIS coverage).
+- **Aveiro chained triple** (DIST-07 differentiator): Sept 28 → Oct 10 → **Nov 15** (the missing middle date is now present; the standalone `run_eval_dist_eu_nov15.py` is deleted and its logic lives in the aveiro `chained_retry` sub-stage of `run_eval_dist_eu.py`).
+- **Reference path pivot**: EFFIS WFS endpoints both unreachable (Plan 05-02 probe; Candidate A timeout, Candidate B DNS NXDOMAIN); switched to EFFIS REST API at `api.effis.emergency.copernicus.eu/rest/2/burntareas/current/`. Constants pinned in `eval-dist_eu/effis_endpoint_lock.txt`. Greece country code is `EL` not `GR`.
+- **Per-event try/except isolation**: One event's crash no longer blocks the matrix-cell write (Plan 05-07 D-12 invariant).
+- **F1 + 95% block-bootstrap CI**: Per-event metric reporting via `validation/bootstrap.py` (Hall 1985 moving block bootstrap, PCG64 seed=0, B=500, 1000-m blocks).
+- **Dual-rasterise diagnostic**: `all_touched=False` (primary) + `all_touched=True` (diagnostic) bracket the rasterisation-induced uncertainty per CONTEXT D-17.
+
+### Live eval result: 0/3 PASS — honest FAIL
+
+`make eval-dist-eu` ran end-to-end in ~30 minutes. All 3 events failed, with 3 distinct attributable causes:
+
+| Event | Status | F1 [CI] | Cause |
+|-------|--------|---------|-------|
+| aveiro 2024-09-28 | FAIL | 0.000 [0.000, 0.000] | dist_s1 produced no `GEN-DIST-STATUS.tif` — silent failure mode (no exception raised; output file simply absent). chained_retry not attempted because primary post-date stage failed. |
+| evros 2023-09-05 | FAIL | 0.000 [0.000, 0.000] | Same dist_s1 silent-no-output mode. Track number was the speculative fallback (`track=29`); the runtime probe via `dist_s1_enumerator` did not succeed in overriding the default. |
+| spain_culebra 2022-06-28 | FAIL | 0.000 [0.000, 0.000] | `ValueError: no LUT data found for MGRS tile 29TQG track number 125`. Available track numbers per `dist_s1_enumerator.mgrs_burst_data` LUT for 29TQG are `1, 52, 74, 147, 154` — none of which is 125. Speculative fallback wrong; runtime probe didn't override. |
+
+Aggregate matrix-cell render: `0/3 PASS (3 FAIL) | worst f1=0.000 (aveiro)`.
+
+### What's working (the Phase 5 deliverable)
+
+The infrastructure is structurally complete and tested:
+
+- **Per-event try/except absorbed all 3 crashes** without blocking the matrix-cell write — exactly the D-12 invariant.
+- **`metrics.json` validates against `DistEUCellMetrics`** (Pydantic v2 `extra='forbid'`); per-event records include `f1`, `precision`, `recall`, `accuracy` as `MetricWithCI` shapes (point + ci_lower + ci_upper, all 0.0 here because dist_s1 produced no output, but the schema is exercised).
+- **`meta.json` validates against `MetaJson`** with verbatim field names (Blocker 1 fix from Plan 05-06).
+- **`matrix_writer._render_dist_eu_cell` (Plan 05-05)** consumes the metrics.json and renders the cell correctly.
+- **EFFIS REST client (Plan 05-05)** queried successfully — the `effis_query_meta` block in each per-event record captures the request fingerprint.
+- **CONTEXT D-23 cache layout**: per-event sub-directories under `eval-dist_eu/aveiro/`, `eval-dist_eu/evros/`, `eval-dist_eu/spain_culebra/` were created.
+- **Matrix manifest unchanged**: `matrix_writer` reads JSON sidecars only (REL-02 manifest-authoritative); CONCLUSIONS files are narrative only and are NOT parsed.
+
+### What needs v1.2 attention
+
+Three concrete failure modes documented above, each with a clear fix path:
+
+1. **dist_s1 silent-no-output mode (aveiro + evros)**: `run_dist_s1_workflow` returned without raising, but the `GEN-DIST-STATUS.tif` was missing. The most likely root cause is the `spawn` start method on macOS (the v1.0 multiprocessing-deadlock note from the historical baseline above is the prior-art evidence). Fix candidates: (a) `multiprocessing.set_start_method('fork')` ahead of dist_s1 invocation; (b) Linux container; (c) inspect dist_s1 internal worker logs for the actual failure point. Phase 1's `_mp.configure_multiprocessing()` already attempts forkserver — investigate whether dist_s1 honours it.
+
+2. **Runtime track-number probing didn't override speculative fallback (evros + spain_culebra)**: The plan called for `dist_s1_enumerator.get_mgrs_tiles_overlapping_geometry` to populate the EVENTS list at runtime; the speculative defaults (`track=29` for evros, `track=125` for spain_culebra) were intended as fallbacks only. v1.2 fix: use `dist_s1_enumerator.get_burst_ids_in_mgrs_tiles` to enumerate the valid tracks per MGRS tile and pick the one with the most coverage in the AOI bbox + date window.
+
+3. **Aveiro chained_triple validation (DIST-07)**: chained_retry status is `SKIPPED` (event crashed before differentiator stage). The chain itself (Sept 28 → Oct 10 → Nov 15 with `prior_dist_s1_product` = previous stage's output) is wired into `run_eval_dist_eu.py._chained_retry_for_aveiro` and ready to validate once the primary stage succeeds.
+
+### Audit trail
+
+- Eval invocation: `python -m subsideo.validation.supervisor run_eval_dist_eu.py`
+- Wallclock: ~30 minutes (well under the 8-hour `EXPECTED_WALL_S` budget; supervisor budget = 16h)
+- Sidecar paths: `eval-dist_eu/metrics.json`, `eval-dist_eu/meta.json`
+- Schema parsers (regression-protected): `DistEUCellMetrics`, `MetaJson` (Pydantic v2 `extra='forbid'`)
+- Matrix render branch: `_render_dist_eu_cell` in `src/subsideo/validation/matrix_writer.py` (added by Plan 05-05)
+- Tests: `tests/unit/test_matrix_writer_dist.py` (4 tests covering DIST-EU + DIST-NAM branches; all pass)
+
+### Phase 5 verdict
+
+**Infrastructure: COMPLETE.** The eval script, schema definitions, REST client, matrix render branches, and unit tests all land per the plan. **Scientific verdict: FAIL** with three distinct, attributable causes — preserved as the honest-FAIL signal per the project's Phase 4 precedent. v1.2 will fix the dist_s1 silent-output mode and runtime track probing, then re-run the eval to attempt PASS.
