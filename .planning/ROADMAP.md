@@ -212,7 +212,28 @@ DIST-01 (01, 06), DIST-02 (01, 06), DIST-03 (01, 03, 06), DIST-04 (01, 05, 06, 0
 
 **Internal ordering**: AOI research (DSWX-02) must precede fit-set compute commit; grid search (DSWX-04) consumes fit set; threshold module update (DSWX-05) consumes grid-search results; EU re-run (DSWX-06) consumes updated thresholds.
 
-**Plans**: TBD
+**Plans**: 7 plans across 5 waves
+
+Plans:
+- [ ] 06-01-PLAN.md — Probe artifacts: dswx_fitset_aoi_candidates.md (5+1 AOIs locked) + PROTEUS ATBD ceiling chain probe + dswx_aoi_selection.ipynb + dswx_failure_modes.yml + Makefile recalibrate-dswx + dswx-fitset-aoi-md targets + USER LOCK-IN CHECKPOINT [Wave 1] [DSWX-02, DSWX-03, DSWX-07]
+- [ ] 06-02-PLAN.md — Foundation scaffolding: dswx_thresholds.py (frozen+slots DSWEThresholds + 2 instances + dispatch dict) + Settings.dswx_region env-var + criteria.py dswx.nam.investigation_f1_max INVESTIGATION_TRIGGER + harness.RETRY_POLICY['jrc'] + matrix_schema 6 new Pydantic types (DswxNamCellMetrics + DswxEUCellMetrics + 4 helpers) [Wave 1] [DSWX-05, DSWX-06]
+- [ ] 06-03-PLAN.md — dswx.py decomposition (compute_index_bands + score_water_class_from_indices + IndexBands public API) + DELETE 3 module-level constants (WIGT/AWGT/PSWT2_MNDWI) + KEEP 8 (PSWT1_*/PSWT2_BLUE/NIR/SWIR1/SWIR2) + thread thresholds keyword + DSWxConfig.region field + run_dswx region resolution [Wave 2] [DSWX-04, DSWX-05]
+- [ ] 06-04-PLAN.md — compare_dswx shoreline 1-pixel buffer (D-16 uniform application) + JRC retry refactor via harness.download_reference_with_retry(source='jrc') + matrix_writer dswx render branches (_is_dswx_*_shape + _render_dswx_*_cell; AFTER dist:* per D-27) [Wave 2] [DSWX-06]
+- [ ] 06-05-PLAN.md — N.Am. positive control: run_eval_dswx_nam.py NEW (10-stage CANDIDATES iteration + INVESTIGATION_TRIGGER halt) + execute eval + CONCLUSIONS_DSWX_N_AM.md NEW + USER CHECKPOINT [Wave 3] [DSWX-01]
+- [ ] 06-06-PLAN.md — Recalibration pipeline: scripts/recalibrate_dswe_thresholds.py NEW (11-stage joblib parallel + 8400-gridpoint grid search + LOO-CV + edge sentinel + LOO-CV gap gate + Balaton + threshold module rewrite) + dswx_recalibration.ipynb NEW + 3 USER CHECKPOINTS (edge / loocv-gap / final-review) [Wave 4] [DSWX-03, DSWX-04, DSWX-05, DSWX-06]
+- [ ] 06-07-PLAN.md — EU re-run + reporting: run_eval_dswx.py 5 changes (region='eu', tuple-unpack, DswxEUCellMetrics, recalibration results read) + execute Balaton EU re-run + CONCLUSIONS_DSWX.md v1.0 baseline preamble + 3 v1.1 sections + docs/validation_methodology.md §5 (5 sub-sections) + matrix.md regen [Wave 5] [DSWX-06, DSWX-07]
+
+**Requirements coverage audit** (all 7 Phase 6 requirement IDs):
+DSWX-01 (05), DSWX-02 (01), DSWX-03 (01, 06), DSWX-04 (03, 06), DSWX-05 (02, 03, 06), DSWX-06 (02, 04, 06, 07), DSWX-07 (01, 07). Every requirement appears in at least one plan.
+
+**Plan-phase commits resolved**:
+- AOI fit-set lock: 5 EU biomes (Alcántara / Tagus / Vänern / Garda / Doñana) + Balaton held-out per CONTEXT D-01 + Plan 06-01 user checkpoint
+- N.Am. positive-control candidates: Tahoe T10SFH + Pontchartrain T15RYP per CONTEXT D-18 + Plan 06-01 STAC verification
+- PROTEUS ATBD ceiling: own-data fallback default per CONTEXT D-17 path (d); Plan 06-01 may resolve via path (a) Product Spec PDF download
+- pyarrow availability: parquet for gridscores per CONTEXT D-07; pyarrow 23.0.0 verified present
+- Decomposition shape: clean 2-function split (compute_index_bands + score_water_class_from_indices) + IndexBands public dataclass per CONTEXT D-05
+- EXPECTED_WALL_S: 1800s (run_eval_dswx_nam.py) + 21600s (recalibrate_dswe_thresholds.py) per CONTEXT D-24
+
 
 ### Phase 7: Results Matrix + Release Readiness
 
