@@ -69,7 +69,7 @@ Shipped v1.0 with 4,914 LOC Python (source) + 4,209 LOC Python (tests) across 88
 
 All five product pipelines functional with lazy imports for conda-forge deps. Full CLI with 7 subcommands. Validation framework covers RTC (OPERA N.Am.), CSLC (OPERA N.Am.), DISP (EGMS EU), and DSWx (JRC GSW).
 
-**v1.1 progress**: Phases 1, 2, 3, 4 of 7 complete. Phase 4 (DISP-S1 comparison adapter + honest FAIL) shipped 2026-04-25 — `prepare_for_reference` adapter with explicit `method=` (DISP-01); SoCal r=0.049 / Bologna r=0.336 honest-FAIL signal preserved with ramp-attribution diagnostic; `DISP_UNWRAPPER_SELECTION_BRIEF.md` queued for v1.2 follow-up; `docs/validation_methodology.md` §3 multilook ADR appended.
+**v1.1 progress**: Phases 1, 2, 3, 4, 5 of 7 complete. Phase 5 (DIST-S1 OPERA v0.1 + EFFIS EU) shipped 2026-04-26 — DIST-04 CMR auto-supersede probe + DEFERRED N.Am. cell; DIST-05 EFFIS REST cross-validation (WFS endpoints both unreachable; pivoted to REST per Probe 3); DIST-06 EU 3-event aggregate (aveiro + evros EMSR686 + spain_culebra) with per-event try/except isolation; DIST-07 chained_retry differentiator wired (Sept 28 → Oct 10 → Nov 15). Live `make eval-dist-eu` produced **honest FAIL 0/3 PASS** with three distinct attributable causes (dist_s1 silent failure × 2 + speculative track number wrong × 1); infrastructure deliverables verified (7/7 must-haves, 13/13 unit tests). DIST-01/02/03 deferred-with-evidence to v1.2 (RESEARCH Probes 1 + 6: no canonical CloudFront URL; CMR empty); `docs/validation_methodology.md` §4 appended (4 sub-sections; §4.5 deferred to v1.2).
 
 ## Context
 
@@ -128,4 +128,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-20 — v1.1 milestone started (N.Am./EU Validation Parity & Scientific PASS)*
+*Last updated: 2026-04-26 — Phase 5 (DIST-S1 OPERA v0.1 + EFFIS EU) shipped honest FAIL infrastructure*
