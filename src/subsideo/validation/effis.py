@@ -323,9 +323,14 @@ def fetch_effis_perimeters(
             raw_features = [
                 {
                     "type": "Feature",
+                    # ME-01 fix: read geometry from the loop variable `f`, not
+                    # from `first` (the captured first element). Previously
+                    # every feature in the output carried the first feature's
+                    # geometry, collapsing all post-filter perimeters to a
+                    # single shape in the non-GeoJSON branch.
                     "geometry": (
-                        first.get("shape") or first.get("centroid")  # type: ignore[union-attr]
-                        if isinstance(first, dict) else None
+                        f.get("shape") or f.get("centroid")  # type: ignore[union-attr]
+                        if isinstance(f, dict) else None
                     ),
                     "properties": {
                         k: v
