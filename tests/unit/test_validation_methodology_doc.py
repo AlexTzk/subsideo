@@ -49,20 +49,36 @@ def test_has_section_2_product_quality_distinction() -> None:
     assert "## 2. Product-quality vs reference-agreement distinction" in text
 
 
-def test_no_stub_scaffolding_for_phase_5_6_7() -> None:
-    """D-15 append-only policy: section 4/5 belong to later phases.
+def test_no_stub_scaffolding_for_phase_6_7() -> None:
+    """D-15 append-only policy: section 5 belongs to Phase 6.
 
-    Phase 4 (Plan 04-05) appended `## 3. DISP comparison-adapter design`. The
-    next forbidden frontier is `## 4.` (Phase 5/6 own §4-§5; Phase 7 REL-03
+    Phase 4 (Plan 04-05) appended `## 3. DISP comparison-adapter design`.
+    Phase 5 (Plan 05-09) appended `## 4. DIST-S1 Validation Methodology`
+    with content sub-sections 4.1-4.4 (4.5 deferred to v1.2 per scope amendment).
+    The next forbidden frontier is `## 5.` (Phase 6 owns §5; Phase 7 REL-03
     writes the ToC).
+
+    Phase 5's §4 must be a real authored section (≥ 4 sub-sections / ≥ 50 lines
+    of content), not a stub — anchored on at least one of the bootstrap-CI
+    constants from validation/bootstrap.py to prove substantive content.
     """
     text = _read_doc()
-    for forbidden_header in ("## 4.", "## 5."):
-        assert forbidden_header not in text, (
-            f"Found stub-heading {forbidden_header!r} -- Phase 4 must NOT "
-            "pre-create section 4/5. Phase 5/6 append section 4/5; Phase 7 "
-            "REL-03 writes the ToC."
-        )
+
+    # §5 is forbidden until Phase 6 legitimately authors it.
+    assert "## 5." not in text, (
+        "Found stub-heading '## 5.' -- Phase 5 must NOT pre-create section 5. "
+        "Phase 6 appends section 5; Phase 7 REL-03 writes the ToC."
+    )
+
+    # §4 must be present (Phase 5 deliverable) with substantive content.
+    assert "## 4. DIST-S1 Validation Methodology" in text, (
+        "Phase 5 (Plan 05-09) must append `## 4. DIST-S1 Validation Methodology`."
+    )
+    # Anchor on bootstrap-CI constants to prove §4 isn't a stub.
+    assert "DEFAULT_BLOCK_SIZE_M" in text or "block_bootstrap" in text, (
+        "Phase 5 §4 must reference the block-bootstrap CI machinery from "
+        "validation/bootstrap.py (DEFAULT_BLOCK_SIZE_M / block_bootstrap_ci)."
+    )
 
 
 def test_structural_argument_leads_diagnostic_evidence() -> None:
