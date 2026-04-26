@@ -11,28 +11,35 @@ so the module is importable without conda-forge-only packages.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 from loguru import logger
 
+from subsideo.products.dswx_thresholds import THRESHOLDS_BY_REGION, DSWEThresholds
 from subsideo.products.types import DSWxConfig, DSWxResult
 
-__all__ = ["run_dswx", "run_dswx_from_aoi"]
+__all__ = [
+    "run_dswx",
+    "run_dswx_from_aoi",
+    "compute_index_bands",          # Phase 6 D-05 public API
+    "score_water_class_from_indices",  # Phase 6 D-05 public API
+    "IndexBands",                   # Phase 6 D-05 public dataclass
+]
 
 # ---------------------------------------------------------------------------
 # DSWE diagnostic test thresholds (PROTEUS defaults)
+# Phase 6 D-12: WIGT, AWGT, PSWT2_MNDWI DELETED (moved to dswx_thresholds.py)
+# The 8 constants below are NOT in the recalibration grid and stay here.
 # ---------------------------------------------------------------------------
 
-WIGT = 0.124  # MNDWI threshold for Test 1
-AWGT = 0.0  # AWESH threshold for Test 3
-
+# Kept (NOT grid-tunable per CONTEXT D-12):
 PSWT1_MNDWI = -0.44
 PSWT1_NIR = 1500  # scaled reflectance (0.15)
 PSWT1_SWIR1 = 900  # scaled reflectance (0.09)
 PSWT1_NDVI = 0.7
 
-PSWT2_MNDWI = -0.5
 PSWT2_BLUE = 1000  # scaled reflectance (0.10)
 PSWT2_NIR = 2500  # scaled reflectance (0.25)
 PSWT2_SWIR1 = 3000  # scaled reflectance (0.30)
@@ -93,7 +100,130 @@ INTERPRETED_WATER_CLASS: dict[int, int] = {
 
 
 # ---------------------------------------------------------------------------
-# Internal: diagnostic test computation
+# Public: IndexBands dataclass + decomposed computation functions (Phase 6 D-05)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class IndexBands:
+    """Container for the 5 DSWE diagnostic index bands.
+
+    All arrays are float32 with identical shape (the S2 native grid after
+    BOA offset + Claverie cross-cal). Cacheable via numpy.save without
+    re-running the band-read + cross-cal pipeline.
+
+    Phase 6 D-05: cached per (AOI, scene) by Plan 06-06 grid search so
+    the recalibration's 8400-gridpoint inner loop runs against pre-computed
+    IndexBands without re-reading SAFEs.
+    """
+
+    mndwi: np.ndarray  # Modified NDWI (green - swir1) / (green + swir1)
+    ndvi: np.ndarray   # NDVI (nir - red) / (nir + red)
+    mbsrv: np.ndarray  # Multi-band visible (green + red)
+    mbsrn: np.ndarray  # Multi-band NIR (nir + swir1)
+    awesh: np.ndarray  # AWEI-shadow (blue + 2.5*green - 1.5*mbsrn - 0.25*swir2)
+
+
+def compute_index_bands(
+    blue: np.ndarray,
+    green: np.ndarray,
+    red: np.ndarray,
+    nir: np.ndarray,
+    swir1: np.ndarray,
+    swir2: np.ndarray,
+) -> IndexBands:
+    """Compute the 5 DSWE diagnostic index bands from S2 L2A reflectance.
+
+    All band arrays must be uint16 scaled integer reflectance (x10000)
+    after BOA offset + HLS Claverie S2->L8 cross-calibration applied
+    upstream. This function is pure-numpy and takes no thresholds --
+    its output is invariant to the WIGT/AWGT/PSWT2_MNDWI grid sweep.
+
+    Phase 6 D-05 architectural enabler: cache the returned IndexBands
+    per (AOI, scene) so the grid search runs `score_water_class_from_indices`
+    8400 times per scene against the cached bands -- no SAFE re-read.
+    """
+    eps = np.float32(1e-10)
+    green_f = green.astype(np.float32)
+    nir_f = nir.astype(np.float32)
+    red_f = red.astype(np.float32)
+    swir1_f = swir1.astype(np.float32)
+    blue_f = blue.astype(np.float32)
+    swir2_f = swir2.astype(np.float32)
+
+    mndwi = (green_f - swir1_f) / (green_f + swir1_f + eps)
+    ndvi = (nir_f - red_f) / (nir_f + red_f + eps)
+    mbsrv = green_f + red_f
+    mbsrn = nir_f + swir1_f
+    awesh = blue_f + 2.5 * green_f - 1.5 * mbsrn - 0.25 * swir2_f
+
+    return IndexBands(
+        mndwi=mndwi.astype(np.float32),
+        ndvi=ndvi.astype(np.float32),
+        mbsrv=mbsrv.astype(np.float32),
+        mbsrn=mbsrn.astype(np.float32),
+        awesh=awesh.astype(np.float32),
+    )
+
+
+def score_water_class_from_indices(
+    indices: IndexBands,
+    blue: np.ndarray,
+    nir: np.ndarray,
+    swir1: np.ndarray,
+    swir2: np.ndarray,
+    *,
+    thresholds: DSWEThresholds,
+) -> np.ndarray:
+    """Score the 5-bit DSWE diagnostic given pre-computed index bands.
+
+    Reads only the 3 grid-tunable thresholds (WIGT/AWGT/PSWT2_MNDWI)
+    from the ``thresholds`` argument; PSWT1_*/PSWT2_BLUE/PSWT2_NIR/
+    PSWT2_SWIR1/PSWT2_SWIR2 stay as module-level constants (NOT in the
+    recalibration grid per CONTEXT D-12).
+
+    blue/nir/swir1/swir2 raw bands are still required for Test 4 + Test 5
+    boundary checks (e.g. ``swir1 < PSWT2_SWIR1``); the cache layout
+    (CONTEXT D-05) stores them as int16 alongside the 5 indices.
+
+    Returns uint8 array of 5-bit packed diagnostic; downstream
+    ``_classify_water`` (kept private) maps to DSWE classes 0-4.
+    """
+    diag = np.zeros(indices.mndwi.shape, dtype=np.uint8)
+
+    # Test 1: MNDWI > WIGT (grid-tunable)
+    diag += np.uint8(indices.mndwi > thresholds.WIGT)
+
+    # Test 2: MBSRV > MBSRN (no threshold)
+    diag += np.uint8(indices.mbsrv > indices.mbsrn) * 2
+
+    # Test 3: AWESH > AWGT (grid-tunable)
+    diag += np.uint8(indices.awesh > thresholds.AWGT) * 4
+
+    # Test 4 (partial surface water - conservative): bit 3
+    # Uses module-level constants (NOT in recalibration grid per D-12)
+    diag += np.uint8(
+        (indices.mndwi > PSWT1_MNDWI)
+        & (swir1 < PSWT1_SWIR1)
+        & (nir < PSWT1_NIR)
+        & (indices.ndvi < PSWT1_NDVI)
+    ) * 8
+
+    # Test 5 (partial surface water - aggressive): bit 4
+    # PSWT2_MNDWI is grid-tunable; the rest are module-level constants
+    diag += np.uint8(
+        (indices.mndwi > thresholds.PSWT2_MNDWI)
+        & (blue < PSWT2_BLUE)
+        & (swir1 < PSWT2_SWIR1)
+        & (swir2 < PSWT2_SWIR2)
+        & (nir < PSWT2_NIR)
+    ) * 16
+
+    return diag
+
+
+# ---------------------------------------------------------------------------
+# Internal: diagnostic test computation (backward-compat shim)
 # ---------------------------------------------------------------------------
 
 
@@ -104,50 +234,27 @@ def _compute_diagnostic_tests(
     nir: np.ndarray,
     swir1: np.ndarray,
     swir2: np.ndarray,
+    *,
+    thresholds: DSWEThresholds,  # Phase 6 D-12: required keyword (no default)
 ) -> np.ndarray:
     """Compute 5-bit DSWE diagnostic layer from S2 L2A bands.
 
-    All band arrays must be uint16 scaled integer reflectance (x10000).
-    Returns uint8 array with bits 0-4 representing diagnostic tests 1-5.
+    Backward-compat shim composing ``compute_index_bands`` +
+    ``score_water_class_from_indices``. Phase 6 D-12: the ``thresholds``
+    keyword is REQUIRED (no default); callers must pass a DSWEThresholds
+    instance explicitly. The grid-search consumer (Plan 06-06) calls the
+    public functions directly to avoid re-computing index bands per
+    gridpoint.
+
+    All band arrays must be uint16 scaled integer reflectance (x10000)
+    after BOA offset + Claverie cross-cal. Returns uint8 array with bits
+    0-4 representing diagnostic tests 1-5.
     """
-    eps = 1e-10
-
-    # Scale-invariant ratios
-    green_f = green.astype(np.float32)
-    nir_f = nir.astype(np.float32)
-    red_f = red.astype(np.float32)
-    swir1_f = swir1.astype(np.float32)
-
-    mndwi = (green_f - swir1_f) / (green_f + swir1_f + eps)
-    ndvi = (nir_f - red_f) / (nir_f + red_f + eps)
-
-    # Composite values (raw scaled reflectance)
-    mbsrv = green_f + red_f
-    mbsrn = nir_f + swir1_f
-    awesh = (
-        blue.astype(np.float32) + 2.5 * green_f
-        - 1.5 * mbsrn - 0.25 * swir2.astype(np.float32)
+    indices = compute_index_bands(blue, green, red, nir, swir1, swir2)
+    return score_water_class_from_indices(
+        indices, blue=blue, nir=nir, swir1=swir1, swir2=swir2,
+        thresholds=thresholds,
     )
-
-    diag = np.zeros(blue.shape, dtype=np.uint8)
-    diag += np.uint8(mndwi > WIGT)                     # Test 1: bit 0
-    diag += np.uint8(mbsrv > mbsrn) * 2                # Test 2: bit 1
-    diag += np.uint8(awesh > AWGT) * 4                  # Test 3: bit 2
-
-    # Test 4 (partial surface water - conservative): bit 3
-    diag += np.uint8(
-        (mndwi > PSWT1_MNDWI) & (swir1 < PSWT1_SWIR1)
-        & (nir < PSWT1_NIR) & (ndvi < PSWT1_NDVI)
-    ) * 8
-
-    # Test 5 (partial surface water - aggressive): bit 4
-    diag += np.uint8(
-        (mndwi > PSWT2_MNDWI) & (blue < PSWT2_BLUE)
-        & (swir1 < PSWT2_SWIR1) & (swir2 < PSWT2_SWIR2)
-        & (nir < PSWT2_NIR)
-    ) * 16
-
-    return diag
 
 
 def _classify_water(diagnostic: np.ndarray) -> np.ndarray:
@@ -449,7 +556,6 @@ def _write_cog_30m(
     import rasterio
     from rasterio.crs import CRS
     from rasterio.enums import Resampling
-    from rasterio.transform import from_bounds
     from rasterio.warp import calculate_default_transform, reproject
 
     src_crs = profile_20m.get("crs") or CRS.from_epsg(4326)
@@ -586,6 +692,18 @@ def run_dswx(cfg: DSWxConfig) -> DSWxResult:
     DSWxResult
         Processing result with output path and validation status.
     """
+    # Lazy-import to avoid circular dep with subsideo.config
+    from subsideo.config import Settings
+
+    settings = Settings()
+    region = cfg.region or settings.dswx_region
+    thresholds = THRESHOLDS_BY_REGION[region]
+    logger.info(
+        "DSWx region={!r}; thresholds.WIGT={}, thresholds.AWGT={}, "
+        "thresholds.PSWT2_MNDWI={}",
+        region, thresholds.WIGT, thresholds.AWGT, thresholds.PSWT2_MNDWI,
+    )
+
     # ENV-04: configure multiprocessing BEFORE any subprocess or matplotlib import
     from subsideo._mp import configure_multiprocessing
 
@@ -607,6 +725,7 @@ def run_dswx(cfg: DSWxConfig) -> DSWxResult:
             nir=bands["B08"],
             swir1=bands["B11"],
             swir2=bands["B12"],
+            thresholds=thresholds,  # Phase 6 D-12
         )
 
         # 3. Classify water

@@ -16,6 +16,7 @@ from subsideo.products.dswx import (
     _classify_water,
     _compute_diagnostic_tests,
 )
+from subsideo.products.dswx_thresholds import THRESHOLDS_NAM
 
 
 class TestComputeDiagnosticTests:
@@ -34,26 +35,26 @@ class TestComputeDiagnosticTests:
         defaults.update(overrides)
         return {k: np.array([[v]], dtype=np.uint16) for k, v in defaults.items()}
 
-    def test_high_mndwi_sets_bit0(self):
+    def test_high_mndwi_sets_bit0(self) -> None:
         """High green, low swir1 -> MNDWI > 0.124 -> bit 0."""
         bands = self._make_bands(green=5000, swir1=1000)
-        diag = _compute_diagnostic_tests(**bands)
+        diag = _compute_diagnostic_tests(**bands, thresholds=THRESHOLDS_NAM)
         assert diag[0, 0] & 0b00001, "Test 1 (MNDWI) bit should be set"
 
-    def test_mbsrv_gt_mbsrn_sets_bit1(self):
+    def test_mbsrv_gt_mbsrn_sets_bit1(self) -> None:
         """green + red > nir + swir1 -> bit 1."""
         bands = self._make_bands(green=3000, red=3000, nir=1000, swir1=1000)
-        diag = _compute_diagnostic_tests(**bands)
+        diag = _compute_diagnostic_tests(**bands, thresholds=THRESHOLDS_NAM)
         assert diag[0, 0] & 0b00010, "Test 2 (MBSRV>MBSRN) bit should be set"
 
-    def test_awesh_positive_sets_bit2(self):
+    def test_awesh_positive_sets_bit2(self) -> None:
         """AWESH = blue + 2.5*green - 1.5*(nir+swir1) - 0.25*swir2 > 0."""
         # Make AWESH strongly positive: high blue+green, low nir/swir
         bands = self._make_bands(blue=5000, green=5000, red=500, nir=100, swir1=100, swir2=100)
-        diag = _compute_diagnostic_tests(**bands)
+        diag = _compute_diagnostic_tests(**bands, thresholds=THRESHOLDS_NAM)
         assert diag[0, 0] & 0b00100, "Test 3 (AWESH) bit should be set"
 
-    def test_pswt1_sets_bit3(self):
+    def test_pswt1_sets_bit3(self) -> None:
         """Partial surface water Test 4: MNDWI > -0.44, low NIR/SWIR1, NDVI < 0.7."""
         bands = self._make_bands(
             green=2000, swir1=800, nir=1000, red=800, blue=500, swir2=500
@@ -62,10 +63,10 @@ class TestComputeDiagnosticTests:
         # swir1=800 < 900 YES
         # nir=1000 < 1500 YES
         # NDVI = (1000 - 800) / (1000 + 800) = 0.111 < 0.7 YES
-        diag = _compute_diagnostic_tests(**bands)
+        diag = _compute_diagnostic_tests(**bands, thresholds=THRESHOLDS_NAM)
         assert diag[0, 0] & 0b01000, "Test 4 (PSWT1) bit should be set"
 
-    def test_pswt2_sets_bit4(self):
+    def test_pswt2_sets_bit4(self) -> None:
         """Partial surface water Test 5: aggressive thresholds."""
         bands = self._make_bands(
             green=2000, swir1=500, nir=500, red=500, blue=500, swir2=500
@@ -75,26 +76,26 @@ class TestComputeDiagnosticTests:
         # swir1=500 < 3000 YES
         # swir2=500 < 1000 YES
         # nir=500 < 2500 YES
-        diag = _compute_diagnostic_tests(**bands)
+        diag = _compute_diagnostic_tests(**bands, thresholds=THRESHOLDS_NAM)
         assert diag[0, 0] & 0b10000, "Test 5 (PSWT2) bit should be set"
 
-    def test_no_tests_pass_for_dry_land(self):
+    def test_no_tests_pass_for_dry_land(self) -> None:
         """Typical dry land reflectance -> no DSWE tests pass."""
         # High NIR, high SWIR, low green -> land signature
         bands = self._make_bands(
             blue=1500, green=1500, red=2000, nir=4000, swir1=3500, swir2=2500
         )
-        diag = _compute_diagnostic_tests(**bands)
+        diag = _compute_diagnostic_tests(**bands, thresholds=THRESHOLDS_NAM)
         assert diag[0, 0] == 0, f"Expected 0 for dry land, got {diag[0, 0]:#07b}"
 
-    def test_multi_pixel_array(self):
+    def test_multi_pixel_array(self) -> None:
         """Works with multi-pixel arrays."""
         shape = (3, 4)
         bands = {
             k: np.full(shape, 500, dtype=np.uint16)
             for k in ("blue", "green", "red", "nir", "swir1", "swir2")
         }
-        diag = _compute_diagnostic_tests(**bands)
+        diag = _compute_diagnostic_tests(**bands, thresholds=THRESHOLDS_NAM)
         assert diag.shape == shape
         assert diag.dtype == np.uint8
 
