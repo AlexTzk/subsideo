@@ -38,14 +38,14 @@ from importlib.resources import files as _pkg_files
 from pathlib import Path
 from typing import Any, Literal
 
-import requests
+import requests  # type: ignore[import-untyped]
 from loguru import logger
 
 # ----------------------------------------------------------------------------
 # Retry policy (PITFALLS P0.4)
 # ----------------------------------------------------------------------------
 
-RetrySource = Literal["CDSE", "EARTHDATA", "CLOUDFRONT", "HTTPS", "EFFIS"]
+RetrySource = Literal["CDSE", "EARTHDATA", "CLOUDFRONT", "HTTPS", "EFFIS", "jrc"]
 
 RETRY_POLICY: dict[str, dict[str, Any]] = {
     "CDSE": {
@@ -87,6 +87,20 @@ RETRY_POLICY: dict[str, dict[str, Any]] = {
         # at 60s by default).
         "max_attempts": 5,
         "backoff_factor": 2,
+    },
+    "jrc": {
+        # Phase 6 DSWX-04 JRC Global Surface Water Monthly History tile fetch.
+        # Public HTTPS endpoint (no auth); jeodpp.jrc.ec.europa.eu / EC servers
+        # serve large GeoTIFFs (~30 MB each at 10-degree tile size). 404 means
+        # tile out-of-coverage (ocean tile or pre-1984/post-2021); benign,
+        # propagated as None per existing _fetch_jrc_tile signature (Plan 06-04
+        # refactors compare_dswx._fetch_jrc_tile to call download_reference_with_retry
+        # with source='jrc'). Backoff schedule: 2s, 4s, 8s, 16s, 32s = 62s total.
+        "retry_on": [429, 503, 504, "ConnectionError", "TimeoutError"],
+        "abort_on": [401, 403, 404],
+        "max_attempts": 5,
+        "backoff_factor": 2,
+        "max_backoff_s": 60,
     },
 }
 

@@ -16,8 +16,8 @@ own entries when it lands (EFFIS precision/recall, DSWx recalibration F1).
 Coverage:
   9 v1.0 BINDING (RTC x2, CSLC amplitude x2, DISP x2, DIST x2, DSWx x1)
   4 v1.1 CALIBRATING (CSLC self-consistency x2, DISP self-consistency x2)
-  2 v1.1 INVESTIGATION_TRIGGER (RTC-EU Phase 2 D-13: RMSE, r -- NOT gates)
- = 15 total.
+  3 v1.1 INVESTIGATION_TRIGGER (RTC-EU Phase 2 D-13: RMSE, r; DSWx-NAM Phase 6 D-20)
+ = 16 total.
 """
 from __future__ import annotations
 
@@ -195,6 +195,25 @@ CRITERIA: dict[str, Criterion] = {
             "prevention."
         ),
     ),
+    # -- DSWx-N.Am. INVESTIGATION trigger (Phase 6 D-20) --
+    # NOT a gate. F1 < 0.85 against JRC Monthly History over Tahoe/Pontchartrain
+    # triggers a BOA-offset / Claverie cross-cal / SCL-mask investigation
+    # sub-section in CONCLUSIONS_DSWX_N_AM.md AND halts EU recalibration via
+    # scripts/recalibrate_dswe_thresholds.py Stage 0 metrics.json gate (Plan 06-06).
+    # Phase 2 D-13/D-14 INVESTIGATION_TRIGGER pattern.
+    "dswx.nam.investigation_f1_max": Criterion(
+        name="dswx.nam.investigation_f1_max", threshold=0.85, comparator="<",
+        type="INVESTIGATION_TRIGGER", binding_after_milestone=None,
+        rationale=(
+            "N.Am. positive-control DSWx F1 regression trigger. NOT a gate -- "
+            "F1 < 0.85 against JRC over Tahoe/Pontchartrain triggers a "
+            "BOA-offset / Claverie cross-cal / SCL-mask investigation sub-section "
+            "in CONCLUSIONS_DSWX_N_AM.md AND halts EU recalibration via "
+            "scripts/recalibrate_dswe_thresholds.py Stage 0 metrics.json gate "
+            "(Plan 06-06; Phase 2 D-13/D-14 pattern; PITFALLS M4 goalpost prevention). "
+            "BINDING dswx.f1_min stays at 0.90."
+        ),
+    ),
 }
 
 
@@ -259,3 +278,7 @@ def rtc_eu_investigation_rmse_db_min() -> Criterion:
 
 def rtc_eu_investigation_r_max() -> Criterion:
     return CRITERIA["rtc.eu.investigation_r_max"]
+
+
+def dswx_nam_investigation_f1_max() -> Criterion:
+    return CRITERIA["dswx.nam.investigation_f1_max"]

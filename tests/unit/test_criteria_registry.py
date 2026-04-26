@@ -17,8 +17,9 @@ def test_criterion_is_frozen_dataclass() -> None:
         c.threshold = 99.0  # type: ignore[misc]
 
 
-def test_registry_has_15_entries() -> None:
-    assert len(CRITERIA) == 15
+def test_registry_has_16_entries() -> None:
+    # Phase 6 D-20 added dswx.nam.investigation_f1_max (16 total; was 15 in Phase 5).
+    assert len(CRITERIA) == 16
 
 
 def test_binding_count_and_milestone_field() -> None:
@@ -27,7 +28,7 @@ def test_binding_count_and_milestone_field() -> None:
     investigation = [c for c in CRITERIA.values() if c.type == "INVESTIGATION_TRIGGER"]
     assert len(binding) == 9
     assert len(calibrating) == 4
-    assert len(investigation) == 2
+    assert len(investigation) == 3  # Phase 6 adds dswx.nam.investigation_f1_max
     assert all(c.binding_after_milestone is None for c in binding)
     assert all(c.binding_after_milestone == "v1.2" for c in calibrating)
     assert all(c.binding_after_milestone is None for c in investigation)
@@ -50,6 +51,8 @@ def test_expected_criterion_ids() -> None:
         "disp.selfconsistency.coherence_min", "disp.selfconsistency.residual_mm_yr_max",
         "dist.f1_min", "dist.accuracy_min",
         "dswx.f1_min",
+        # Phase 6 D-20 addition:
+        "dswx.nam.investigation_f1_max",
     }
     assert set(CRITERIA.keys()) == expected
 
