@@ -188,9 +188,9 @@ Plans:
 - [x] 05-04-PLAN.md — harness.RETRY_POLICY['EFFIS'] + pyproject.toml owslib pip pin [Wave 1] [DIST-05]
 - [x] 05-05-PLAN.md — validation/effis.py (WFS query + dual rasterise) + matrix_writer dist:nam (DEFERRED) + dist:eu (X/3 PASS) render branches [Wave 2] [DIST-04, DIST-05, DIST-06]
 - [x] 05-06-PLAN.md — run_eval_dist.py rewrite: CMR Stage 0 auto-supersede probe + DEFERRED metrics.json write + D-16 archival + unit tests [Wave 2] [DIST-01, DIST-02, DIST-03, DIST-04]
-- [ ] 05-07-PLAN.md — run_eval_dist_eu.py rewrite as declarative EVENTS list (Aveiro chained triple including missing Oct 10 + Evros EMSR686 + Spain Culebra) + track_number probe [Wave 3] [DIST-05, DIST-06, DIST-07]
-- [ ] 05-08-PLAN.md — Cache directory cleanup: eval-dist → eval-dist-park-fire rename; eval-dist-eu* → eval-dist_eu consolidation; delete run_eval_dist_eu_nov15.py [Wave 4] [DIST-04, DIST-06]
-- [ ] 05-09-PLAN.md — Docs: docs/validation_methodology.md §4 append + CONCLUSIONS_DIST_N_AM.md (deferred sub-section) + CONCLUSIONS_DIST_EU.md (3-event sub-section) [Wave 5] [DIST-04, DIST-05, DIST-06, DIST-07]
+- [x] 05-07-PLAN.md — run_eval_dist_eu.py rewrite as declarative EVENTS list (Aveiro chained triple including missing Oct 10 + Evros EMSR686 + Spain Culebra) + track_number probe [Wave 3] [DIST-05, DIST-06, DIST-07]
+- [x] 05-08-PLAN.md — Cache directory cleanup: eval-dist → eval-dist-park-fire rename; eval-dist-eu* → eval-dist_eu consolidation; delete run_eval_dist_eu_nov15.py [Wave 4] [DIST-04, DIST-06]
+- [x] 05-09-PLAN.md — Docs: docs/validation_methodology.md §4 append + CONCLUSIONS_DIST_N_AM.md (deferred sub-section) + CONCLUSIONS_DIST_EU.md (3-event sub-section) [Wave 5] [DIST-04, DIST-05, DIST-06, DIST-07]
 
 **Requirements coverage audit** (all 7 Phase 5 requirement IDs):
 DIST-01 (01, 06), DIST-02 (01, 06), DIST-03 (01, 03, 06), DIST-04 (01, 05, 06, 08, 09), DIST-05 (02, 03, 04, 05, 07, 09), DIST-06 (01, 02, 03, 05, 07, 08, 09), DIST-07 (03, 07, 09). Every requirement appears in at least one plan.
