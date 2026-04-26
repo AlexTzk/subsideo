@@ -462,13 +462,27 @@ def _is_dist_eu_shape(metrics_path: Path) -> bool:
 
 
 def _is_dist_nam_shape(metrics_path: Path) -> bool:
-    """Return True when metrics.json has cell_status='DEFERRED' + reference_source key.
+    """Return True when metrics.json carries the DistNamCellMetrics shape.
 
     Phase 5 deferred-cell discriminator (scope amendment 2026-04-25). The
     dist:nam cell ships as DEFERRED until OPERA_L3_DIST-ALERT-S1_V1 publishes
     operationally; the auto-supersede CMR probe in run_eval_dist.py Stage 0
     will repopulate the cell when operational appears (auto-detection
     happens at the next ``make eval-dist-nam`` invocation; no re-planning).
+
+    ME-03 fix (v1.2 forward-compat): when cell_status transitions from
+    'DEFERRED' to 'PASS' or 'FAIL' in v1.2, this discriminator must still
+    return True so the file is routed to the dist:nam renderer rather than
+    falling through to ``_load_metrics``, where pydantic ``extra='forbid'``
+    would reject ``cell_status``, ``reference_source``, ``cmr_probe_outcome``,
+    ``reference_granule_id``, ``deferred_reason`` and surface the cell as
+    ``RUN_FAILED``. The discriminator now keys on ``reference_source`` +
+    ``cmr_probe_outcome`` (both present across all DistNamCellMetrics
+    versions per the v1.1 schema and v1.2 extension plan in D-24/D-25)
+    instead of ``cell_status == 'DEFERRED'``. v1.2 must still add a full
+    ``_render_dist_nam_full_cell`` renderer alongside the existing
+    ``_render_dist_nam_deferred_cell`` and dispatch on cell_status, but
+    the discriminator no longer silently regresses.
     """
     import json as _json
 
@@ -479,8 +493,8 @@ def _is_dist_nam_shape(metrics_path: Path) -> bool:
         return False
     return (
         isinstance(raw, dict)
-        and raw.get("cell_status") == "DEFERRED"
         and "reference_source" in raw
+        and "cmr_probe_outcome" in raw
     )
 
 
@@ -512,14 +526,22 @@ def _render_dist_eu_cell(metrics_path: Path) -> tuple[str, str] | None:
 
 
 def _render_dist_nam_deferred_cell(metrics_path: Path) -> tuple[str, str] | None:
-    """Render the deferred dist:nam cell (Phase 5 scope amendment).
+    """Render the dist:nam cell (Phase 5 scope amendment + ME-03 v1.2 guard).
 
     pq_col: '—' (no product-quality gate in v1.1; full schema lands in v1.2).
-    ra_col format: 'DEFERRED (CMR: <cmr_probe_outcome>)' -- e.g.
-    'DEFERRED (CMR: operational_not_found)' on miss; if Stage 0 in v1.2 ever
-    finds operational the cell shape is no longer DEFERRED so this renderer
-    is bypassed (the discriminator returns False) and the v1.2 full-schema
-    DistNamCellMetrics renderer takes over.
+
+    ra_col format (v1.1):
+        - cell_status == 'DEFERRED': 'DEFERRED (CMR: <cmr_probe_outcome>)' --
+          e.g. 'DEFERRED (CMR: operational_not_found)' on miss.
+
+    ra_col format (v1.2 forward-compat -- ME-03):
+        - cell_status == 'PASS' / 'FAIL': '<cell_status> (CMR: <cmr_probe_outcome>)'.
+          A v1.2 full-schema renderer will likely supersede this with measured
+          metrics; until then, surface the cell status verbatim rather than
+          mislabelling it as 'DEFERRED'. The discriminator
+          (``_is_dist_nam_shape``) was widened to keep these cells routed
+          here instead of falling through to ``_load_metrics`` (which would
+          produce ``RUN_FAILED`` from pydantic ``extra='forbid'``).
     """
     import json as _json
 
@@ -532,8 +554,9 @@ def _render_dist_nam_deferred_cell(metrics_path: Path) -> tuple[str, str] | None
         return None
 
     cmr_outcome = raw.get("cmr_probe_outcome", "probe_failed")
+    cell_status = raw.get("cell_status", "DEFERRED")
     pq_col = "—"
-    ra_col = f"DEFERRED (CMR: {cmr_outcome})"
+    ra_col = f"{cell_status} (CMR: {cmr_outcome})"
     return pq_col, ra_col
 
 
