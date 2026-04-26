@@ -786,7 +786,10 @@ class DistEUEventMetrics(BaseModel):
     )
     error: str | None = Field(
         default=None,
-        description="repr(exception) on event-level failure (per-event try/except isolation, Phase 2 D-06).",
+        description=(
+            "repr(exception) on event-level failure "
+            "(per-event try/except isolation, Phase 2 D-06)."
+        ),
     )
     traceback: str | None = Field(
         default=None,
@@ -868,3 +871,178 @@ class DistNamCellMetrics(MetricsJson):
             "v1.2 unsets this field when supersede happens."
         ),
     )
+
+
+# ============================================================================
+# Phase 6 DSWx cell metrics (CONTEXT D-15 + D-26)
+# ============================================================================
+# matrix_writer detects DswxNamCellMetrics via cell_status + selected_aoi keys
+# (Plan 06-04 _is_dswx_nam_shape discriminator);
+# DswxEUCellMetrics via region='eu' + thresholds_used keys
+# (Plan 06-04 _is_dswx_eu_shape discriminator).
+# ZERO edits to existing types per Phase 1 D-09 + Phase 4 D-09 + Phase 5 D-25
+# immutability lock.
+
+DswxNamCellStatus = Literal["PASS", "FAIL", "BLOCKER"]
+DswxEUCellStatus = Literal["PASS", "FAIL", "BLOCKER"]
+
+
+class DSWEThresholdsRef(BaseModel):
+    """Provenance handle for the DSWEThresholds instance applied at run-time.
+
+    Mirrors fields from src/subsideo/products/dswx_thresholds.py:DSWEThresholds
+    that are useful for matrix_writer cell-rendering + meta.json input-hashing.
+    Full provenance lives in the DSWEThresholds module-level singleton; this
+    Ref is the run-time stamp written into metrics.json.
+
+    W3 fix: BLOCKER pre-finalize state stamps grid_search_run_date='blocker-pre-finalize'
+    and fit_set_hash='' so Plan 06-06 Stages 6 + 8 can construct the partial
+    DswxEUCellMetrics for BLOCKER write.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    region: Literal["nam", "eu"]
+    # ISO date or '1996-01-01-PROTEUS-baseline' / 'blocker-pre-finalize' sentinel
+    grid_search_run_date: str
+    # sha256 hex of sorted (AOI, scene) IDs concatenated; 'n/a' for NAM; '' for BLOCKER
+    fit_set_hash: str
+
+
+class PerAOIF1Breakdown(BaseModel):
+    """One AOI's F1 in the recalibration fit set (DswxEU diagnostic; D-13)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    aoi_id: str                 # 'alcantara' / 'tagus' / etc.
+    biome: str                  # 'Mediterranean reservoir' / etc.
+    wet_scene_f1: float
+    dry_scene_f1: float
+    aoi_mean_f1: float
+
+
+class LOOCVPerFold(BaseModel):
+    """One fold of the post-hoc LOO-CV (DswxEU diagnostic; D-14).
+
+    B1 fix: LOO-CV is leave-one-pair-out across 10 fit-set pairs (5 AOIs x 2
+    wet/dry seasons). Each fold leaves out a single (aoi, season) pair, refits
+    on the remaining 9 pairs, and scores the left-out pair at the per-fold
+    refit-best gridpoint. Total folds = 10 (NOT 12; Balaton is held out and
+    NOT in the fit set; NOT 5 — leave-one-AOI-out collapses both seasons of
+    the held-out AOI together which loses signal).
+
+    ``left_out_season`` field encodes the pair identity. CONTEXT D-14 wording
+    "rotate 12 times" was a writing error in CONTEXT that conflated 12 fit-set
+    + held-out total pairs with the actual 10 fit-set folds.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    fold_idx: int               # 0..9 (10 folds per B1 fix)
+    left_out_aoi: str           # 'alcantara' / 'tagus' / etc.
+    left_out_season: Literal["wet", "dry"]  # B1 fix: encode pair-out granularity
+    refit_best_wigt: float      # WIGT threshold at per-fold refit best gridpoint
+    refit_best_awgt: float      # AWGT threshold at per-fold refit best gridpoint
+    refit_best_pswt2_mndwi: float  # PSWT2_MNDWI threshold at per-fold refit best gridpoint
+    test_f1: float
+
+
+class RegressionDiagnostic(BaseModel):
+    """N.Am. positive-control regression diagnostic (DswxNam; D-20).
+
+    f1_below_regression_threshold: bool flag computed at eval close
+    (run_eval_dswx_nam.py Stage 8). When True, regression_diagnostic_required
+    enumerates the BOA-offset / Claverie cross-cal / SCL-mask audit steps
+    that must complete before EU recalibration proceeds. Plan 06-06 Stage 0
+    asserts ``not f1_below_regression_threshold OR investigation_resolved``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    f1_below_regression_threshold: bool
+    # e.g. ['boa_offset_check', 'claverie_xcal_check', 'scl_mask_audit']
+    regression_diagnostic_required: list[str]
+    investigation_resolved: bool
+
+
+class DswxNamCellMetrics(MetricsJson):
+    """Phase 6 N.Am. DSWx positive-control cell aggregate (D-26 + D-18 + D-20).
+
+    Fields beyond MetricsJson base:
+    - selected_aoi / selected_scene_id / cloud_cover_pct / candidates_attempted:
+      runtime auto-pick result from CANDIDATES list iteration.
+    - region: stamped 'nam' (Literal).
+    - cell_status: PASS / FAIL / BLOCKER (BLOCKER if both candidates failed).
+    - named_upgrade_path (D-15): None on PASS; 'ML-replacement (DSWX-V2-01)' on
+      0.85 <= F1 < 0.90; 'BOA-offset / Claverie cross-cal regression' on F1 < 0.85.
+    - regression: RegressionDiagnostic embedded for INVESTIGATION_TRIGGER state.
+    - f1_full_pixels (W2 fix): F1 without shoreline buffer exclusion (diagnostic;
+      None for BLOCKER state when no F1 was computed).
+    - shoreline_buffer_excluded_pixels (W2 fix): count for transparency (None
+      for BLOCKER). W2 fix establishes schema symmetry with DswxEUCellMetrics
+      and eliminates the need for a ``eval-dswx_nam/diagnostics.json`` sidecar.
+    """
+
+    model_config = ConfigDict(extra="forbid", ser_json_inf_nan="constants")
+
+    selected_aoi: str
+    selected_scene_id: str
+    cloud_cover_pct: float
+    # {aoi_name, scenes_found, cloud_min}
+    candidates_attempted: list[dict[str, str | int | float]]
+    region: Literal["nam"] = "nam"
+    cell_status: DswxNamCellStatus
+    named_upgrade_path: str | None = None
+    regression: RegressionDiagnostic
+    # W2 fix: schema symmetry with DswxEUCellMetrics; Plan 06-05 writes both fields:
+    f1_full_pixels: float | None = None
+    shoreline_buffer_excluded_pixels: int | None = None
+
+
+class DswxEUCellMetrics(MetricsJson):
+    """Phase 6 EU DSWx held-out-Balaton cell aggregate (D-13 + D-26).
+
+    Fields beyond MetricsJson base:
+    - region: stamped 'eu' (Literal).
+    - thresholds_used: DSWEThresholdsRef stamping which (region, fit_set_hash,
+      grid_search_run_date) thresholds were applied.
+    - fit_set_mean_f1 / loocv_mean_f1 / loocv_gap (D-14): grid-search outputs.
+      W3 fix: typed ``float``; accept NaN sentinel for BLOCKER pre-finalize
+      state (Plan 06-06 Stages 6 + 8 stamp NaN when grid bounds OR LOO-CV gap
+      gates trigger before final-result computation).
+    - loocv_per_fold (D-14): 10-fold leave-one-pair-out per-fold detail
+      (B1 fix; was 12). Default ``[]`` for BLOCKER state.
+    - per_aoi_breakdown (D-13 diagnostic): per-fit-AOI wet/dry F1 plus mean.
+      Default ``[]`` for BLOCKER state.
+    - f1_full_pixels (D-16 diagnostic): F1 without shoreline buffer exclusion.
+      W3 fix: typed ``float``; accepts NaN for BLOCKER state.
+    - shoreline_buffer_excluded_pixels (D-16): count for transparency. W3 fix:
+      typed ``int``; defaults to 0 for BLOCKER state.
+    - cell_status: PASS / FAIL / BLOCKER.
+    - named_upgrade_path (D-15): None on PASS; 'ML-replacement (DSWX-V2-01)'
+      on 0.85 <= F1 < 0.90; 'fit-set quality review' on F1 < 0.85;
+      'grid expansion required' (W3) on edge-of-grid BLOCKER;
+      'fit-set quality review' on LOO-CV gap BLOCKER.
+
+    The OFFICIAL EU matrix-cell F1 = held-out Balaton F1, stamped in
+    reference_agreement.measurements['f1'] (inherited from MetricsJson base
+    schema). fit_set_mean_f1 + LOO-CV are diagnostics-only per BOOTSTRAP §5.4.
+
+    ``ser_json_inf_nan="constants"`` enables NaN-preserving JSON round-trip for
+    BLOCKER pre-finalize state (W3 fix; pydantic-core default serializes NaN as
+    null which breaks round-trip).
+    """
+
+    model_config = ConfigDict(extra="forbid", ser_json_inf_nan="constants")
+
+    region: Literal["eu"] = "eu"
+    thresholds_used: DSWEThresholdsRef
+    fit_set_mean_f1: float
+    loocv_mean_f1: float
+    loocv_gap: float
+    loocv_per_fold: list[LOOCVPerFold] = Field(default_factory=list)
+    per_aoi_breakdown: list[PerAOIF1Breakdown] = Field(default_factory=list)
+    f1_full_pixels: float
+    shoreline_buffer_excluded_pixels: int = 0
+    cell_status: DswxEUCellStatus
+    named_upgrade_path: str | None = None
