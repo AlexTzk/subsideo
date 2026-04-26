@@ -339,6 +339,23 @@ if __name__ == "__main__":
                 n_layers_present=n_layers,
                 dist_status_nonempty=dist_status_nonempty,
             )
+        except TimeoutError as e:
+            # HI-02 fix: distinguish hang vs crash so the
+            # ChainedRunStatus='dist_s1_hang' Literal (matrix_schema.py:646)
+            # is reachable. CONTEXT D-14 promises a hung-vs-crashed distinction
+            # in CONCLUSIONS / metrics.json -- if dist_s1 (or an in-process
+            # supervisor) raises TimeoutError on a wallclock budget breach,
+            # surface that as 'dist_s1_hang'. Out-of-process kills (SIGKILL
+            # from an external supervisor) bypass this handler entirely and
+            # the script is terminated by the signal -- that case is reported
+            # by the supervisor itself, not by this function.
+            logger.error("chained_retry HANG for {}: {}", cfg.event_id, e)
+            return ChainedRunResult(
+                status="dist_s1_hang",
+                output_dir=str(chained_dst) if chained_dst.exists() else None,
+                error=repr(e),
+                traceback=traceback.format_exc(),
+            )
         except Exception as e:
             logger.error("chained_retry crashed for {}: {}", cfg.event_id, e)
             return ChainedRunResult(
