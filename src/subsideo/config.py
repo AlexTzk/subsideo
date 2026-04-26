@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 from pydantic_settings import (
     BaseSettings,
@@ -11,7 +12,6 @@ from pydantic_settings import (
     SettingsConfigDict,
     YamlConfigSettingsSource,
 )
-import yaml
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -38,12 +38,24 @@ class Settings(BaseSettings):
         default_factory=lambda: Path.home() / ".subsideo",
         description="Cache directory for downloaded data",
     )
+    dswx_region: Literal["nam", "eu"] = Field(
+        default="nam",
+        validation_alias="SUBSIDEO_DSWX_REGION",
+        description=(
+            "DSWx threshold region selector. SUBSIDEO_DSWX_REGION env var. "
+            "Determines which DSWEThresholds instance run_dswx applies "
+            "(THRESHOLDS_NAM = PROTEUS defaults; THRESHOLDS_EU = Phase 6 "
+            "recalibrated). DSWxConfig.region (Plan 06-03) overrides per-call. "
+            "Plan 06-02 D-10."
+        ),
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         yaml_file=None,
         extra="ignore",
+        populate_by_name=True,
     )
 
     @classmethod
