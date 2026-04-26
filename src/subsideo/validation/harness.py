@@ -45,7 +45,7 @@ from loguru import logger
 # Retry policy (PITFALLS P0.4)
 # ----------------------------------------------------------------------------
 
-RetrySource = Literal["CDSE", "EARTHDATA", "CLOUDFRONT", "HTTPS"]
+RetrySource = Literal["CDSE", "EARTHDATA", "CLOUDFRONT", "HTTPS", "EFFIS"]
 
 RETRY_POLICY: dict[str, dict[str, Any]] = {
     "CDSE": {
@@ -65,6 +65,21 @@ RETRY_POLICY: dict[str, dict[str, Any]] = {
     },
     "HTTPS": {
         "retry_on": [429, 503],
+        "abort_on": [401, 403, 404],
+    },
+    "EFFIS": {
+        # Phase 5 DIST-05 EFFIS WFS access. Public endpoint (no auth) but
+        # owslib raises ConnectionError / TimeoutError from urllib3 rather
+        # than HTTP status codes for transport-layer failures, so both kinds
+        # appear in retry_on. 504 is added because EFFIS MapServer responses
+        # can take 30+s for large bbox + date-window queries (RESEARCH Probe
+        # 3 Risk F). The abort_on triplet 401/403/404 mirrors EARTHDATA: 401
+        # is impossible on a public endpoint but is included for parity in
+        # case the WFS server starts requiring tokens; 404 catches typo'd
+        # typenames (chosen layer name from eval-dist_eu/effis_endpoint_lock.txt
+        # is locked at Plan 05-05 / 05-07; runtime drift surfaces as 404
+        # rather than infinite retry).
+        "retry_on": [429, 503, 504, "ConnectionError", "TimeoutError"],
         "abort_on": [401, 403, 404],
     },
 }

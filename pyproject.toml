@@ -123,6 +123,7 @@ validation = [
     "pandas>=2.2",
     "scikit-image>=0.22",       # image comparison metrics (SSIM, RMSE)
     "statsmodels>=0.14",        # spatial statistics for validation reports
+    "owslib>=0.35,<1",          # Phase 5 EFFIS WFS access (noarch pure-Python; RESEARCH Probe 5)
     # EGMStoolkit 0.3.0 is GitHub-only; the upstream setup.cfg is missing
     # a src-layout package_dir entry, so a plain `pip install` of the tag
     # installs dist-info only. Use the fork/branch below once published,
