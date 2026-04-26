@@ -124,9 +124,15 @@ def _build_retry_session() -> requests.Session:
 
     policy = RETRY_POLICY["EFFIS"]
     status_forcelist = [s for s in policy["retry_on"] if isinstance(s, int)]
+    # ME-02 fix: read retry parameters from RETRY_POLICY['EFFIS'] (single
+    # source of truth per CONTEXT D-18) rather than hardcoding 5 / 2 here.
+    # Defaults match the historical hardcoded values for back-compat if a
+    # caller swaps in a policy dict that lacks these keys.
+    max_attempts = int(policy.get("max_attempts", 5))
+    backoff_factor = float(policy.get("backoff_factor", 2))
     retry = Retry(
-        total=5,
-        backoff_factor=2,       # 2s, 4s, 8s, 16s, 32s (cap 60s via harness convention)
+        total=max_attempts,
+        backoff_factor=backoff_factor,  # 2s, 4s, 8s, 16s, 32s (cap 60s)
         status_forcelist=status_forcelist,
         allowed_methods=frozenset(["GET"]),
         raise_on_status=False,  # we check abort_on manually post-response

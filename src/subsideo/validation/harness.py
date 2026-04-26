@@ -81,6 +81,12 @@ RETRY_POLICY: dict[str, dict[str, Any]] = {
         # rather than infinite retry).
         "retry_on": [429, 503, 504, "ConnectionError", "TimeoutError"],
         "abort_on": [401, 403, 404],
+        # ME-02 fix: declare retry parameters here so effis.py reads them
+        # from the policy rather than hardcoding (CONTEXT D-18 single source
+        # of truth). Backoff schedule: 2s, 4s, 8s, 16s, 32s (urllib3 caps
+        # at 60s by default).
+        "max_attempts": 5,
+        "backoff_factor": 2,
     },
 }
 
