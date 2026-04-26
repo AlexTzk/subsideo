@@ -90,3 +90,18 @@ Advisory rejections (soft signals elevated in selection rationale — not hard a
 
 **Held-out (gate-of-truth per BOOTSTRAP §5.4):**
 - Balaton (HU) — bbox (17.20, 46.60, 18.20, 46.95), MGRS 33TXP, EPSG 32633
+
+## User Lock-In
+
+**Status:** APPROVED
+**Date:** 2026-04-26
+**Approved by:** Alex V (project owner)
+**Approval scope:**
+- 5 fit-set AOIs (Alcántara, Tagus, Vänern, Garda, Doñana) locked per the table above
+- Balaton (HU) locked as held-out gate-of-truth
+- N.Am. positive-control AOIs locked: Lake Tahoe T10SFH (USGS-verified) + Lake Pontchartrain T15RYP (per `dswx_proteus_atbd_ceiling_probe.md`)
+- PROTEUS ATBD F1 ceiling resolved via path (c): OPERA Cal/Val F1_OSW = 0.8786 ± 0.08 (N=52 scenes, 2023). The "F1 ≈ 0.92" assumption from BOOTSTRAP is corrected — 0.92 is OSW *class accuracy*, not F1. Plan 06-05 is to interpret an N.Am. F1 of ~0.88 as on-baseline, not as a regression.
+
+**Caveat acknowledged:** Live CDSE STAC scoring deferred (collection-name mismatch); fallback values from RESEARCH.md table accepted. JRC live downloads skipped to avoid timeout. Plan 06-05 / 06-06 may re-run the notebook (`jupyter nbconvert --execute --inplace`) if live scores are required.
+
+Plan 06-06 fit-set compute is unblocked.
