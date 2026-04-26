@@ -28,7 +28,7 @@ decisions:
 metrics:
   duration: "19 minutes"
   completed_date: "2026-04-25T23:22:35Z"
-  tasks_completed: 2
+  tasks_completed: 3
   tasks_total: 3
   files_created: 1
   files_modified: 0
@@ -46,7 +46,7 @@ EFFIS WFS endpoints both unreachable (ReadTimeout + DNS NXDOMAIN); adopted REST 
 |---|------|--------|--------|
 | 1 | Verify owslib + init lock header | b12c34b | Done |
 | 2 | GetCapabilities probe + smoke test | 4ddefb4 | Done |
-| 3 | checkpoint:human-verify | — | **PAUSED** |
+| 3 | checkpoint:human-verify | — | **APPROVED** (REST pivot accepted by user 2026-04-25) |
 
 ## Endpoint Probe Results
 
