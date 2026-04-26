@@ -52,6 +52,30 @@ eval-all: eval-nam eval-eu results-matrix
 results-matrix:
 	$(PY) -m subsideo.validation.matrix_writer --out results/matrix.md
 
+# ----------------------------------------------------------------------------
+# Phase 6 DSWx recalibration pipeline (DSWX-04 + DSWX-05)
+# ----------------------------------------------------------------------------
+# scripts/recalibrate_dswe_thresholds.py is a Phase 6 deliverable (Plan 06-06).
+# Wired here in Plan 06-01 so Plan 06-06 can `make recalibrate-dswx` immediately
+# without Makefile edits.
+recalibrate-dswx:
+	$(SUPERVISOR) scripts/recalibrate_dswe_thresholds.py
+.PHONY: recalibrate-dswx
+
+# ----------------------------------------------------------------------------
+# Phase 6 docs auto-render: dswx_aoi_selection.ipynb -> dswx_fitset_aoi_selection.md
+# ----------------------------------------------------------------------------
+# Per CONTEXT D-01 + RESEARCH §Notebook rendering: keep the rendered docs copy
+# in sync with the source notebook. nbconvert verified present in conda env.
+docs/dswx_fitset_aoi_selection.md: notebooks/dswx_aoi_selection.ipynb
+	micromamba run -n subsideo jupyter nbconvert --to markdown \
+	    --output-dir docs \
+	    --output dswx_fitset_aoi_selection.md \
+	    notebooks/dswx_aoi_selection.ipynb
+
+dswx-fitset-aoi-md: docs/dswx_fitset_aoi_selection.md
+.PHONY: dswx-fitset-aoi-md
+
 # Safety: require FORCE=1 to prevent accidental wipes (T-07-02 mitigation).
 clean-cache:
 ifeq ($(FORCE),1)
