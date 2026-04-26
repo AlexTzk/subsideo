@@ -1,0 +1,45 @@
+# Curated list of EU AOIs known to trigger DSWE failure modes.
+# Source: Phase 6 RESEARCH 2026-04-26 + literature review.
+# Plan-phase 06-01 commits per-AOI flags; notebook reads for advisory display.
+# CONTEXT D-02: hybrid auto-reject (hard signals) + advisory pre-screen (soft signals).
+failure_modes:
+  glacier_or_frozen_lake:
+    - aoi_id: vanern
+      months: [12, 1, 2]
+      flag: 'frozen surface; auto-reject'
+    - aoi_id: saimaa
+      months: [11, 12, 1, 2, 3, 4]
+      flag: 'frozen surface; auto-reject'
+    - aoi_id: malaren
+      months: [12, 1, 2, 3]
+      flag: 'frozen surface; auto-reject'
+
+  mountain_shadow:
+    - aoi_id: garda
+      months: [10, 11, 12, 1, 2]
+      flag: 'low sun angle; advisory'
+    - aoi_id: leman
+      months: [10, 11, 12, 1, 2]
+      flag: 'low sun angle; advisory'
+    - aoi_id: maggiore
+      months: [10, 11, 12, 1, 2]
+      flag: 'low sun angle; advisory'
+
+  tidal_turbidity:
+    - aoi_id: tagus
+      flag: 'suspended sediment; advisory'
+    - aoi_id: loire
+      flag: 'suspended sediment + tidal flats; advisory'
+    - aoi_id: severn
+      flag: 'mudflats + 14m tidal range; advisory'
+
+  drought_year_risk:
+    - aoi_id: alcantara
+      years: [2017, 2022]
+      flag: 'low reservoir; alternate-year retry'
+    - aoi_id: alarcon
+      years: [2017, 2022]
+      flag: 'very low reservoir; alternate-year retry'
+    - aoi_id: donana
+      years: [2017, 2022]
+      flag: 'wetlands dry; alternate-year retry'
