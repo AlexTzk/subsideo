@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
 status: executing
 stopped_at: Phase 6 context gathered
-last_updated: "2026-04-26T20:36:31.389Z"
-last_activity: 2026-04-26 -- Phase 6 planning complete
+last_updated: "2026-04-26T21:54:50.294Z"
+last_activity: 2026-04-26 -- Phase 06 execution started
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 40
-  completed_plans: 33
-  percent: 83
+  completed_plans: 35
+  percent: 88
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 05 — dist-s1-opera-v0-1-effis-eu
+**Current focus:** Phase 06 — dswx-s2-n-am-eu-recalibration
 
 ## Current Position
 
-Phase: 6
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-26 -- Phase 6 planning complete
+Phase: 06 (dswx-s2-n-am-eu-recalibration) — EXECUTING
+Plan: 1 of 7
+Status: Executing Phase 06
+Last activity: 2026-04-26 -- Phase 06 execution started
 
 **Resume path:** All 5 plans complete (Waves 1 + 2 + 3 + 4). Plan 04-05 (Wave 4: docs + brief) renamed `CONCLUSIONS_DISP_EGMS.md` → `CONCLUSIONS_DISP_EU.md` via `git mv` (R100; history preserved via `git log --follow`); appended 4 v1.1 sub-sections (§11 Product Quality / §12 Reference Agreement / §13 Ramp Attribution / §14 Brief link) to both `CONCLUSIONS_DISP_N_AM.md` (258 → 356 LOC) and `CONCLUSIONS_DISP_EU.md` (304 → 404 LOC) with v1.0 baseline numbers preserved as continuity preamble; wrote `.planning/milestones/v1.1-research/DISP_UNWRAPPER_SELECTION_BRIEF.md` (129 LOC) with 4-candidate × 4-column scoping table (PHASS+post-deramping S/SPURT native M/tophu+SNAPHU L/20×20 m fallback L) and attribution-driven prioritisation recommending ERA5 toggle (DISP-V2-02) FIRST in v1.2; appended §3 multilook ADR to `docs/validation_methodology.md` (247 → 365 LOC) with 5-part PITFALLS+FEATURES dialogue and explicit "Native 5×10 m stays production default" per DISP-05; §4 + §5 NOT created per Phase 3 D-15 append-only. **Phase 4 closure complete.** Honest FAIL signal preserved + scoped: SoCal r=0.049 / Bologna r=0.336 (both FAIL > 0.92), both attributed_source='inconclusive', cross-cell pattern flags atmospheric long-wavelength curvature as primary v1.2 candidate. Ready for verifier per `.planning/config.json` `workflow.verifier: true`.
 
