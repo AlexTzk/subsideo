@@ -182,10 +182,10 @@ DISP-01 (02, 04), DISP-02 (01, 04), DISP-03 (01, 03, 04, 05), DISP-04 (05), DISP
 **Plans**: 9 plans across 6 waves
 
 Plans:
-- [ ] 05-01-PLAN.md — ROADMAP + REQUIREMENTS scope amendment (defer DIST-01/02/03; correct EMSR686; document Spain substitution; D-18 + D-24 amendments; RESEARCH Resolution Log) [Wave 0] [DIST-01, DIST-02, DIST-03]
-- [ ] 05-02-PLAN.md — EFFIS WFS endpoint GetCapabilities probe + lock artifact [Wave 0] [DIST-05, DIST-06]
-- [ ] 05-03-PLAN.md — Pure-additive scaffolding: bootstrap.py module + matrix_schema.py 7 EU types + minimal DistNamCellMetrics-Deferred [Wave 1] [DIST-03, DIST-05, DIST-06, DIST-07]
-- [ ] 05-04-PLAN.md — harness.RETRY_POLICY['EFFIS'] + pyproject.toml owslib pip pin [Wave 1] [DIST-05]
+- [x] 05-01-PLAN.md — ROADMAP + REQUIREMENTS scope amendment (defer DIST-01/02/03; correct EMSR686; document Spain substitution; D-18 + D-24 amendments; RESEARCH Resolution Log) [Wave 0] [DIST-01, DIST-02, DIST-03]
+- [x] 05-02-PLAN.md — EFFIS WFS endpoint GetCapabilities probe + lock artifact [Wave 0] [DIST-05, DIST-06]
+- [x] 05-03-PLAN.md — Pure-additive scaffolding: bootstrap.py module + matrix_schema.py 7 EU types + minimal DistNamCellMetrics-Deferred [Wave 1] [DIST-03, DIST-05, DIST-06, DIST-07]
+- [x] 05-04-PLAN.md — harness.RETRY_POLICY['EFFIS'] + pyproject.toml owslib pip pin [Wave 1] [DIST-05]
 - [ ] 05-05-PLAN.md — validation/effis.py (WFS query + dual rasterise) + matrix_writer dist:nam (DEFERRED) + dist:eu (X/3 PASS) render branches [Wave 2] [DIST-04, DIST-05, DIST-06]
 - [ ] 05-06-PLAN.md — run_eval_dist.py rewrite: CMR Stage 0 auto-supersede probe + DEFERRED metrics.json write + D-16 archival + unit tests [Wave 2] [DIST-01, DIST-02, DIST-03, DIST-04]
 - [ ] 05-07-PLAN.md — run_eval_dist_eu.py rewrite as declarative EVENTS list (Aveiro chained triple including missing Oct 10 + Evros EMSR686 + Spain Culebra) + track_number probe [Wave 3] [DIST-05, DIST-06, DIST-07]
