@@ -28,8 +28,8 @@ decisions:
 metrics:
   duration: "<2 min (script write + verification; actual eval runtime = up to 8h)"
   completed: "2026-04-25"
-  tasks_completed: 1
-  tasks_total: 1
+  tasks_completed: 2
+  tasks_total: 2
   files_modified: 1
 ---
 
@@ -126,15 +126,30 @@ All 19 acceptance criteria checks passed post-rewrite:
 - **Files modified:** `run_eval_dist_eu.py`
 - **Commit:** 8503808
 
-## Checkpoint Status
+## Checkpoint Status — RESOLVED 2026-04-25
 
-Plan 05-07 has a `checkpoint:human-verify` task after Task 1. The script is committed but NOT yet executed. The checkpoint requires the user to:
+User approved live `make eval-dist-eu` invocation. Eval ran end-to-end in
+~30 minutes (well under the 8-hour budget) and produced valid sidecars.
 
-1. Visually inspect the EVENTS list in `run_eval_dist_eu.py`
-2. Run `make eval-dist-eu` (8-hour wall budget)
-3. Verify `eval-dist_eu/metrics.json` and `eval-dist_eu/meta.json` parse cleanly
+**Outcome: 0/3 events PASS — honest FAIL signal preserved (matches the
+Phase 4 pattern).**
 
-The actual execution and metrics output are out of scope for this plan's SUMMARY (they happen at runtime under the checkpoint).
+| Event | Status | Cause | Fix scope |
+|-------|--------|-------|-----------|
+| aveiro 2024-09-28 | FAIL | dist_s1 produced no GEN-DIST-STATUS.tif (silent dist_s1 failure) | v1.2 follow-up: investigate dist_s1 silent-failure mode for this AOI/post-date |
+| evros 2023-09-05 | FAIL | dist_s1 produced no GEN-DIST-STATUS.tif (likely same root cause + speculative track=29) | v1.2 follow-up: probe via `dist_s1_enumerator.get_burst_ids_in_mgrs_tiles` first |
+| spain_culebra 2022-06-28 | FAIL | `ValueError: no LUT data for MGRS 29TQG track 125` (speculative fallback wrong; valid tracks are 1, 52, 74, 147, 154) | v1.2 follow-up: fix runtime probe to override speculative fallback |
+
+The script's per-event try/except absorbed all 3 failures cleanly. The
+metrics.json + meta.json validate against `DistEUCellMetrics` /
+`MetaJson` (Pydantic v2 `extra='forbid'` would have raised on any drift).
+The matrix render branches in `matrix_writer.py` (Plan 05-05) consume the
+metrics.json as-is and produce `0/3 PASS (3 FAIL) | worst f1=0.000 (aveiro)`.
+
+The infrastructure deliverables are complete and tested. The scientific
+verdict is FAIL with three distinct, attributable causes — exactly the
+pattern Phase 4 established for honest FAIL recording. v1.2 will fix the
+track-probing + dist_s1 silent-failure issues and re-run.
 
 ## Known Stubs
 
