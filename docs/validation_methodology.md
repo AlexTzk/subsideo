@@ -363,3 +363,151 @@ milestone per Phase 4 04-CONTEXT.md §Deferred. CONCLUSIONS may cite
 yield r=Y" as a v1.2/v2 footnote.)
 
 ---
+
+## 4. DIST-S1 Validation Methodology
+
+This section documents the methodological choices made by Phase 5 for the
+DIST-S1 product family (N.Am. + EU). Per the Phase 5 scope amendment
+(2026-04-25), §4.5 (config-drift gate semantics) is **deferred to v1.2**
+alongside DIST-01 / DIST-02 / DIST-03 — the gate cannot be authored without
+an operational reference to drift against, and OPERA `L3_DIST-ALERT-S1_V1`
+returns empty in CMR as of writing (RESEARCH Probes 1 + 6).
+
+### 4.1 Single-event F1 variance + block-bootstrap CI
+
+DIST-S1 ships at 30 m posting; a single Aveiro-class event yields O(10^4–10^5)
+classified pixels but the underlying detection units (burn-scar polygons + RTC
+multilooked windows) are spatially correlated at scales of hundreds of metres.
+A naive pixel-wise F1 over-counts independent samples and produces a
+spuriously narrow confidence interval.
+
+The block-bootstrap CI in `src/subsideo/validation/bootstrap.py`
+(Hall 1985 — moving block bootstrap with PCG64 seed=0) addresses this. The
+method partitions the per-event difference grid into spatially contiguous
+blocks of side `DEFAULT_BLOCK_SIZE_M = 1000` (m) — large enough to
+de-correlate adjacent burn-scar polygons under the Sentinel-1 12-day repeat —
+and resamples blocks with replacement `DEFAULT_N_BOOTSTRAP = 500` times to
+estimate the F1 distribution. Reported CIs are at `DEFAULT_CI_LEVEL = 0.95`.
+Pixel size for the block-count math is `DEFAULT_PIXEL_SIZE_M = 30`.
+
+These constants live as module-level attributes in `bootstrap.py` and are
+written into `meta.json.bootstrap_config` (when populated) so a downstream
+audit can re-evaluate the same data with different block sizes if the
+correlation length is later revised. The seed is fixed (`DEFAULT_RNG_SEED = 0`)
+so repeat runs of the same eval produce byte-identical CIs — this is the
+reproducibility contract for the matrix.
+
+The CI is the load-bearing pass/fail signal: a single F1 point estimate is
+not actionable when the bootstrap distribution has a CI half-width comparable
+to the threshold (e.g. F1 = 0.71 [0.55, 0.86] is qualitatively different
+from F1 = 0.71 [0.69, 0.73] even though both have the same point estimate).
+Phase 5 reports both the point estimate and the 95% CI in every per-event
+row of the dist:eu cell.
+
+### 4.2 EFFIS rasterisation choice (`all_touched=False` primary)
+
+The EFFIS REST API (`api.effis.emergency.copernicus.eu/rest/2/burntareas/current/`,
+adopted after both candidate WFS endpoints failed in Plan 05-02) returns
+burnt-area perimeter polygons as GeoJSON Feature objects. The validation
+pipeline must rasterise these onto the 30-m OPERA DIST grid for cell-wise
+comparison.
+
+`src/subsideo/validation/effis.py` performs a **dual rasterise**:
+
+- **Primary**: `all_touched=False` — only pixels whose *centre* lies inside a
+  burn-scar polygon are flagged as positive. This matches OPERA DIST-S1's own
+  rasterisation convention (centre-of-pixel sampling against the burn polygon),
+  which is what the DIST product effectively encodes when its high-resolution
+  internal mask is downsampled to 30 m. CONTEXT D-17 records this as the
+  binding choice for the per-event F1 numerator.
+
+- **Diagnostic**: `all_touched=True` — every pixel touched by the polygon
+  boundary is flagged. The intersection of the two rasters bounds the
+  rasterisation-induced uncertainty: `all_touched=True` is the maximally
+  permissive count, `all_touched=False` is the centre-only count. The two
+  numbers are reported side-by-side in the per-event diagnostic so the user
+  can judge whether a borderline F1 is rasterisation-limited.
+
+The constant pinning the REST resource path is `EFFIS_LAYER_NAME =
+"burntareas/current"` (was a WFS typename in the v1.0 plan; the REST pivot
+is documented in `eval-dist_eu/effis_endpoint_lock.txt`).
+
+### 4.3 EFFIS class-definition mismatch caveat
+
+EFFIS reports burnt-area perimeters consolidated *post-event* (typically
+days-to-weeks after the fire is extinguished). OPERA DIST-S1, in contrast,
+detects active disturbance signal in the radar backscatter time series — it
+flags pixels as *first-detection*, *provisional*, *confirmed*, *finished*
+along the alert lifecycle.
+
+PITFALLS P4.5 records the consequence: a pixel labelled
+`GEN-DIST-STATUS = 5` (confirmed-fd-high) by DIST-S1 may correspond to an
+EFFIS polygon dated 14 days *after* the DIST detection event. The two
+references are *temporally consistent* (both indicate "fire happened in this
+period") but *not class-equivalent*. Specifically:
+
+- DIST-S1 flags wildfire **and** clear-cut **and** other surface
+  disturbances; EFFIS is **fire-only**. (This is why Plan 05-07 substituted
+  Spain Sierra de la Culebra for the originally-planned Romania 2022
+  clear-cuts: clear-cuts have no EFFIS coverage so the per-event F1 would
+  spuriously read 0.)
+- The EFFIS polygon footprint is the *final extent* (cumulative burned
+  area); the DIST-S1 footprint at any single post-date is the
+  *snapshot-of-detection* extent. F1 is computed against the *cumulative*
+  EFFIS polygon and the post-date DIST-S1 raster — meaning a low-recall
+  result for an early post-date may simply reflect the fire still spreading,
+  not a missed detection.
+
+The chained_retry differentiator (DIST-07; aveiro Sept 28 → Oct 10 → Nov 15)
+exercises this: each successive post-date should bring the DIST-S1 footprint
+closer to the EFFIS final extent (recall increases monotonically), giving a
+qualitative validation of the alert-promotion logic without requiring
+EFFIS to be re-queried at intermediate dates.
+
+### 4.4 CMR auto-supersede behaviour (DIST-04)
+
+The N.Am. dist:nam matrix cell ships as DEFERRED in v1.1 because the OPERA
+v0.1 DIST-S1 sample has no canonical CloudFront URL (Probe 1: notebook-recipe
+regeneration only) and the operational `OPERA_L3_DIST-ALERT-S1_V1`
+collection is empty in CMR (Probe 6 as of 2026-04-25). v1.2 will add the
+full F1+CI pipeline once operational publishes.
+
+Rather than freeze v1.1 with a stale "operational not available" assertion,
+Plan 05-06 implements an **auto-supersede CMR probe** in
+`run_eval_dist.py` Stage 0:
+
+1. Every `make eval-dist-nam` invocation queries CMR for
+   `OPERA_L3_DIST-ALERT-S1_V1` covering T11SLT 2025-01-21 ± 7 days
+   (`earthaccess.search_data`).
+2. **Empty result** (the expected v1.1 outcome) → write `metrics.json` with
+   `cell_status='DEFERRED'`, `cmr_probe_outcome='operational_not_found'`.
+3. **Non-empty result** (v1.2 trigger event) → archive any pre-existing
+   `eval-dist/metrics.json` to `eval-dist/archive/v0.1_metrics_<mtime-iso>.json`
+   per CONTEXT D-16, then raise `NotImplementedError` pointing at v1.2.
+4. **Network/auth failure** → `cmr_probe_outcome='probe_failed'`, cell still
+   DEFERRED but with a different cause-code in the matrix render.
+
+The matrix render branch in `matrix_writer.py` reads `cmr_probe_outcome`
+verbatim and renders `DEFERRED (CMR: operational_not_found)` (or
+`probe_failed`) — the matrix surface always reflects the most recent probe
+outcome. When v1.2 lands and operational appears, the
+`NotImplementedError` is the unambiguous re-plan signal: the user runs
+`/gsd:plan-phase 5 --gaps` and the v1.2 milestone activates the full
+pipeline. The archival hook (`eval-dist/archive/`) preserves the v1.1
+deferred-state record for audit purposes — it is not overwritten by v1.2.
+
+This gives v1.1 a **forward-compatible** deferral: the cell automatically
+advances when operational publishes, with no manual repointing of scripts
+or manifest entries. The unit-test suite at
+`tests/unit/test_run_eval_dist_cmr_stage0.py` exercises all three outcome
+branches (operational_not_found, probe_failed, operational_found) so the
+contract is regression-protected.
+
+### 4.5 Config-drift gate semantics — DEFERRED to v1.2
+
+**Not authored in v1.1.** The config-drift gate compares the active
+`dist_s1` algorithm config against the config the operational reference
+was generated with; without an operational reference, no drift can be
+detected. v1.2 will land §4.5 alongside the operational F1+CI pipeline.
+
+---

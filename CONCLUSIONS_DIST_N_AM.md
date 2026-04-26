@@ -193,3 +193,63 @@ Pulled from the `subsideo` micromamba env (`micromamba run -n subsideo`):
 - **`dist_s1` 2.0.13 logs the full `RunConfigData` pydantic dump** when `run_dist_s1_workflow` returns -- this leaks ~2 KB of RTC input paths into stdout. Cosmetic only; not actionable from subsideo's side
 - **`dist_s1_enumerator.enumerate_one_dist_s1_product` has a `post_date_buffer_days < 6` hard cap** but the default value used inside `run_dist_s1_workflow` is 1, which misses nearly every post-image in practice. Consider upstream PR to change the default to 5 or at least document the trade-off
 - **`validate_dist_product` in `products/dist.py` used the rio_cogeo 6.x import path** -- fixed locally with a try/except fallback, but worth a note that subsideo's test suite mocks rio_cogeo entirely so import drift wasn't caught
+
+---
+
+## v1.1 Phase 5 Update (2026-04-25): dist:nam ships DEFERRED
+
+The above v1.0 narrative (Park Fire 2024, MGRS 10TFK, "structurally complete; reference unavailable") remains the historical baseline — the `eval-dist-park-fire/` cache directory preserves those outputs verbatim per Plan 05-08. v1.1 changes both the AOI **and** the validation strategy.
+
+### What changed
+
+- **AOI repointed**: Park Fire (10TFK, 2024-08-05) → **T11SLT, Los Angeles January 2025 wildfires (Palisades + Eaton, 2025-01-21)** per CONTEXT D-05 + RESEARCH Probe 6. The repoint is in `run_eval_dist.py` (Plan 05-06); the v1.0 cache directory survives at `eval-dist-park-fire/` for any future cross-comparison.
+- **Cell verdict**: ships as `cell_status='DEFERRED'` (not PASS/FAIL/STRUCTURALLY COMPLETE). matrix_writer renders the cell as `DEFERRED (CMR: operational_not_found)`.
+- **Why deferred**: the substantive F1+CI work (DIST-01 / DIST-02 / DIST-03) defers to v1.2 because:
+  - **RESEARCH Probe 1** found the OPERA v0.1 DIST-S1 sample has **no canonical CloudFront URL** (the v0.1 sample is regenerable only via the OPERA-ADT notebook recipe; there is no static distribution endpoint to F1-compare against).
+  - **RESEARCH Probe 6** confirmed `OPERA_L3_DIST-ALERT-S1_V1` returns **empty** in CMR as of 2026-04-25. The operational reference does not yet exist.
+  - Without either an operational reference or a stable v0.1 reference, F1 has nothing to compare against.
+
+### CMR auto-supersede behaviour (DIST-04)
+
+`run_eval_dist.py` Stage 0 runs an `earthaccess.search_data` probe against `OPERA_L3_DIST-ALERT-S1_V1` on every `make eval-dist-nam` invocation:
+
+| CMR result | `cmr_probe_outcome` | `cell_status` | What happens next |
+|---|---|---|---|
+| `[]` (Phase 5 default) | `operational_not_found` | `DEFERRED` | Write deferred metrics.json; matrix render = `DEFERRED (CMR: operational_not_found)` |
+| `Exception` (network/auth) | `probe_failed` | `DEFERRED` | Write deferred metrics.json; matrix render = `DEFERRED (CMR: probe_failed)` |
+| `[granule, ...]` (v1.2 trigger) | `operational_found` | n/a | CONTEXT D-16 archival of any prior metrics.json → `eval-dist/archive/v0.1_metrics_<mtime>.json` → `raise NotImplementedError("v1.2 work")` |
+
+The `NotImplementedError` is the unambiguous re-plan trigger: the user runs `/gsd:plan-phase 5 --gaps` once it surfaces and the v1.2 milestone activates the full F1+CI pipeline. The archive directory contract is in place now (committed in v1.1) so v1.2 inherits a tested foundation.
+
+### What's in `eval-dist/metrics.json`
+
+```json
+{
+  "schema_version": 1,
+  "cell_status": "DEFERRED",
+  "reference_source": "none",
+  "cmr_probe_outcome": "operational_not_found",
+  "reference_granule_id": null,
+  "deferred_reason": "Phase 5 scope amendment 2026-04-25: ...",
+  "product_quality": {"measurements": {}, "criterion_ids": []},
+  "reference_agreement": {"measurements": {}, "criterion_ids": []},
+  "criterion_ids_applied": [],
+  "runtime_conda_list_hash": null
+}
+```
+
+Full provenance is in `eval-dist/meta.json` (`MetaJson` schema; `git_sha`, `run_started_iso`, `run_duration_s ≈ 7s` for the deferred path, etc.). Pydantic v2 `extra='forbid'` enforces the contract.
+
+### Test coverage
+
+`tests/unit/test_run_eval_dist_cmr_stage0.py` (4 tests) exercises all three CMR-outcome branches plus the no-prior-metrics edge case for the D-16 archival hook. The deferred-cell contract is regression-protected so a typo in any of the `CMRProbeOutcome` Literal values (`operational_found` / `operational_not_found` / `probe_failed`) would fail the unit suite immediately rather than silently rendering the wrong matrix cell.
+
+### v1.2 hand-off
+
+When OPERA-ADT publishes operational `OPERA_L3_DIST-ALERT-S1_V1`, the next `make eval-dist-nam` invocation surfaces the `NotImplementedError`. v1.2 work items:
+
+1. Replace the `raise NotImplementedError` block in `run_eval_dist.py` with a real call to the dist-s1 pipeline + the F1 + 95% block-bootstrap CI machinery (already in `validation/bootstrap.py`).
+2. Extend `DistNamCellMetrics` (currently the minimal deferred shape from Plan 05-03) to add `config_drift: ConfigDriftReport`, `bootstrap_config: BootstrapConfig`, and `reference_agreement.metrics: dict[str, MetricWithCI]`.
+3. Author `docs/validation_methodology.md` §4.5 (config-drift gate semantics) — currently DEFERRED in v1.1 because there is no operational reference to drift against.
+
+The matrix render branch (`_render_dist_nam_deferred_cell` in `matrix_writer.py`) is a separate function that the v1.2 full-schema renderer will replace when `cell_status` is no longer DEFERRED. Until then, the deferred branch handles every Phase 5 invocation.
