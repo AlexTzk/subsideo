@@ -53,6 +53,7 @@ if __name__ == "__main__":
     from subsideo._mp import configure_multiprocessing
     configure_multiprocessing()
 
+    import hashlib
     import platform
     import subprocess
     import sys
@@ -596,8 +597,15 @@ if __name__ == "__main__":
         run_duration_s=run_duration_s,
         python_version=platform.python_version(),
         platform=platform.platform(),
+        # ME-04 fix: MetaJson.input_hashes is declared as dict[str, str] with
+        # description "SHA256 hex of primary inputs". The previous version
+        # stored r.effis_query_meta.filter_string[:64] (a truncated query
+        # parameter trace, not a digest). Use SHA256 hex of the encoded
+        # filter string so downstream provenance audits get a real digest.
         input_hashes={
-            f"effis_perimeters_{r.event_id}": r.effis_query_meta.filter_string[:64]
+            f"effis_perimeters_{r.event_id}": hashlib.sha256(
+                r.effis_query_meta.filter_string.encode("utf-8")
+            ).hexdigest()
             for r in per_event if r.effis_query_meta.filter_string
         },
     )
