@@ -254,3 +254,6 @@ eval-rtc/*
 .DS_Store
 .env
 __pycache__/
+
+# Phase 6: cached reference material from 06-01 PROTEUS ATBD probe (23MB, re-downloadable)
+.planning/milestones/*/proteus_atbd_cache/
