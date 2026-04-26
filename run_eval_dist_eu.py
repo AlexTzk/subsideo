@@ -81,7 +81,6 @@ if __name__ == "__main__":
     )
     from subsideo.validation.harness import (
         credential_preflight,
-        ensure_resume_safe,
     )
     from subsideo.validation.matrix_schema import (
         BootstrapConfig,
@@ -270,9 +269,17 @@ if __name__ == "__main__":
         """Single dist_s1 invocation for one (event, post_date) tuple."""
         from dist_s1 import run_dist_s1_workflow
 
-        if ensure_resume_safe(out_dir, ["*GEN-DIST-STATUS.tif"]):
-            logger.info("dist_s1 cached for {} {} at {}", cfg.event_id, post_date, out_dir)
-            return out_dir
+        # Resume guard: check for an actual GEN-DIST-STATUS.tif sentinel file
+        # rather than passing a glob pattern to ensure_resume_safe (which
+        # performs exact filename membership testing, not glob matching --
+        # see harness.py:432). HI-01 fix.
+        if out_dir.exists():
+            existing_sentinel = next(out_dir.glob("*GEN-DIST-STATUS.tif"), None)
+            if existing_sentinel is not None:
+                logger.info(
+                    "dist_s1 cached for {} {} at {}", cfg.event_id, post_date, out_dir
+                )
+                return out_dir
 
         out_dir.mkdir(parents=True, exist_ok=True)
         logger.info(
