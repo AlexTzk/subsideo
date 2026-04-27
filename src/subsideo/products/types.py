@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
 
@@ -148,6 +149,7 @@ class DSWxConfig:
     output_epsg: int | None = None
     output_posting_m: float = 30.0
     product_version: str = "0.1.0"
+    region: Literal["nam", "eu"] | None = None  # Phase 6 D-10: None = use Settings.dswx_region
 
 
 @dataclass

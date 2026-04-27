@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 from loguru import logger
 
 from subsideo.products.dswx_thresholds import THRESHOLDS_BY_REGION, DSWEThresholds
@@ -117,20 +118,20 @@ class IndexBands:
     IndexBands without re-reading SAFEs.
     """
 
-    mndwi: np.ndarray  # Modified NDWI (green - swir1) / (green + swir1)
-    ndvi: np.ndarray   # NDVI (nir - red) / (nir + red)
-    mbsrv: np.ndarray  # Multi-band visible (green + red)
-    mbsrn: np.ndarray  # Multi-band NIR (nir + swir1)
-    awesh: np.ndarray  # AWEI-shadow (blue + 2.5*green - 1.5*mbsrn - 0.25*swir2)
+    mndwi: npt.NDArray[np.float32]  # Modified NDWI (green - swir1) / (green + swir1)
+    ndvi: npt.NDArray[np.float32]   # NDVI (nir - red) / (nir + red)
+    mbsrv: npt.NDArray[np.float32]  # Multi-band visible (green + red)
+    mbsrn: npt.NDArray[np.float32]  # Multi-band NIR (nir + swir1)
+    awesh: npt.NDArray[np.float32]  # AWEI-shadow (blue + 2.5*green - 1.5*mbsrn - 0.25*swir2)
 
 
 def compute_index_bands(
-    blue: np.ndarray,
-    green: np.ndarray,
-    red: np.ndarray,
-    nir: np.ndarray,
-    swir1: np.ndarray,
-    swir2: np.ndarray,
+    blue: npt.NDArray[np.uint16],
+    green: npt.NDArray[np.uint16],
+    red: npt.NDArray[np.uint16],
+    nir: npt.NDArray[np.uint16],
+    swir1: npt.NDArray[np.uint16],
+    swir2: npt.NDArray[np.uint16],
 ) -> IndexBands:
     """Compute the 5 DSWE diagnostic index bands from S2 L2A reflectance.
 
@@ -168,13 +169,13 @@ def compute_index_bands(
 
 def score_water_class_from_indices(
     indices: IndexBands,
-    blue: np.ndarray,
-    nir: np.ndarray,
-    swir1: np.ndarray,
-    swir2: np.ndarray,
+    blue: npt.NDArray[np.uint16],
+    nir: npt.NDArray[np.uint16],
+    swir1: npt.NDArray[np.uint16],
+    swir2: npt.NDArray[np.uint16],
     *,
     thresholds: DSWEThresholds,
-) -> np.ndarray:
+) -> npt.NDArray[np.uint8]:
     """Score the 5-bit DSWE diagnostic given pre-computed index bands.
 
     Reads only the 3 grid-tunable thresholds (WIGT/AWGT/PSWT2_MNDWI)
@@ -228,15 +229,15 @@ def score_water_class_from_indices(
 
 
 def _compute_diagnostic_tests(
-    blue: np.ndarray,
-    green: np.ndarray,
-    red: np.ndarray,
-    nir: np.ndarray,
-    swir1: np.ndarray,
-    swir2: np.ndarray,
+    blue: npt.NDArray[np.uint16],
+    green: npt.NDArray[np.uint16],
+    red: npt.NDArray[np.uint16],
+    nir: npt.NDArray[np.uint16],
+    swir1: npt.NDArray[np.uint16],
+    swir2: npt.NDArray[np.uint16],
     *,
     thresholds: DSWEThresholds,  # Phase 6 D-12: required keyword (no default)
-) -> np.ndarray:
+) -> npt.NDArray[np.uint8]:
     """Compute 5-bit DSWE diagnostic layer from S2 L2A bands.
 
     Backward-compat shim composing ``compute_index_bands`` +
