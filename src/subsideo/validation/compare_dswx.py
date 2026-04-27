@@ -189,6 +189,122 @@ def _fetch_jrc_tile(url: str, cache_dir: Path) -> Path | None:
         raise
 
 
+def _fetch_jrc_tile_for_bbox(
+    year: int,
+    month: int,
+    lonlat_bbox: tuple[float, float, float, float],
+    cache_dir: Path,
+) -> Path | None:
+    """Download and stitch all JRC tiles covering ``lonlat_bbox`` for the given year+month.
+
+    ``lonlat_bbox`` is ``(west, south, east, north)`` in WGS84 degrees.
+    Returns a single merged GeoTIFF (virtual merge via rasterio in-memory), or
+    ``None`` if no tiles cover the bbox.
+
+    Plan 06-06 B4 fix: promoted helper bridging the Stage 3 ``compute_intermediates``
+    call site (which passes year/month/bbox) to the existing ``_fetch_jrc_tile``
+    (which takes a per-tile URL). Stitches single-tile case and multi-tile case.
+    """
+    import rasterio
+    from rasterio.merge import merge as rasterio_merge
+
+    west, south, east, north = lonlat_bbox
+    tiles = _tiles_for_bounds(west, south, east, north)
+    tile_paths: list[Path] = []
+    for tx, ty in tiles:
+        url = _jrc_tile_url(year, month, tx, ty)
+        tp = _fetch_jrc_tile(url=url, cache_dir=cache_dir)
+        if tp is not None:
+            tile_paths.append(tp)
+    if not tile_paths:
+        return None
+    if len(tile_paths) == 1:
+        return tile_paths[0]
+    # Multi-tile merge: write merged GeoTIFF to cache
+    merged_path = cache_dir / f"merged_{year}_{month:02d}_{west:.2f}_{south:.2f}.tif"
+    if not merged_path.exists():
+        datasets = [rasterio.open(p) for p in tile_paths]
+        try:
+            merged_arr, merged_transform = rasterio_merge(datasets)
+            profile = datasets[0].profile.copy()
+            profile.update(
+                width=merged_arr.shape[-1],
+                height=merged_arr.shape[-2],
+                transform=merged_transform,
+                count=1,
+            )
+            with rasterio.open(merged_path, "w", **profile) as dst:
+                dst.write(merged_arr[0], 1)
+        finally:
+            for ds in datasets:
+                ds.close()
+    return merged_path
+
+
+def _reproject_jrc_to_s2_grid(
+    jrc_tile_path: Path | None,
+    target_epsg: int,
+    target_shape: tuple[int, int],
+    target_transform: object | None = None,
+) -> np.ndarray:
+    """Reproject a JRC tile to a target S2 UTM grid.
+
+    Returns a uint8 numpy array aligned to ``target_shape`` (rows, cols).
+    If ``jrc_tile_path`` is None or the reprojection produces all-nodata,
+    returns a zero array (all pixels treated as non-water).
+
+    ``target_transform`` may be a rasterio Affine or an array with a
+    ``.transform`` attribute; if None, the function uses rasterio to
+    derive an appropriate transform from ``target_epsg + target_shape``.
+
+    Plan 06-06 B4 fix: promoted helper for Stage 3 compute_intermediates to
+    align JRC reference to the S2 UTM grid established by band reading.
+    """
+    import rasterio
+    import rasterio.crs
+    from rasterio.enums import Resampling
+    from rasterio.transform import from_bounds
+    from rasterio.warp import reproject, transform_bounds
+
+    if jrc_tile_path is None:
+        return np.zeros(target_shape, dtype=np.uint8)
+
+    rows, cols = target_shape
+
+    # Resolve transform: accept Affine, array with .transform attr, or None
+    if target_transform is not None and hasattr(target_transform, "c"):
+        # Already an Affine object
+        dst_transform = target_transform
+    elif target_transform is not None and hasattr(target_transform, "transform"):
+        dst_transform = target_transform.transform
+    else:
+        dst_transform = None  # will be derived below
+
+    with rasterio.open(jrc_tile_path) as src:
+        dst_crs = rasterio.crs.CRS.from_epsg(target_epsg)
+
+        if dst_transform is None:
+            # Derive an approximate transform by reprojecting the tile bounds
+            bounds_4326 = transform_bounds(src.crs, "EPSG:4326", *src.bounds)
+            from pyproj import Transformer
+            t = Transformer.from_crs("EPSG:4326", f"EPSG:{target_epsg}", always_xy=True)
+            min_x, min_y = t.transform(bounds_4326[0], bounds_4326[1])
+            max_x, max_y = t.transform(bounds_4326[2], bounds_4326[3])
+            dst_transform = from_bounds(min_x, min_y, max_x, max_y, cols, rows)
+
+        dst_arr = np.zeros((rows, cols), dtype=np.uint8)
+        reproject(
+            source=rasterio.band(src, 1),
+            destination=dst_arr,
+            src_transform=src.transform,
+            src_crs=src.crs,
+            dst_transform=dst_transform,
+            dst_crs=dst_crs,
+            resampling=Resampling.nearest,
+        )
+    return dst_arr
+
+
 def _binarize_dswx(water_class: np.ndarray) -> np.ndarray:
     """Binarize DSWx water classification to water/non-water.
 
