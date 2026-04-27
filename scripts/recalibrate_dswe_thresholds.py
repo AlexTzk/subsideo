@@ -75,6 +75,8 @@ if __name__ == "__main__":
         DswxEUCellMetrics,
         LOOCVPerFold,
         PerAOIF1Breakdown,
+        ProductQualityResultJson,
+        ReferenceAgreementResultJson,
     )
     from subsideo.validation.metrics import (
         f1_score,
@@ -82,7 +84,6 @@ if __name__ == "__main__":
         precision_score,
         recall_score,
     )
-    from subsideo.validation.results import ProductQualityResult, ReferenceAgreementResult
 
     load_dotenv()
     credential_preflight([
@@ -133,8 +134,8 @@ if __name__ == "__main__":
             aoi_id="vanern", biome="Boreal lake",
             bbox=(12.40, 58.45, 14.20, 59.45),
             mgrs_tile="33VVF", epsg=32633,
-            wet_year=2021, wet_month=5,  # May (snowmelt)
-            dry_year=2021, dry_month=9,
+            wet_year=2021, wet_month=6,  # Jun (snowmelt; May 2021 no cloud-free scene)
+            dry_year=2021, dry_month=10,  # Oct (Sep 2021 no cloud-free scene; Oct=9.4% OK)
             held_out=False,
         ),
         FitsetAOI(
@@ -158,7 +159,7 @@ if __name__ == "__main__":
             bbox=(17.20, 46.60, 18.20, 46.95),
             mgrs_tile="33TXP", epsg=32633,
             wet_year=2021, wet_month=4,
-            dry_year=2021, dry_month=8,
+            dry_year=2021, dry_month=7,  # Jul (Aug 2021 no cloud-free scene; Jul=0.9% OK)
             held_out=True,  # CONTEXT D-01 + BOOTSTRAP §5.4 + DSWX-03
         ),
     ]
@@ -234,11 +235,15 @@ if __name__ == "__main__":
         year = aoi.wet_year if season == "wet" else aoi.dry_year
         month = aoi.wet_month if season == "wet" else aoi.dry_month
         bbox = bounds_for_mgrs_tile(aoi.mgrs_tile, buffer_deg=0.1)
+        # Pass naive datetimes -- CDSEClient.search_stac appends 'Z' to
+        # isoformat() output; tz-aware datetime.isoformat() already ends
+        # with '+00:00', so appending 'Z' would produce the invalid
+        # '2021-03-01T00:00:00+00:00Z' string.
         items = cdse.search_stac(
             collection="SENTINEL-2",
             bbox=list(bbox),
-            start=datetime(year, month, 1, tzinfo=timezone.utc),
-            end=datetime(year, month, 28, 23, 59, 59, tzinfo=timezone.utc),
+            start=datetime(year, month, 1),
+            end=datetime(year, month, 28, 23, 59, 59),
             product_type="S2MSI2A",
             max_items=20,
         )
@@ -252,9 +257,15 @@ if __name__ == "__main__":
             )
         scene = sorted(cloud_free, key=lambda i: i["properties"].get("eo:cloud_cover", 100))[0]
         safe_id = scene["id"]
-        safe_dir = CACHE / aoi.aoi_id / season / f"{safe_id}.SAFE"
+        # download_safe creates <scene>.SAFE inside output_root; pass the
+        # parent directory. The SAFE dir itself is CACHE/aoi/season/<scene>.SAFE.
+        output_root = CACHE / aoi.aoi_id / season
+        output_root.mkdir(parents=True, exist_ok=True)
+        safe_dir = output_root / f"{safe_id}.SAFE"
         if not ensure_resume_safe(safe_dir, manifest_keys=["MTD_MSIL2A.xml"]):
-            cdse.download_safe(s3_prefix=extract_safe_s3_prefix(scene), dest_dir=safe_dir)
+            safe_dir = cdse.download_safe(
+                extract_safe_s3_prefix(scene), output_root
+            )
         return (aoi.aoi_id, season, safe_dir)
 
     pairs_to_download = [(a, s) for a in AOIS for s in ("wet", "dry")]
@@ -381,17 +392,17 @@ if __name__ == "__main__":
         # SCL cloud-mask (values 3, 8, 9, 10) excluded
         cloud_mask = np.isin(scl, [3, 8, 9, 10])
 
-        # Shoreline buffer on JRC native grid (D-16; uniform-application)
-        shoreline_buffer = _compute_shoreline_buffer_mask(jrc, iterations=1)
-        valid_mask_full = (~cloud_mask) & (jrc != 255)  # 255 = JRC nodata
+        # JRC Monthly History: 0=no obs, 1=not water, 2=water
+        # _compute_shoreline_buffer_mask expects a BINARY mask (1=water, 0=non-water).
+        # Pass the binarized JRC so the buffer computes on the actual water/land boundary.
+        jrc_binary = (jrc == 2).astype(np.uint8)
+        # Shoreline buffer on JRC binary grid (D-16; uniform-application)
+        shoreline_buffer = _compute_shoreline_buffer_mask(jrc_binary, iterations=1)
+        valid_mask_full = (~cloud_mask) & (jrc != 0)  # 0 = JRC no-observation
         valid_mask_excl = valid_mask_full & (~shoreline_buffer)
 
         # Reconstruct IndexBands for score_water_class_from_indices
         indices = IndexBands(mndwi=mndwi, ndvi=ndvi, mbsrv=mbsrv, mbsrn=mbsrn, awesh=awesh)
-
-        # JRC binary truth (1 = water; 2 = water per JRC encoding; 0 = non-water)
-        # JRC Monthly History: 0=no obs, 1=not water, 2=water
-        jrc_binary = (jrc == 2).astype(np.uint8)
 
         # Iterate 8400 gridpoints
         wigts, awgts, pswt2_mndwis = [], [], []
@@ -532,15 +543,10 @@ if __name__ == "__main__":
         run_date_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         BLOCKER_METRICS_PATH.parent.mkdir(parents=True, exist_ok=True)
         blocker_metrics = DswxEUCellMetrics(
-            product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
-            reference_agreement=ReferenceAgreementResult(
+            product_quality=ProductQualityResultJson(measurements={}, criterion_ids=[]),
+            reference_agreement=ReferenceAgreementResultJson(
                 measurements={"f1": float("nan")},
                 criterion_ids=["dswx.f1_min"],
-                diagnostics={
-                    "blocker_reason": f"edge-of-grid sentinel: {edge_check_status}",
-                    "joint_best_gridpoint": list(joint_best),
-                    "fit_set_mean_f1": fit_set_mean_f1,
-                },
             ),
             criterion_ids_applied=["dswx.f1_min"],
             region="eu",
@@ -643,17 +649,10 @@ if __name__ == "__main__":
         loocv_models = [LOOCVPerFold(**r) for r in loocv_per_fold_records]
         per_aoi_models = [PerAOIF1Breakdown(**r) for r in per_aoi_breakdown_raw]
         blocker_metrics = DswxEUCellMetrics(
-            product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
-            reference_agreement=ReferenceAgreementResult(
+            product_quality=ProductQualityResultJson(measurements={}, criterion_ids=[]),
+            reference_agreement=ReferenceAgreementResultJson(
                 measurements={"f1": float("nan")},
                 criterion_ids=["dswx.f1_min"],
-                diagnostics={
-                    "blocker_reason": f"LOO-CV gap {loocv_gap:.4f} >= 0.02 (overfit)",
-                    "joint_best_gridpoint": list(joint_best),
-                    "fit_set_mean_f1": fit_set_mean_f1,
-                    "loocv_mean_f1": loocv_mean_f1,
-                    "loocv_gap": loocv_gap,
-                },
             ),
             criterion_ids_applied=["dswx.f1_min"],
             region="eu",
@@ -742,8 +741,11 @@ if __name__ == "__main__":
         scl = np.load(intermediates_dir / "scl.npy")
         jrc = np.load(intermediates_dir / "jrc.npy")
         cloud_mask = np.isin(scl, [3, 8, 9, 10])
-        shoreline_buffer = _compute_shoreline_buffer_mask(jrc, iterations=1)
-        valid_mask_excl = (~cloud_mask) & (jrc != 255) & (~shoreline_buffer)
+        # JRC Monthly History: 2=water, 1=not water, 0=no obs
+        # _compute_shoreline_buffer_mask expects binary (1=water, 0=non-water)
+        jrc_bin_for_buf = (jrc == 2).astype(np.uint8)
+        shoreline_buffer = _compute_shoreline_buffer_mask(jrc_bin_for_buf, iterations=1)
+        valid_mask_excl = (~cloud_mask) & (jrc != 0) & (~shoreline_buffer)
         indices = IndexBands(mndwi=mndwi, ndvi=ndvi, mbsrv=mbsrv, mbsrn=mbsrn, awesh=awesh)
         diag = score_water_class_from_indices(
             indices, blue=blue, nir=nir, swir1=swir1, swir2=swir2,

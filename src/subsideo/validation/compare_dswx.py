@@ -215,7 +215,16 @@ def _fetch_jrc_tile_for_bbox(
         url = _jrc_tile_url(year, month, tx, ty)
         tp = _fetch_jrc_tile(url=url, cache_dir=cache_dir)
         if tp is not None:
-            tile_paths.append(tp)
+            # Validate: a real JRC GeoTIFF at 30m / 40000 px tile is > 1MB.
+            # Zero-byte or sub-kilobyte files are corrupted downloads.
+            if tp.stat().st_size < 1024:
+                logger.warning(
+                    "JRC tile suspiciously small ({} bytes), deleting and skipping: {}",
+                    tp.stat().st_size, tp,
+                )
+                tp.unlink(missing_ok=True)
+            else:
+                tile_paths.append(tp)
     if not tile_paths:
         return None
     if len(tile_paths) == 1:

@@ -1,0 +1,32 @@
+{
+  "cell_status": "BLOCKER",
+  "edge_check": {
+    "status": "at_edge_WIGT",
+    "joint_best": [
+      0.08,
+      0.00999999999999994,
+      -0.65
+    ]
+  },
+  "joint_best_gridpoint": {
+    "WIGT": 0.08,
+    "AWGT": 0.00999999999999994,
+    "PSWT2_MNDWI": -0.65
+  },
+  "fit_set_mean_f1": 0.10869348175325715,
+  "grid_bounds": {
+    "WIGT": [
+      0.08,
+      0.20000000000000012
+    ],
+    "AWGT": [
+      -0.1,
+      0.0999999999999999
+    ],
+    "PSWT2_MNDWI": [
+      -0.65,
+      -0.34999999999999976
+    ]
+  },
+  "named_upgrade_path": "grid expansion required"
+}
