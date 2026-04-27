@@ -71,7 +71,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### DSWx-S2 N.Am. Validation + EU Recalibration
 
-- [ ] **DSWX-01**: N.Am. DSWx-S2 positive control eval runs on a selected AOI (Lake Tahoe or Lake Pontchartrain) and reports F1 against JRC Monthly History; F1 < 0.85 triggers regression investigation (BOA offset / Claverie cross-calibration) before recalibration proceeds
+- [x] **DSWX-01**: N.Am. DSWx-S2 positive control eval runs on a selected AOI (Lake Tahoe or Lake Pontchartrain) and reports F1 against JRC Monthly History; F1 < 0.85 triggers regression investigation (BOA offset / Claverie cross-calibration) before recalibration proceeds — F1=0.9252 PASS (Lake Tahoe T10SFH, July 2021)
 - [ ] **DSWX-02**: EU fit-set AOI selection is documented in `notebooks/dswx_aoi_selection.ipynb` with per-AOI rationale spanning JRC reference quality + S2 cloud-free scene availability + water-body type diversity + absence of known algorithm failure modes (glacier/frozen lake, heavy turbid water, dominant mountain shadow)
 - [ ] **DSWX-03**: EU fit set contains 12 (AOI, wet-scene, dry-scene) triples across 6 biome-diverse AOIs (Mediterranean reservoir, Atlantic estuary, boreal lake, Pannonian plain, Alpine valley, Iberian summer-dry); Balaton is held out as independent test set
 - [ ] **DSWX-04**: `scripts/recalibrate_dswe_thresholds.py` performs a joint grid search over `WIGT` ([0.08, 0.20] step 0.005), `AWGT` ([−0.1, +0.1] step 0.01), and `PSWT2_MNDWI` ([−0.65, −0.35] step 0.02), optimising mean F1 across the fit set
@@ -197,7 +197,7 @@ Which phases cover which requirements. Populated by roadmapper.
 | DIST-05 | Phase 5 | Pending |
 | DIST-06 | Phase 5 | Pending |
 | DIST-07 | Phase 5 | Pending |
-| DSWX-01 | Phase 6 | Pending |
+| DSWX-01 | Phase 6 | Complete (Plan 06-05) |
 | DSWX-02 | Phase 6 | Pending |
 | DSWX-03 | Phase 6 | Pending |
 | DSWX-04 | Phase 6 | Pending |
