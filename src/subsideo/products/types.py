@@ -162,12 +162,34 @@ class DSWxResult:
 
 
 @dataclass
+class DSWxValidationDiagnostics:
+    """Optional diagnostic numbers attached to a DSWxValidationResult.
+
+    Phase 6 D-16 + B2 fix: f1_full_pixels and shoreline_buffer_excluded_pixels
+    are exposed as a side-channel on the EXISTING DSWxValidationResult rather
+    than via a tuple-return change. ZERO breaking change for v1.0 callers
+    that ignore .diagnostics; downstream Plans 06-05 / 06-06 / 06-07 access
+    via `result.diagnostics.f1_full_pixels` / `.shoreline_buffer_excluded_pixels`.
+    """
+
+    f1_full_pixels: float
+    shoreline_buffer_excluded_pixels: int
+
+
+@dataclass
 class DSWxValidationResult:
     """Validation metrics comparing DSWx output against JRC reference.
 
     Nested composite: product_quality is currently empty; reference_agreement
     carries F1 / precision / recall / accuracy.
+
+    Phase 6 D-16 + B2 fix: adds optional `.diagnostics` attribute carrying
+    f1_full_pixels + shoreline_buffer_excluded_pixels. Default None preserves
+    backward compatibility for v1.0 callers that do not set or read it.
     """
 
     product_quality: ProductQualityResult
     reference_agreement: ReferenceAgreementResult
+    # Phase 6 D-16 + B2 fix: new optional attribute; default None preserves
+    # backward compatibility for v1.0 callers that do not set or read it.
+    diagnostics: DSWxValidationDiagnostics | None = None

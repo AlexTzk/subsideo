@@ -1,14 +1,12 @@
 """DSWx-S2 product validation against JRC Global Surface Water."""
 from __future__ import annotations
 
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 import numpy as np
 from loguru import logger
 
-from subsideo.products.types import DSWxValidationResult
+from subsideo.products.types import DSWxValidationDiagnostics, DSWxValidationResult
 from subsideo.validation.metrics import (
     f1_score,
     overall_accuracy,
@@ -88,8 +86,72 @@ def _tiles_for_bounds(
     return tiles
 
 
+def _compute_shoreline_buffer_mask(
+    jrc_water_class: np.ndarray[tuple[int, ...], np.dtype[np.generic]],
+    iterations: int = 1,
+) -> np.ndarray[tuple[int, ...], np.dtype[np.bool_]]:
+    """Compute 1-pixel buffer around JRC water/land class boundary.
+
+    Per CONTEXT D-16: the shoreline buffer mask MUST be computed on the
+    JRC reference grid (the source of the boundary), then reprojected
+    alongside the JRC water/land array using Resampling.nearest. This
+    avoids buffering the DSWx prediction's boundary (which we don't want
+    -- we want JRC's boundary uniformly excluded from the F1 evaluation).
+
+    Phase 6 D-16: applied uniformly in BOTH the grid search (Plan 06-06)
+    AND final F1 reporting (Plan 06-05 + 06-07). Single source of truth
+    for what counts as a fair F1.
+
+    Parameters
+    ----------
+    jrc_water_class : np.ndarray
+        Binary water mask on JRC grid (1=water, 0=non-water). nodata
+        pixels (typically jrc class 0 or 255) should be masked out
+        BEFORE this call so they don't contribute to the boundary.
+    iterations : int, default=1
+        Number of dilation iterations (each = 1 pixel buffer at JRC's
+        30m posting). 1 matches CONTEXT D-16 "1-pixel buffer".
+
+    Returns
+    -------
+    np.ndarray
+        Boolean mask: True = shoreline buffer (EXCLUDE from F1);
+        False = include in F1 evaluation.
+
+    Notes
+    -----
+    Default 4-connectivity structuring element via the binary_dilation
+    iterations parameter. The XOR-of-dilations approach catches the buffer
+    ring without consuming pure-water or pure-non-water interior. Per
+    PITFALLS P5.2: the buffer mitigates JRC commission (98-99%) /
+    omission (74-99%) asymmetry at the shoreline.
+    """
+    from scipy.ndimage import binary_dilation  # lazy import (Phase 1 pattern)
+
+    water = (jrc_water_class == 1).astype(np.uint8)
+    non_water = (jrc_water_class == 0).astype(np.uint8)
+
+    water_dilated = binary_dilation(water, iterations=iterations)
+    non_water_dilated = binary_dilation(non_water, iterations=iterations)
+
+    # Shoreline = pixels within 1px of BOTH water AND non-water classes.
+    # Per RESEARCH lines 818-820: this XOR-of-dilations correctly handles
+    # the asymmetric shoreline even when JRC has nodata interior gaps.
+    shoreline_buffer: np.ndarray[tuple[int, ...], np.dtype[np.bool_]] = (
+        water_dilated.astype(bool) & non_water_dilated.astype(bool)
+    )
+
+    return shoreline_buffer
+
+
 def _fetch_jrc_tile(url: str, cache_dir: Path) -> Path | None:
     """Download a JRC tile to cache_dir if not already cached.
+
+    Phase 6 D-25: refactored to consume harness.download_reference_with_retry
+    (source='jrc') instead of bare urllib.request.urlretrieve. Per-source
+    retry policy lives in harness.RETRY_POLICY['jrc'] (Plan 06-02). Preserves
+    v1.0 None-on-404 semantics by catching ReferenceDownloadError when the
+    underlying status was 404 (benign tile-out-of-coverage).
 
     Args:
         url: Full URL to the JRC GeoTIFF tile.
@@ -98,6 +160,11 @@ def _fetch_jrc_tile(url: str, cache_dir: Path) -> Path | None:
     Returns:
         Path to the cached tile, or None if the tile does not exist (404).
     """
+    from subsideo.validation.harness import (
+        ReferenceDownloadError,
+        download_reference_with_retry,
+    )
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     filename = url.rsplit("/", maxsplit=1)[-1]
     local_path = cache_dir / filename
@@ -106,11 +173,18 @@ def _fetch_jrc_tile(url: str, cache_dir: Path) -> Path | None:
         return local_path
     try:
         logger.info(f"Downloading JRC tile: {url}")
-        urllib.request.urlretrieve(url, local_path)  # noqa: S310
-        return local_path
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            logger.warning(f"JRC tile not found (ocean?): {url}")
+        return download_reference_with_retry(
+            url=url,
+            dest=local_path,
+            source="jrc",
+        )
+    except ReferenceDownloadError as exc:
+        # Phase 6 D-25 preserves v1.0 _fetch_jrc_tile semantics: 404 (tile-out-
+        # of-coverage; benign for ocean tiles or pre-1984/post-2021 dates) is
+        # propagated as None rather than raised. Other ReferenceDownloadErrors
+        # (e.g. all 5 retries exhausted, 403 auth) re-raise.
+        if getattr(exc, "status", None) == 404 or "404" in str(exc):
+            logger.warning(f"JRC tile not in coverage (404): {url}")
             return None
         raise
 
@@ -181,7 +255,8 @@ def compare_dswx(
     import rasterio
     from rasterio.merge import merge
     from rasterio.warp import Resampling, reproject, transform_bounds
-    from rasterio.windows import Window, from_bounds as window_from_bounds
+    from rasterio.windows import Window
+    from rasterio.windows import from_bounds as window_from_bounds
 
     if cache_dir is None:
         cache_dir = Path.home() / ".subsideo" / "jrc_cache"
@@ -285,13 +360,28 @@ def compare_dswx(
     prod_bin = _binarize_dswx(prod_crop)
     jrc_bin = _binarize_jrc(jrc_crop)
 
+    # Phase 6 D-16: compute shoreline buffer mask on the JRC-aligned window grid.
+    # The buffer is computed on the JRC water/land class array (jrc_crop is
+    # already in the UTM-aligned window; we use JRC binary water/land to find the
+    # boundary). jrc_water_class=1 means water in the binary mask sense (jrc==2
+    # in the raw encoding maps to 1.0 in _binarize_jrc; here we work with the
+    # raw jrc_crop encoding where 2=water, 1=not-water, 0=nodata).
+    # Build a simplified binary (water=True, non-water=False) for the buffer call:
+    jrc_binary_for_mask = np.where(jrc_crop == 2, np.uint8(1), np.uint8(0))
+    shoreline_mask = _compute_shoreline_buffer_mask(jrc_binary_for_mask, iterations=1)
+
     # 8. Mask to valid pixels (both non-NaN)
-    valid = np.isfinite(prod_bin) & np.isfinite(jrc_bin)
-    pred = prod_bin[valid].astype(np.int32)
-    ref = jrc_bin[valid].astype(np.int32)
+    valid_full = np.isfinite(prod_bin) & np.isfinite(jrc_bin)
+    valid_shoreline_excl = valid_full & (~shoreline_mask)
+
+    pred_full = prod_bin[valid_full].astype(np.int32)
+    ref_full = jrc_bin[valid_full].astype(np.int32)
+
+    pred = prod_bin[valid_shoreline_excl].astype(np.int32)
+    ref = jrc_bin[valid_shoreline_excl].astype(np.int32)
 
     if pred.size == 0:
-        logger.warning("No valid overlapping pixels between DSWx and JRC")
+        logger.warning("No valid overlapping pixels between DSWx and JRC after shoreline exclusion")
         return DSWxValidationResult(
             product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
             reference_agreement=ReferenceAgreementResult(
@@ -305,26 +395,36 @@ def compare_dswx(
             ),
         )
 
-    # 9. Compute metrics
+    # 9. Compute shoreline-excluded metrics (gate value per D-16)
     f1 = f1_score(pred, ref)
     prec = precision_score(pred, ref)
     rec = recall_score(pred, ref)
     acc = overall_accuracy(pred, ref)
 
+    # Phase 6 D-16 diagnostic: F1 without shoreline exclusion (P5.2 transparency)
+    f1_full = f1_score(pred_full, ref_full) if pred_full.size > 0 else float("nan")
+    shoreline_excluded_count = int(shoreline_mask.sum())
+
     logger.info(
-        f"DSWx validation: F1={f1:.4f}, precision={prec:.4f}, "
-        f"recall={rec:.4f}, OA={acc:.4f}"
+        f"DSWx validation: F1={f1:.4f} (shoreline-excl), "
+        f"F1_full={f1_full:.4f}, "
+        f"shoreline_excluded_px={shoreline_excluded_count}, "
+        f"precision={prec:.4f}, recall={rec:.4f}, OA={acc:.4f}"
     )
 
     return DSWxValidationResult(
         product_quality=ProductQualityResult(measurements={}, criterion_ids=[]),
         reference_agreement=ReferenceAgreementResult(
             measurements={
-                "f1": f1,
+                "f1": f1,          # shoreline-excluded (gate per D-16)
                 "precision": prec,
                 "recall": rec,
                 "accuracy": acc,
             },
             criterion_ids=["dswx.f1_min"],
+        ),
+        diagnostics=DSWxValidationDiagnostics(
+            f1_full_pixels=f1_full,
+            shoreline_buffer_excluded_pixels=shoreline_excluded_count,
         ),
     )
