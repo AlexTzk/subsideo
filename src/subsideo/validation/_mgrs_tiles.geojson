@@ -65,6 +65,48 @@
           ]
         ]
       }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "tile_id": "10SFH",
+        "region": "nam",
+        "used_by": "run_eval_dswx_nam.py",
+        "description": "Lake Tahoe, CA — UTM zone 10N 600000-700000 E, 4300000-4400000 N"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-121.8477, 38.8431],
+            [-120.6664, 38.8431],
+            [-120.6664, 39.7264],
+            [-121.8477, 39.7264],
+            [-121.8477, 38.8431]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "tile_id": "15RYP",
+        "region": "nam",
+        "used_by": "run_eval_dswx_nam.py",
+        "description": "Lake Pontchartrain, LA — UTM zone 15N 700000-800000 E, 3300000-3400000 N"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-90.9304, 29.7940],
+            [-89.8682, 29.7940],
+            [-89.8682, 30.6951],
+            [-90.9304, 30.6951],
+            [-90.9304, 29.7940]
+          ]
+        ]
+      }
     }
   ]
 }
