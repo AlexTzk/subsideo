@@ -1,19 +1,19 @@
 {
   "cell_status": "BLOCKER",
   "edge_check": {
-    "status": "at_edge_WIGT",
+    "status": "at_edge_PSWT2_MNDWI",
     "joint_best": [
-      0.08,
+      0.09500000000000001,
       0.00999999999999994,
       -0.65
     ]
   },
   "joint_best_gridpoint": {
-    "WIGT": 0.08,
+    "WIGT": 0.09500000000000001,
     "AWGT": 0.00999999999999994,
     "PSWT2_MNDWI": -0.65
   },
-  "fit_set_mean_f1": 0.10869348175325715,
+  "fit_set_mean_f1": 0.1706031622712081,
   "grid_bounds": {
     "WIGT": [
       0.08,
