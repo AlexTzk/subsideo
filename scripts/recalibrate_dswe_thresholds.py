@@ -310,7 +310,9 @@ if __name__ == "__main__":
         return (aoi.aoi_id, season, safe_dir)
 
     pairs_to_download = [(a, s) for a in AOIS for s in ("wet", "dry")]
-    download_results = Parallel(n_jobs=4, backend="loky")(
+    # n_jobs=2: CDSE WAF throttles 4 parallel STAC searches; 2 concurrent
+    # STAC lookups avoids exhausting retries while still parallelising S3 download.
+    download_results = Parallel(n_jobs=2, backend="loky")(
         delayed(download_aoi_scene)(a, s) for a, s in pairs_to_download
     )
 
