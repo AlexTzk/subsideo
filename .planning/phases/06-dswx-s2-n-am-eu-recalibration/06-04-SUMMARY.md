@@ -139,6 +139,17 @@ None - no external service configuration required.
 - `_compute_shoreline_buffer_mask` is the single source of truth for shoreline buffer (D-16); grid search and final reporting both use the same function
 - matrix_writer dispatch table is complete for all Phase 6 DSWx cell types; metrics.json written by Plans 06-05/06-06/06-07 will route correctly
 
+## Self-Check: PASSED
+
+- FOUND: tests/unit/test_compare_dswx_shoreline.py
+- FOUND: tests/unit/test_matrix_writer_dswx.py
+- FOUND: src/subsideo/products/types.py (DSWxValidationDiagnostics + diagnostics field)
+- FOUND: src/subsideo/validation/compare_dswx.py (_compute_shoreline_buffer_mask + harness retry)
+- FOUND: src/subsideo/validation/matrix_writer.py (_is_dswx_nam_shape + _is_dswx_eu_shape + renderers + dispatch)
+- FOUND: a3699fc (Task 1 commit)
+- FOUND: 2a63075 (Task 2 commit)
+- FOUND: db442df (metadata commit)
+
 ---
 *Phase: 06-dswx-s2-n-am-eu-recalibration*
 *Completed: 2026-04-27*
