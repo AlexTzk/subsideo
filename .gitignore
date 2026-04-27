@@ -216,6 +216,10 @@ eval-dist/*
 eval-dist-eu/*
 eval-dist-eu-nov15/*
 eval-dswx/*
+eval-dswx_nam/input/
+eval-dswx_nam/output/
+eval-dswx_nam/jrc/
+eval-dswx_nam/stac_*.json
 eval-rtc/*
 
 *.zip
