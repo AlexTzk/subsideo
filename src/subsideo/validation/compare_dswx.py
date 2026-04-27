@@ -166,8 +166,16 @@ def _fetch_jrc_tile(url: str, cache_dir: Path) -> Path | None:
     )
 
     cache_dir.mkdir(parents=True, exist_ok=True)
-    filename = url.rsplit("/", maxsplit=1)[-1]
-    local_path = cache_dir / filename
+    # Include year+month in the cache filename to avoid cross-month cache
+    # collisions (Rule 1 fix: the bare tile filename "0000080000-0000760000.tif"
+    # is shared across all months — caching without year+month caused a June 2021
+    # all-zero tile to be served for August 2021 queries in Plan 06-06).
+    # URL structure: {BASE}/{year}/{year}_{month:02d}/{pixel_y}-{pixel_x}.tif
+    url_parts = url.rstrip("/").split("/")
+    tile_filename = url_parts[-1]          # e.g. "0000080000-0000760000.tif"
+    year_month_dir = url_parts[-2]         # e.g. "2021_06"
+    cache_filename = f"{year_month_dir}_{tile_filename}"  # e.g. "2021_06_0000080000-0000760000.tif"
+    local_path = cache_dir / cache_filename
     if local_path.exists():
         logger.debug(f"JRC tile cached: {local_path}")
         return local_path

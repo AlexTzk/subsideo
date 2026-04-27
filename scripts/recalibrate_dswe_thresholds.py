@@ -134,8 +134,8 @@ if __name__ == "__main__":
             aoi_id="vanern", biome="Boreal lake",
             bbox=(12.40, 58.45, 14.20, 59.45),
             mgrs_tile="33VVF", epsg=32633,
-            wet_year=2021, wet_month=6,  # Jun (snowmelt; May 2021 no cloud-free scene)
-            dry_year=2021, dry_month=10,  # Oct (Sep 2021 no cloud-free scene; Oct=9.4% OK)
+            wet_year=2021, wet_month=8,  # Aug (JRC tile for Jun/Oct 2021 is all-zero; Aug=47.6% water OK)
+            dry_year=2021, dry_month=5,  # May (spring; JRC tile May 2021 = 47.8% water OK)
             held_out=False,
         ),
         FitsetAOI(
@@ -245,15 +245,45 @@ if __name__ == "__main__":
             start=datetime(year, month, 1),
             end=datetime(year, month, 28, 23, 59, 59),
             product_type="S2MSI2A",
-            max_items=20,
+            max_items=50,  # increased from 20; MGRS tile filter below narrows to target tile
         )
+        # MGRS tile filter: keep only items from the exact expected tile.
+        # The STAC bbox search returns all tiles overlapping the search bbox;
+        # without this filter, the lowest-cloud-cover scene may belong to a
+        # neighbouring tile and produce a JRC/S2 spatial mismatch.
+        # Two paths: (1) STAC property "s2:mgrs_tile" (preferred, present in
+        # new CDSE STAC); (2) tile code embedded in the scene ID as "T{5chars}"
+        # (e.g., "T29SQE" in "S2A_MSIL2A_..._T29SQE_...").
+        def _item_mgrs_tile(item: dict) -> str:
+            # Path 1: explicit STAC property
+            prop_tile = (item.get("properties") or {}).get("s2:mgrs_tile", "")
+            if prop_tile:
+                return prop_tile.upper().lstrip("T")
+            # Path 2: tile code in scene ID (6th '_'-split token starting with T)
+            scene_id = item.get("id", "")
+            for token in scene_id.split("_"):
+                if token.startswith("T") and len(token) == 6:
+                    return token[1:]  # strip leading "T" -> e.g. "29SQE"
+            return ""
+
         cloud_free = [
             it for it in items
             if (it.get("properties", {}).get("eo:cloud_cover") or 100) < 15
+            and _item_mgrs_tile(it).upper() == aoi.mgrs_tile.upper()
         ]
         if not cloud_free:
+            # Widen cloud threshold to 30% before giving up, to handle months
+            # with light cloud cover that still have valid observations over
+            # the water body (CONTEXT D-04 robustness note).
+            cloud_free = [
+                it for it in items
+                if (it.get("properties", {}).get("eo:cloud_cover") or 100) < 30
+                and _item_mgrs_tile(it).upper() == aoi.mgrs_tile.upper()
+            ]
+        if not cloud_free:
             raise RuntimeError(
-                f"no cloud-free scene for {aoi.aoi_id} {season} ({year}-{month:02d})"
+                f"no cloud-free scene for {aoi.aoi_id} {season} ({year}-{month:02d}) "
+                f"on tile {aoi.mgrs_tile!r} (searched {len(items)} items from CDSE STAC)"
             )
         scene = sorted(cloud_free, key=lambda i: i["properties"].get("eo:cloud_cover", 100))[0]
         safe_id = scene["id"]
