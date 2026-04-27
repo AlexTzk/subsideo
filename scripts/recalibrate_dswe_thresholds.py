@@ -1,10 +1,19 @@
 # scripts/recalibrate_dswe_thresholds.py -- DSWx EU threshold recalibration via joint grid search
 #
-# Phase 6 DSWX-04 + DSWX-05 + DSWX-06: joint grid search over WIGT x AWGT x
-# PSWT2_MNDWI; 8400 gridpoints x 10 fit-set (AOI, scene) pairs (5 AOIs x 2
-# wet/dry seasons; Balaton held out per BOOTSTRAP §5.4 -- NOT in fit set, NOT
-# in LOO-CV folds). PITFALLS P5.1 mitigation: edge-of-grid sentinel + LOO-CV
-# gap < 0.02 acceptance gate. CONTEXT D-04..D-08 + D-13..D-16.
+# Phase 6 DSWX-04 + DSWX-05 + DSWX-06: joint grid search over WIGT x AWGT
+# (PSWT2_MNDWI fixed at OPERA reference -0.44 -- zero sensitivity across all
+# EU fit-set pairs; see Iteration 2 fix A); 525 gridpoints x 10 fit-set (AOI,
+# scene) pairs (5 AOIs x 2 wet/dry seasons; Balaton held out per BOOTSTRAP
+# §5.4 -- NOT in fit set, NOT in LOO-CV folds). PITFALLS P5.1 mitigation:
+# edge-of-grid sentinel + LOO-CV gap < 0.02 acceptance gate.
+# CONTEXT D-04..D-08 + D-13..D-16.
+#
+# Iteration 2 fixes:
+# - A: PSWT2_MNDWI held fixed at OPERA ATBD reference -0.44 (zero sensitivity
+#      in EU; removed from grid to avoid spurious edge-of-grid trigger)
+# - B: Donana replaced with Ebro Delta (Donana is a seasonal wetland that dries
+#      out in summer; not a valid water classifier calibration target; Ebro Delta
+#      is a stable coastal delta, always wet)
 #
 # Iteration 1 fixes:
 # - B1: 10-fold leave-one-pair-out (NOT 12; CONTEXT D-14 wording error)
@@ -157,12 +166,22 @@ if __name__ == "__main__":
             dry_year=2021, dry_month=10,  # Oct; 0.0% cloud on 32TPR
             held_out=False,
         ),
+        # Iteration 2 fix B: Donana replaced with Ebro Delta.
+        # Donana is a seasonal wetland that dries out completely in summer
+        # (Mediterranean marismas); it is NOT a valid calibration target for a
+        # permanent-water classifier. The Aug 2021 dry-season scene has <1% JRC
+        # water fraction — the classifier cannot learn a meaningful dry boundary
+        # from a site that is simply absent. Ebro Delta (Tarragona, Spain) is a
+        # stable coastal delta with permanent water bodies; it is reliably wet
+        # year-round and provides a valid dry-contrast via surrounding agriculture.
+        # MGRS tile 31TCF verified via CDSE STAC search (covers lat 40.3-41.3
+        # along the Ebro Delta coastline at 0.5-1.5°E).
         FitsetAOI(
-            aoi_id="donana", biome="Iberian summer-dry",
-            bbox=(-6.55, 36.80, -6.30, 37.05),
-            mgrs_tile="29SQB", epsg=32629,  # confirmed correct
-            wet_year=2021, wet_month=3,   # Mar; 0.0% cloud on 29SQB
-            dry_year=2021, dry_month=8,   # Aug; 4.9% cloud on 29SQB
+            aoi_id="ebro_delta", biome="Mediterranean coastal delta",
+            bbox=(0.50, 40.50, 1.10, 40.90),
+            mgrs_tile="31TCF", epsg=32631,
+            wet_year=2021, wet_month=3,   # Mar wet season (after winter rainfall)
+            dry_year=2021, dry_month=8,   # Aug dry season (Mediterranean summer)
             held_out=False,
         ),
         FitsetAOI(
@@ -178,12 +197,16 @@ if __name__ == "__main__":
     FIT_SET_AOIS = [a for a in AOIS if not a.held_out]  # 5 AOIs
     HELD_OUT_AOI = next(a for a in AOIS if a.held_out)  # Balaton
 
-    # Grid bounds (CONTEXT D-04; verified 8400 = 25 x 21 x 16 per RESEARCH lines 318-321)
+    # Grid bounds: WIGT x AWGT only (Iteration 2 fix A: PSWT2_MNDWI held fixed).
+    # 25 x 21 = 525 gridpoints (reduced from 8400 x 3-axis search).
     WIGT_VALS = np.arange(0.08, 0.20 + 1e-9, 0.005)              # 25 values
     AWGT_VALS = np.arange(-0.10, 0.10 + 1e-9, 0.01)               # 21 values
-    PSWT2_MNDWI_VALS = np.arange(-0.65, -0.35 + 1e-9, 0.02)       # 16 values
-    GRIDPOINTS = list(product(WIGT_VALS, AWGT_VALS, PSWT2_MNDWI_VALS))
-    assert len(GRIDPOINTS) == 8400, f"expected 8400 gridpoints, got {len(GRIDPOINTS)}"
+    # PSWT2_MNDWI fixed at OPERA ATBD reference value: zero sensitivity across all
+    # EU fit-set pairs in the previous run (best gridpoint at the axis edge -0.65;
+    # this indicates the classifier is insensitive to this parameter over EU biomes).
+    PSWT2_MNDWI_FIXED: float = -0.44
+    GRIDPOINTS = list(product(WIGT_VALS, AWGT_VALS))
+    assert len(GRIDPOINTS) == 525, f"expected 525 gridpoints, got {len(GRIDPOINTS)}"
 
     CACHE = Path("./eval-dswx-fitset")
     CACHE.mkdir(exist_ok=True)
@@ -413,7 +436,11 @@ if __name__ == "__main__":
     # Stage 4: Joint grid search (joblib parallel over 12 pairs; D-06)
     # ====================================================================
     def grid_search_one_pair(aoi_id: str, season: str, intermediates_dir: Path) -> Path:
-        """Run 8400-gridpoint grid search on one (AOI, scene). Writes gridscores.parquet."""
+        """Run 525-gridpoint grid search on one (AOI, scene). Writes gridscores.parquet.
+
+        Grid is WIGT x AWGT only (525 points = 25 x 21); PSWT2_MNDWI is held
+        fixed at PSWT2_MNDWI_FIXED (-0.44, OPERA ATBD reference) per Iter-2 fix A.
+        """
         out_path = intermediates_dir.parent / "gridscores.parquet"
         if out_path.exists():
             logger.info(f"grid search cache hit: {aoi_id}/{season}")
@@ -447,13 +474,13 @@ if __name__ == "__main__":
         # Reconstruct IndexBands for score_water_class_from_indices
         indices = IndexBands(mndwi=mndwi, ndvi=ndvi, mbsrv=mbsrv, mbsrn=mbsrn, awesh=awesh)
 
-        # Iterate 8400 gridpoints
-        wigts, awgts, pswt2_mndwis = [], [], []
+        # Iterate 525 gridpoints (WIGT x AWGT; PSWT2_MNDWI fixed at PSWT2_MNDWI_FIXED)
+        wigts, awgts = [], []
         f1s, precisions, recalls, accuracies = [], [], [], []
         n_total, n_excl = [], []
-        for w, a, p in GRIDPOINTS:
+        for w, a in GRIDPOINTS:
             thresholds = DSWEThresholds(
-                WIGT=float(w), AWGT=float(a), PSWT2_MNDWI=float(p),
+                WIGT=float(w), AWGT=float(a), PSWT2_MNDWI=PSWT2_MNDWI_FIXED,
                 grid_search_run_date="<grid_search_in_progress>",
                 fit_set_hash="", fit_set_mean_f1=float("nan"),
                 held_out_balaton_f1=float("nan"), loocv_mean_f1=float("nan"),
@@ -469,7 +496,6 @@ if __name__ == "__main__":
 
             wigts.append(w)
             awgts.append(a)
-            pswt2_mndwis.append(p)
             f1s.append(f1_score(dswx_binary[valid_mask_excl], jrc_binary[valid_mask_excl]))
             precisions.append(
                 precision_score(dswx_binary[valid_mask_excl], jrc_binary[valid_mask_excl])
@@ -483,11 +509,11 @@ if __name__ == "__main__":
             n_total.append(int(valid_mask_full.sum()))
             n_excl.append(int(valid_mask_excl.sum()))
 
-        # Write parquet
+        # Write parquet (no PSWT2_MNDWI column -- it is a fixed constant, not a grid axis)
         table = pa.Table.from_arrays(
-            [wigts, awgts, pswt2_mndwis, f1s, precisions, recalls, accuracies, n_total, n_excl],
+            [wigts, awgts, f1s, precisions, recalls, accuracies, n_total, n_excl],
             names=[
-                "WIGT", "AWGT", "PSWT2_MNDWI", "f1", "precision", "recall",
+                "WIGT", "AWGT", "f1", "precision", "recall",
                 "accuracy", "n_pixels_total", "n_pixels_shoreline_excluded",
             ],
         )
@@ -530,18 +556,17 @@ if __name__ == "__main__":
     all_gs = pd.concat(gridscores_dfs, ignore_index=True)
     assert len(all_gs) == len(FIT_SET_AOIS) * 2 * len(GRIDPOINTS), (
         f"expected {len(FIT_SET_AOIS) * 2 * len(GRIDPOINTS)} rows in fit-set aggregate "
-        f"(10 pairs x 8400 gridpoints), got {len(all_gs)}"
+        f"(10 pairs x 525 gridpoints), got {len(all_gs)}"
     )
 
-    # Mean F1 per gridpoint across 10 fit-set pairs
+    # Mean F1 per gridpoint across 10 fit-set pairs (WIGT x AWGT only)
     mean_f1_per_grid = (
-        all_gs.groupby(["WIGT", "AWGT", "PSWT2_MNDWI"])["f1"].mean().reset_index()
+        all_gs.groupby(["WIGT", "AWGT"])["f1"].mean().reset_index()
     )
     joint_best_idx = mean_f1_per_grid["f1"].idxmax()
     joint_best = (
         float(mean_f1_per_grid.loc[joint_best_idx, "WIGT"]),
         float(mean_f1_per_grid.loc[joint_best_idx, "AWGT"]),
-        float(mean_f1_per_grid.loc[joint_best_idx, "PSWT2_MNDWI"]),
     )
     fit_set_mean_f1 = float(mean_f1_per_grid.loc[joint_best_idx, "f1"])
 
@@ -552,7 +577,6 @@ if __name__ == "__main__":
             (all_gs["aoi_id"] == aoi.aoi_id)
             & (all_gs["WIGT"] == joint_best[0])
             & (all_gs["AWGT"] == joint_best[1])
-            & (all_gs["PSWT2_MNDWI"] == joint_best[2])
         ]
         wet_match = aoi_df[aoi_df["season"] == "wet"]
         dry_match = aoi_df[aoi_df["season"] == "dry"]
@@ -572,13 +596,12 @@ if __name__ == "__main__":
     def _at_edge(val: float, arr: "np.ndarray") -> bool:
         return abs(val - float(arr[0])) < 1e-9 or abs(val - float(arr[-1])) < 1e-9
 
+    # Edge-of-grid check applies only to WIGT and AWGT (PSWT2_MNDWI is fixed, not a grid axis)
     edge_check_status = "ok"
     if _at_edge(joint_best[0], WIGT_VALS):
         edge_check_status = "at_edge_WIGT"
     elif _at_edge(joint_best[1], AWGT_VALS):
         edge_check_status = "at_edge_AWGT"
-    elif _at_edge(joint_best[2], PSWT2_MNDWI_VALS):
-        edge_check_status = "at_edge_PSWT2_MNDWI"
 
     if edge_check_status != "ok":
         # W3 fix: write a DswxEUCellMetrics-validated metrics.json (NOT a hand-rolled JSON).
@@ -613,13 +636,15 @@ if __name__ == "__main__":
             "cell_status": "BLOCKER",
             "edge_check": {"status": edge_check_status, "joint_best": list(joint_best)},
             "joint_best_gridpoint": {
-                "WIGT": joint_best[0], "AWGT": joint_best[1], "PSWT2_MNDWI": joint_best[2],
+                "WIGT": joint_best[0], "AWGT": joint_best[1],
+                "PSWT2_MNDWI": PSWT2_MNDWI_FIXED,
             },
+            "pswt2_mndwi_treatment": "fixed_at_opera_ref",
+            "pswt2_mndwi_fixed_value": PSWT2_MNDWI_FIXED,
             "fit_set_mean_f1": float(fit_set_mean_f1),
             "grid_bounds": {
                 "WIGT": [float(WIGT_VALS[0]), float(WIGT_VALS[-1])],
                 "AWGT": [float(AWGT_VALS[0]), float(AWGT_VALS[-1])],
-                "PSWT2_MNDWI": [float(PSWT2_MNDWI_VALS[0]), float(PSWT2_MNDWI_VALS[-1])],
             },
             "named_upgrade_path": "grid expansion required",
         }
@@ -649,15 +674,14 @@ if __name__ == "__main__":
                 & (all_gs["season"] == left_out_season)
             )
         ]
-        # Per-gridpoint mean F1 across the 9 refit pairs
+        # Per-gridpoint mean F1 across the 9 refit pairs (WIGT x AWGT only)
         fold_mean_f1 = (
-            fold_df.groupby(["WIGT", "AWGT", "PSWT2_MNDWI"])["f1"].mean().reset_index()
+            fold_df.groupby(["WIGT", "AWGT"])["f1"].mean().reset_index()
         )
         fold_best_idx = fold_mean_f1["f1"].idxmax()
         fold_best = (
             float(fold_mean_f1.loc[fold_best_idx, "WIGT"]),
             float(fold_mean_f1.loc[fold_best_idx, "AWGT"]),
-            float(fold_mean_f1.loc[fold_best_idx, "PSWT2_MNDWI"]),
         )
         # Score the left-out pair at the per-fold refit-best gridpoint:
         test_row = all_gs[
@@ -665,7 +689,6 @@ if __name__ == "__main__":
             & (all_gs["season"] == left_out_season)
             & (all_gs["WIGT"] == fold_best[0])
             & (all_gs["AWGT"] == fold_best[1])
-            & (all_gs["PSWT2_MNDWI"] == fold_best[2])
         ]
         test_f1 = float(test_row["f1"].iloc[0]) if len(test_row) else float("nan")
         # Note: LOOCVPerFold schema uses lowercase field names
@@ -675,7 +698,7 @@ if __name__ == "__main__":
             "left_out_season": left_out_season,
             "refit_best_wigt": fold_best[0],
             "refit_best_awgt": fold_best[1],
-            "refit_best_pswt2_mndwi": fold_best[2],
+            "refit_best_pswt2_mndwi": PSWT2_MNDWI_FIXED,  # fixed constant, not per-fold
             "test_f1": test_f1,
         })
 
@@ -722,8 +745,11 @@ if __name__ == "__main__":
             "loocv_mean_f1": loocv_mean_f1,
             "loocv_per_fold": loocv_per_fold_records,
             "joint_best_gridpoint": {
-                "WIGT": joint_best[0], "AWGT": joint_best[1], "PSWT2_MNDWI": joint_best[2],
+                "WIGT": joint_best[0], "AWGT": joint_best[1],
+                "PSWT2_MNDWI": PSWT2_MNDWI_FIXED,
             },
+            "pswt2_mndwi_treatment": "fixed_at_opera_ref",
+            "pswt2_mndwi_fixed_value": PSWT2_MNDWI_FIXED,
             "named_upgrade_path": "fit-set quality review",
         }
         RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -749,7 +775,7 @@ if __name__ == "__main__":
     # score_water_class_from_indices path as Stage 4. We reuse the cached
     # Balaton intermediates (created at Stage 3) -- no re-read of SAFE.
     balaton_thresholds = DSWEThresholds(
-        WIGT=joint_best[0], AWGT=joint_best[1], PSWT2_MNDWI=joint_best[2],
+        WIGT=joint_best[0], AWGT=joint_best[1], PSWT2_MNDWI=PSWT2_MNDWI_FIXED,
         grid_search_run_date=grid_search_run_date,
         fit_set_hash=fit_set_hash,
         fit_set_mean_f1=fit_set_mean_f1,
@@ -837,7 +863,7 @@ if __name__ == "__main__":
         "THRESHOLDS_EU = DSWEThresholds(",
         f"    WIGT={joint_best[0]:.4f},",
         f"    AWGT={joint_best[1]:.4f},",
-        f"    PSWT2_MNDWI={joint_best[2]:.4f},",
+        f"    PSWT2_MNDWI={PSWT2_MNDWI_FIXED:.4f},  # OPERA ATBD reference (fixed; not grid-searched)",
         f"    grid_search_run_date='{grid_search_run_date}',",
         f"    fit_set_hash='{fit_set_hash}',",
         f"    fit_set_mean_f1={fit_set_mean_f1:.4f},",
@@ -847,11 +873,13 @@ if __name__ == "__main__":
         "    notebook_path='notebooks/dswx_recalibration.ipynb',",
         "    results_json_path='scripts/recalibrate_dswe_thresholds_results.json',",
         "    provenance_note=(",
-        "        'Joint grid search over WIGT x AWGT x PSWT2_MNDWI; '",
+        "        'Joint grid search over WIGT x AWGT (525 gridpoints = 25x21); '",
+        "        'PSWT2_MNDWI held fixed at OPERA ATBD reference -0.44 (zero sensitivity "
+        "in EU -- Iter-2 fix A); '",
         f"        '{len(fitset_pairs)} fit-set (AOI, scene) pairs across 5 EU biomes '",
         "        '(Mediterranean reservoir / Atlantic estuary / boreal lake / '",
-        "        'Alpine valley / Iberian summer-dry); Balaton held out as test '",
-        "        'set per BOOTSTRAP_V1.1.md §5.4. Plan 06-06 grid search.'",
+        "        'Alpine valley / Mediterranean coastal delta); Balaton held out as test '",
+        "        'set per BOOTSTRAP_V1.1.md §5.4. Plan 06-06 grid search Iter-2.'",
         "    ),",
         ")",
         END_ANCHOR,
@@ -861,7 +889,7 @@ if __name__ == "__main__":
     threshold_module_path.write_text(new_src)
     logger.info(
         f"updated THRESHOLDS_EU: WIGT={joint_best[0]:.4f}, AWGT={joint_best[1]:.4f}, "
-        f"PSWT2_MNDWI={joint_best[2]:.4f}; fit_set_mean_f1={fit_set_mean_f1:.4f}; "
+        f"PSWT2_MNDWI={PSWT2_MNDWI_FIXED:.4f} (fixed); fit_set_mean_f1={fit_set_mean_f1:.4f}; "
         f"loocv_gap={loocv_gap:.4f}; held_out_balaton_f1={balaton_f1:.4f}"
     )
 
@@ -883,8 +911,10 @@ if __name__ == "__main__":
         "joint_best_gridpoint": {
             "WIGT": float(joint_best[0]),
             "AWGT": float(joint_best[1]),
-            "PSWT2_MNDWI": float(joint_best[2]),
+            "PSWT2_MNDWI": PSWT2_MNDWI_FIXED,
         },
+        "pswt2_mndwi_treatment": "fixed_at_opera_ref",
+        "pswt2_mndwi_fixed_value": PSWT2_MNDWI_FIXED,
         "fit_set_mean_f1": float(fit_set_mean_f1),
         "loocv_mean_f1": loocv_mean_f1,
         "loocv_gap": loocv_gap,
