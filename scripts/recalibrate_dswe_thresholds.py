@@ -198,15 +198,17 @@ if __name__ == "__main__":
     HELD_OUT_AOI = next(a for a in AOIS if a.held_out)  # Balaton
 
     # Grid bounds: WIGT x AWGT only (Iteration 2 fix A: PSWT2_MNDWI held fixed).
-    # 25 x 21 = 525 gridpoints (reduced from 8400 x 3-axis search).
-    WIGT_VALS = np.arange(0.08, 0.20 + 1e-9, 0.005)              # 25 values
-    AWGT_VALS = np.arange(-0.10, 0.10 + 1e-9, 0.01)               # 21 values
+    # Iteration 3 expansion: WIGT upper bound extended to 0.30 (45 values);
+    # AWGT lower bound extended to -0.20 (31 values); 45 x 31 = 1395 gridpoints.
+    # Previous run had joint best at WIGT=0.20 (top edge) -> expand upward.
+    WIGT_VALS = np.linspace(0.08, 0.30, 45)                       # 45 values
+    AWGT_VALS = np.linspace(-0.20, 0.10, 31)                      # 31 values
     # PSWT2_MNDWI fixed at OPERA ATBD reference value: zero sensitivity across all
     # EU fit-set pairs in the previous run (best gridpoint at the axis edge -0.65;
     # this indicates the classifier is insensitive to this parameter over EU biomes).
     PSWT2_MNDWI_FIXED: float = -0.44
     GRIDPOINTS = list(product(WIGT_VALS, AWGT_VALS))
-    assert len(GRIDPOINTS) == 525, f"expected 525 gridpoints, got {len(GRIDPOINTS)}"
+    assert len(GRIDPOINTS) == 1395, f"expected 1395 gridpoints, got {len(GRIDPOINTS)}"
 
     CACHE = Path("./eval-dswx-fitset")
     CACHE.mkdir(exist_ok=True)
@@ -436,10 +438,13 @@ if __name__ == "__main__":
     # Stage 4: Joint grid search (joblib parallel over 12 pairs; D-06)
     # ====================================================================
     def grid_search_one_pair(aoi_id: str, season: str, intermediates_dir: Path) -> Path:
-        """Run 525-gridpoint grid search on one (AOI, scene). Writes gridscores.parquet.
+        """Run 1395-gridpoint grid search on one (AOI, scene). Writes gridscores.parquet.
 
-        Grid is WIGT x AWGT only (525 points = 25 x 21); PSWT2_MNDWI is held
+        Grid is WIGT x AWGT only (1395 points = 45 x 31); PSWT2_MNDWI is held
         fixed at PSWT2_MNDWI_FIXED (-0.44, OPERA ATBD reference) per Iter-2 fix A.
+        Iteration 3: WIGT extended to 0.30 (from 0.20); AWGT extended to -0.20 lower
+        bound (from -0.10). Old gridscores.parquet files from Iter-2 (525 points) are
+        stale and must be deleted before re-running this script.
         """
         out_path = intermediates_dir.parent / "gridscores.parquet"
         if out_path.exists():
@@ -556,7 +561,7 @@ if __name__ == "__main__":
     all_gs = pd.concat(gridscores_dfs, ignore_index=True)
     assert len(all_gs) == len(FIT_SET_AOIS) * 2 * len(GRIDPOINTS), (
         f"expected {len(FIT_SET_AOIS) * 2 * len(GRIDPOINTS)} rows in fit-set aggregate "
-        f"(10 pairs x 525 gridpoints), got {len(all_gs)}"
+        f"(10 pairs x {len(GRIDPOINTS)} gridpoints), got {len(all_gs)}"
     )
 
     # Mean F1 per gridpoint across 10 fit-set pairs (WIGT x AWGT only)
