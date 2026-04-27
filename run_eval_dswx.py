@@ -37,8 +37,11 @@ if __name__ == "__main__":
     import numpy as np
     from dotenv import load_dotenv
 
+    from loguru import logger
+
     from subsideo.data.cdse import CDSEClient, extract_safe_s3_prefix
     from subsideo.products.dswx import run_dswx
+    from subsideo.products.dswx_thresholds import THRESHOLDS_EU
     from subsideo.products.types import DSWxConfig
     from subsideo.validation.compare_dswx import compare_dswx
     from subsideo.validation.harness import (
@@ -56,6 +59,19 @@ if __name__ == "__main__":
         "CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET",
         "CDSE_S3_ACCESS_KEY", "CDSE_S3_SECRET_KEY",
     ])
+
+    # -- Stage 0: EU recalibration pre-check (W5 fix) --------------------------
+    # Plan 06-07 W5: verify THRESHOLDS_EU.fit_set_hash is populated (grid-search
+    # landed) before running any pipeline work. Originally an assert; relaxed to
+    # a warning in Plan 06-06 closure because the EU recalibration was deferred
+    # to v1.2 with an honest BLOCKER (see CONCLUSIONS_DSWX_EU_RECALIB.md).
+    # Plan 06-07 proceeds with PROTEUS defaults; Balaton F1 will be reported
+    # with named_upgrade_path set accordingly.
+    if not THRESHOLDS_EU.fit_set_hash:
+        logger.warning(
+            "THRESHOLDS_EU.fit_set_hash is empty -- running with PROTEUS defaults "
+            "(EU recalibration deferred to v1.2; see CONCLUSIONS_DSWX_EU_RECALIB.md)"
+        )
 
     # -- Configuration --------------------------------------------------------
     # ENV-08: Lake Balaton sits inside MGRS-100km tile 33TXP (UTM 33N). The
