@@ -220,7 +220,7 @@ Plans:
 - [x] 06-03-PLAN.md — dswx.py decomposition (compute_index_bands + score_water_class_from_indices + IndexBands public API) + DELETE 3 module-level constants (WIGT/AWGT/PSWT2_MNDWI) + KEEP 8 (PSWT1_*/PSWT2_BLUE/NIR/SWIR1/SWIR2) + thread thresholds keyword + DSWxConfig.region field + run_dswx region resolution [Wave 2] [DSWX-04, DSWX-05]
 - [x] 06-04-PLAN.md — compare_dswx shoreline 1-pixel buffer (D-16 uniform application) + JRC retry refactor via harness.download_reference_with_retry(source='jrc') + matrix_writer dswx render branches (_is_dswx_*_shape + _render_dswx_*_cell; AFTER dist:* per D-27) [Wave 2] [DSWX-06]
 - [x] 06-05-PLAN.md — N.Am. positive control: run_eval_dswx_nam.py NEW (10-stage CANDIDATES iteration + INVESTIGATION_TRIGGER halt) + execute eval + CONCLUSIONS_DSWX_N_AM.md NEW + USER CHECKPOINT [Wave 3] [DSWX-01] — F1=0.9252 PASS (Lake Tahoe T10SFH); EU recalibration cleared; checkpoint APPROVED
-- [ ] 06-06-PLAN.md — Recalibration pipeline: scripts/recalibrate_dswe_thresholds.py NEW (11-stage joblib parallel + 8400-gridpoint grid search + LOO-CV + edge sentinel + LOO-CV gap gate + Balaton + threshold module rewrite) + dswx_recalibration.ipynb NEW + 3 USER CHECKPOINTS (edge / loocv-gap / final-review) [Wave 4] [DSWX-03, DSWX-04, DSWX-05, DSWX-06]
+- [x] 06-06-PLAN.md — Recalibration pipeline: 3-iteration grid search exhausted; honest BLOCKER (fit_set_mean_f1=0.2092 across all 1395 gridpoints); HLS→S2 L2A spectral transfer gap diagnosed; THRESHOLDS_EU unchanged (PROTEUS defaults); CONCLUSIONS_DSWX_EU_RECALIB.md written; Stage 0 assert relaxed to warning; Plan 06-07 unblocked [Wave 4] [DSWX-03, DSWX-04, DSWX-05, DSWX-06]
 - [ ] 06-07-PLAN.md — EU re-run + reporting: run_eval_dswx.py 5 changes (region='eu', tuple-unpack, DswxEUCellMetrics, recalibration results read) + execute Balaton EU re-run + CONCLUSIONS_DSWX.md v1.0 baseline preamble + 3 v1.1 sections + docs/validation_methodology.md §5 (5 sub-sections) + matrix.md regen [Wave 5] [DSWX-06, DSWX-07]
 
 **Requirements coverage audit** (all 7 Phase 6 requirement IDs):
@@ -272,5 +272,5 @@ DSWX-01 (05), DSWX-02 (01), DSWX-03 (01, 06), DSWX-04 (03, 06), DSWX-05 (02, 03,
 | 3. CSLC-S1 Self-Consistency + EU Validation | v1.1 | 0/0 | Not started | - |
 | 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 5/5 | Complete (honest FAIL on r > 0.92 + bias < 3 mm/yr; cells MIXED with attributed_source=inconclusive; v1.2 follow-up scoped via DISP_UNWRAPPER_SELECTION_BRIEF.md) | 2026-04-25 |
 | 5. DIST-S1 OPERA v0.1 + EFFIS EU | v1.1 | 9/9 | Complete (infrastructure shipped; EU honest FAIL 0/3 PASS — 3 attributable causes documented for v1.2; DIST-01/02/03 deferred-with-evidence to v1.2) | 2026-04-26 |
-| 6. DSWx-S2 N.Am. + EU Recalibration | v1.1 | 0/0 | Not started | - |
+| 6. DSWx-S2 N.Am. + EU Recalibration | v1.1 | 6/7 | Executing (Plan 06-06 honest BLOCKER documented; Plan 06-07 starting) | - |
 | 7. Results Matrix + Release Readiness | v1.1 | 0/0 | Not started | - |
