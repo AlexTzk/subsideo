@@ -1,19 +1,20 @@
 {
   "cell_status": "BLOCKER",
   "edge_check": {
-    "status": "at_edge_PSWT2_MNDWI",
+    "status": "at_edge_WIGT",
     "joint_best": [
-      0.09500000000000001,
-      0.00999999999999994,
-      -0.65
+      0.20000000000000012,
+      0.00999999999999994
     ]
   },
   "joint_best_gridpoint": {
-    "WIGT": 0.09500000000000001,
+    "WIGT": 0.20000000000000012,
     "AWGT": 0.00999999999999994,
-    "PSWT2_MNDWI": -0.65
+    "PSWT2_MNDWI": -0.44
   },
-  "fit_set_mean_f1": 0.1706031622712081,
+  "pswt2_mndwi_treatment": "fixed_at_opera_ref",
+  "pswt2_mndwi_fixed_value": -0.44,
+  "fit_set_mean_f1": 0.2091501987386608,
   "grid_bounds": {
     "WIGT": [
       0.08,
@@ -22,10 +23,6 @@
     "AWGT": [
       -0.1,
       0.0999999999999999
-    ],
-    "PSWT2_MNDWI": [
-      -0.65,
-      -0.34999999999999976
     ]
   },
   "named_upgrade_path": "grid expansion required"
