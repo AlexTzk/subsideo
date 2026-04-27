@@ -498,6 +498,48 @@ def _is_dist_nam_shape(metrics_path: Path) -> bool:
     )
 
 
+def _is_dswx_nam_shape(metrics_path: Path) -> bool:
+    """Return True when metrics.json carries the DswxNamCellMetrics shape (Plan 06-04 D-27).
+
+    Discriminator: presence of ``selected_aoi`` AND ``candidates_attempted`` keys
+    in raw JSON. These are structurally disjoint from disp:* (ramp_attribution),
+    dist:eu (per_event), dist:nam (reference_source + cmr_probe_outcome),
+    cslc:* (per_aoi), and rtc:eu (per_burst) schemas.
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.debug("_is_dswx_nam_shape: cannot read {}: {}", metrics_path, e)
+        return False
+    return (
+        isinstance(raw, dict)
+        and "selected_aoi" in raw
+        and "candidates_attempted" in raw
+    )
+
+
+def _is_dswx_eu_shape(metrics_path: Path) -> bool:
+    """Return True when metrics.json carries the DswxEUCellMetrics shape (Plan 06-04 D-27).
+
+    Discriminator: presence of ``thresholds_used`` AND ``loocv_gap`` keys in
+    raw JSON. Structurally disjoint from all other matrix cell schemas.
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.debug("_is_dswx_eu_shape: cannot read {}: {}", metrics_path, e)
+        return False
+    return (
+        isinstance(raw, dict)
+        and "thresholds_used" in raw
+        and "loocv_gap" in raw
+    )
+
+
 def _render_dist_eu_cell(metrics_path: Path) -> tuple[str, str] | None:
     """Render Phase 5 DIST-EU multi-event aggregate as (pq_col, ra_col).
 
@@ -557,6 +599,72 @@ def _render_dist_nam_deferred_cell(metrics_path: Path) -> tuple[str, str] | None
     cell_status = raw.get("cell_status", "DEFERRED")
     pq_col = "—"
     ra_col = f"{cell_status} (CMR: {cmr_outcome})"
+    return pq_col, ra_col
+
+
+def _render_dswx_nam_cell(metrics_path: Path) -> tuple[str, str] | None:
+    """Render Phase 6 N.Am. DSWx positive-control cell as (pq_col, ra_col).
+
+    pq_col: '—' (DSWx has no product-quality gate; CONTEXT D-26).
+    ra_col format: 'F1=0.XXX [PASS|FAIL|BLOCKER]' + ' [aoi=<selected_aoi>]' inline +
+        ' — named upgrade: <path>' if named_upgrade_path is set +
+        ' INVESTIGATION_REQUIRED' if regression.f1_below_regression_threshold AND
+        NOT investigation_resolved.
+    """
+    from subsideo.validation.matrix_schema import DswxNamCellMetrics
+
+    try:
+        m = DswxNamCellMetrics.model_validate_json(metrics_path.read_text())
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Failed to parse DswxNamCellMetrics from {}: {}", metrics_path, e)
+        return None
+
+    f1_value = m.reference_agreement.measurements.get("f1", float("nan"))
+    if m.cell_status == "BLOCKER":
+        ra_col = (
+            f"BLOCKER [no candidate scene found among {len(m.candidates_attempted)} attempts]"
+        )
+    else:
+        verdict = m.cell_status  # PASS or FAIL
+        base = f"F1={f1_value:.3f} {verdict} [aoi={m.selected_aoi}]"
+        if m.named_upgrade_path:
+            base += f" — named upgrade: {m.named_upgrade_path}"
+        if m.regression.f1_below_regression_threshold and not m.regression.investigation_resolved:
+            base += " INVESTIGATION_REQUIRED"
+        ra_col = base
+
+    pq_col = "—"
+    return pq_col, ra_col
+
+
+def _render_dswx_eu_cell(metrics_path: Path) -> tuple[str, str] | None:
+    """Render Phase 6 EU DSWx held-out-Balaton cell as (pq_col, ra_col).
+
+    pq_col: '—' (DSWx has no product-quality gate; CONTEXT D-26).
+    ra_col format: 'F1=0.XXX [PASS|FAIL|BLOCKER]' (Balaton; D-13) +
+        ' — named upgrade: <path>' if named_upgrade_path is set +
+        ' | LOOCV gap=0.XXX' inline diagnostic.
+    """
+    from subsideo.validation.matrix_schema import DswxEUCellMetrics
+
+    try:
+        m = DswxEUCellMetrics.model_validate_json(metrics_path.read_text())
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Failed to parse DswxEUCellMetrics from {}: {}", metrics_path, e)
+        return None
+
+    f1_balaton = m.reference_agreement.measurements.get("f1", float("nan"))
+    if m.cell_status == "BLOCKER":
+        ra_col = f"BLOCKER [LOOCV gap={m.loocv_gap:.3f} (>= 0.02)]"
+    else:
+        verdict = m.cell_status  # PASS or FAIL
+        base = f"F1={f1_balaton:.3f} {verdict}"
+        if m.named_upgrade_path:
+            base += f" — named upgrade: {m.named_upgrade_path}"
+        base += f" | LOOCV gap={m.loocv_gap:.3f}"
+        ra_col = base
+
+    pq_col = "—"
     return pq_col, ra_col
 
 
@@ -634,6 +742,38 @@ def write_matrix(manifest_path: Path, out_path: Path) -> None:
         # publishes operationally.
         if metrics_path.exists() and _is_dist_nam_shape(metrics_path):
             cols = _render_dist_nam_deferred_cell(metrics_path)
+            if cols is not None:
+                pq_col, ra_col = cols
+                lines.append(
+                    f"| {product} | {region} | {_escape_table_cell(pq_col)} | "
+                    f"{_escape_table_cell(ra_col)} |"
+                )
+                continue
+            # Fall through to default rendering on parse failure.
+
+        # Phase 6 DSWX-N.Am. branch (D-27):
+        # Inserted AFTER dist:* per Phase 5 D-24 amendment in ROADMAP scope-amendment block;
+        # BEFORE cslc:selfconsist + rtc:eu per W6 invariant.
+        # Discriminator (selected_aoi + candidates_attempted) is structurally disjoint
+        # from all earlier branches (ramp_attribution, per_event, reference_source, per_aoi,
+        # per_burst).
+        if metrics_path.exists() and _is_dswx_nam_shape(metrics_path):
+            cols = _render_dswx_nam_cell(metrics_path)
+            if cols is not None:
+                pq_col, ra_col = cols
+                lines.append(
+                    f"| {product} | {region} | {_escape_table_cell(pq_col)} | "
+                    f"{_escape_table_cell(ra_col)} |"
+                )
+                continue
+            # Fall through to default rendering on parse failure.
+
+        # Phase 6 DSWX-EU branch (D-27):
+        # Inserted AFTER dswx:nam per D-27; BEFORE cslc:* + rtc:eu per W6 invariant.
+        # Discriminator (thresholds_used + loocv_gap) is structurally disjoint from
+        # all earlier branches.
+        if metrics_path.exists() and _is_dswx_eu_shape(metrics_path):
+            cols = _render_dswx_eu_cell(metrics_path)
             if cols is not None:
                 pq_col, ra_col = cols
                 lines.append(
