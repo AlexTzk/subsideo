@@ -113,53 +113,64 @@ if __name__ == "__main__":
     # 5 fit-set + 1 Balaton held-out = 6 AOIs x 2 (wet/dry) = 12 (AOI, scene) pairs total;
     # B1 fix: ONLY 10 of those (5 fit-set x 2 seasons) participate in the grid search +
     # LOO-CV; the 2 Balaton pairs are scored at the joint best gridpoint at Stage 9.
+    # NOTE: MGRS tile corrections applied (Plan 06-06 STAC-verified tiles):
+    # - 29SQE (Alcantara) → 29TPE: 29SQE does not exist in CDSE STAC; 29TPE covers
+    #   the main reservoir body at lat 39.64-40.64 (water concentrated at lat 39.75-39.80)
+    # - 32TQR (Garda) → 32TPR: 32TQR does not exist in CDSE STAC; 32TPR is the actual
+    #   tile (confirmed via live STAC search; covers Lake Garda completely)
+    # - 33TXP (Balaton) → 33TXM: 33TXP does not exist in CDSE STAC; 33TXM covers Balaton
+    # - 33VVF (Vanern) → 33VUF: 33VVF only covers a tiny sliver of eastern Vanern; 33VUF
+    #   covers the main lake body (41% JRC water at lat 58.51-58.98)
+    # - Tagus wet_month=2 → 3: Feb 2021 JRC tile is all-zero (no observations); Mar OK
+    # - Vanern wet_month=8→7, dry_month=5→4: Jul has 0% cloud, 41.1% JRC water; Apr has
+    #   1.7% cloud, 41.6% JRC water; both months verified with live JRC tile downloads
     AOIS: list[FitsetAOI] = [
         FitsetAOI(
             aoi_id="alcantara", biome="Mediterranean reservoir",
             bbox=(-7.05, 39.55, -6.65, 39.95),
-            mgrs_tile="29SQE", epsg=32629,
-            wet_year=2021, wet_month=3,  # Mar wet (after winter rain)
-            dry_year=2021, dry_month=8,  # Aug dry
+            mgrs_tile="29TPE", epsg=32629,  # corrected: 29SQE not in CDSE STAC
+            wet_year=2021, wet_month=3,   # Mar wet (after winter rain); 0.03% cloud on 29TPE
+            dry_year=2021, dry_month=8,   # Aug dry; 0.0-0.7% cloud on 29TPE
             held_out=False,
         ),
         FitsetAOI(
             aoi_id="tagus", biome="Atlantic estuary",
             bbox=(-9.45, 38.55, -8.85, 39.05),
-            mgrs_tile="29SMC", epsg=32629,
-            wet_year=2021, wet_month=2,
-            dry_year=2021, dry_month=8,
+            mgrs_tile="29SMC", epsg=32629,  # confirmed correct
+            wet_year=2021, wet_month=3,   # Mar; Feb JRC tile is all-zero; Mar=22.2% water OK
+            dry_year=2021, dry_month=8,   # Aug; 21.7% water in JRC
             held_out=False,
         ),
         FitsetAOI(
             aoi_id="vanern", biome="Boreal lake",
             bbox=(12.40, 58.45, 14.20, 59.45),
-            mgrs_tile="33VVF", epsg=32633,
-            wet_year=2021, wet_month=8,  # Aug (JRC tile for Jun/Oct 2021 is all-zero; Aug=47.6% water OK)
-            dry_year=2021, dry_month=5,  # May (spring; JRC tile May 2021 = 47.8% water OK)
+            mgrs_tile="33VUF", epsg=32633,  # corrected: 33VVF only a sliver; 33VUF = main body
+            wet_year=2021, wet_month=7,   # Jul; 0.0% cloud on 33VUF; JRC 41.1% water
+            dry_year=2021, dry_month=4,   # Apr; 1.7% cloud on 33VUF; JRC 41.6% water
             held_out=False,
         ),
         FitsetAOI(
             aoi_id="garda", biome="Alpine valley",
             bbox=(10.55, 45.55, 10.85, 45.85),
-            mgrs_tile="32TQR", epsg=32632,
-            wet_year=2021, wet_month=6,  # Jun (snowmelt)
-            dry_year=2021, dry_month=10,
+            mgrs_tile="32TPR", epsg=32632,  # corrected: 32TQR not in CDSE STAC
+            wet_year=2021, wet_month=6,   # Jun (snowmelt); 14.0% cloud on 32TPR (best in month)
+            dry_year=2021, dry_month=10,  # Oct; 0.0% cloud on 32TPR
             held_out=False,
         ),
         FitsetAOI(
             aoi_id="donana", biome="Iberian summer-dry",
             bbox=(-6.55, 36.80, -6.30, 37.05),
-            mgrs_tile="29SQB", epsg=32629,
-            wet_year=2021, wet_month=3,
-            dry_year=2021, dry_month=8,
+            mgrs_tile="29SQB", epsg=32629,  # confirmed correct
+            wet_year=2021, wet_month=3,   # Mar; 0.0% cloud on 29SQB
+            dry_year=2021, dry_month=8,   # Aug; 4.9% cloud on 29SQB
             held_out=False,
         ),
         FitsetAOI(
             aoi_id="balaton", biome="Pannonian plain",
             bbox=(17.20, 46.60, 18.20, 46.95),
-            mgrs_tile="33TXP", epsg=32633,
-            wet_year=2021, wet_month=4,
-            dry_year=2021, dry_month=7,  # Jul (Aug 2021 no cloud-free scene; Jul=0.9% OK)
+            mgrs_tile="33TXM", epsg=32633,  # corrected: 33TXP not in CDSE STAC
+            wet_year=2021, wet_month=4,   # Apr; 0.0% cloud on 33TXM
+            dry_year=2021, dry_month=7,   # Jul; 0.0% cloud on 33TXM
             held_out=True,  # CONTEXT D-01 + BOOTSTRAP §5.4 + DSWX-03
         ),
     ]
