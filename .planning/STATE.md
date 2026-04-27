@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
 status: executing
-stopped_at: Phase 6 context gathered
-last_updated: "2026-04-27T00:10:01Z"
-last_activity: 2026-04-27 -- Phase 06 Plan 03 complete
+stopped_at: Completed 06-04-PLAN.md
+last_updated: "2026-04-27T01:41:06Z"
+last_activity: 2026-04-27 -- Phase 06 Plan 04 complete
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 40
-  completed_plans: 36
-  percent: 90
+  completed_plans: 37
+  percent: 93
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 ## Current Position
 
 Phase: 06 (dswx-s2-n-am-eu-recalibration) — EXECUTING
-Plan: 4 of 7 (Plans 01-03 complete)
+Plan: 5 of 7 (Plans 01-04 complete)
 Status: Executing Phase 06
-Last activity: 2026-04-27 -- Phase 06 Plan 03 complete
+Last activity: 2026-04-27 -- Phase 06 Plan 04 complete
 
 **Resume path:** All 5 plans complete (Waves 1 + 2 + 3 + 4). Plan 04-05 (Wave 4: docs + brief) renamed `CONCLUSIONS_DISP_EGMS.md` → `CONCLUSIONS_DISP_EU.md` via `git mv` (R100; history preserved via `git log --follow`); appended 4 v1.1 sub-sections (§11 Product Quality / §12 Reference Agreement / §13 Ramp Attribution / §14 Brief link) to both `CONCLUSIONS_DISP_N_AM.md` (258 → 356 LOC) and `CONCLUSIONS_DISP_EU.md` (304 → 404 LOC) with v1.0 baseline numbers preserved as continuity preamble; wrote `.planning/milestones/v1.1-research/DISP_UNWRAPPER_SELECTION_BRIEF.md` (129 LOC) with 4-candidate × 4-column scoping table (PHASS+post-deramping S/SPURT native M/tophu+SNAPHU L/20×20 m fallback L) and attribution-driven prioritisation recommending ERA5 toggle (DISP-V2-02) FIRST in v1.2; appended §3 multilook ADR to `docs/validation_methodology.md` (247 → 365 LOC) with 5-part PITFALLS+FEATURES dialogue and explicit "Native 5×10 m stays production default" per DISP-05; §4 + §5 NOT created per Phase 3 D-15 append-only. **Phase 4 closure complete.** Honest FAIL signal preserved + scoped: SoCal r=0.049 / Bologna r=0.336 (both FAIL > 0.92), both attributed_source='inconclusive', cross-cell pattern flags atmospheric long-wavelength curvature as primary v1.2 candidate. Ready for verifier per `.planning/config.json` `workflow.verifier: true`.
 
@@ -136,6 +136,10 @@ Recent decisions affecting current work (v1.1):
 - [Phase 4 Plan 04-05]: git mv CONCLUSIONS_DISP_EGMS.md to CONCLUSIONS_DISP_EU.md (R100 rename); 4 v1.1 sub-sections appended to both DISP CONCLUSIONS files (Product Quality / Reference Agreement / Ramp Attribution / Brief link); DISP_UNWRAPPER_SELECTION_BRIEF.md written with 4 candidates x 4 columns at .planning/milestones/v1.1-research/; docs/validation_methodology.md section 3 multilook ADR appended (5-part PITFALLS+FEATURES dialogue); v1.0 baseline numbers preserved as continuity preamble; no section 4/section 5 added per Phase 3 D-15 append-only
 - [Phase 4 Plan 04-05]: Section 3 multilook ADR framed as posture-not-science; PITFALLS P3.1 Gaussian-physics + FEATURES anti-feature block_mean both correct on own terms; ADR resolves by picking lower-bound r kernel (block_mean) for milestone-publish artefacts; eval-script constant REFERENCE_MULTILOOK_METHOD lives at module top in run_eval_disp.py + run_eval_disp_egms.py per D-04; switching kernel post-measurement requires PR diff + CONCLUSIONS sub-section per section 3.5; no env-var override / CLI flag
 - [Phase 4 Plan 04-05]: Brief author recommends activating diagnostic (c) ERA5 toggle FIRST in v1.2 milestone (DISP-V2-02 integration) given Phase 4's both-cells-inconclusive outcome triggers CONTEXT D-14 'diagnostics b+c BEFORE candidate evaluation' branch; cross-cell pattern (SoCal r(mag,coh)=+0.15 near-zero; Bologna r(mag,coh)=-0.52 negative) suggests atmospheric long-wavelength curvature; if ERA5 flips both cells to phass then ordered escalation is candidate 2 (SPURT) -> 1 (PHASS+post-deramping) -> 3 (tophu+SNAPHU) -> 4 (20x20 m fallback)
+- [Phase 6 Plan 06-04]: B2 fix: DSWxValidationDiagnostics attribute side-channel (default None) on DSWxValidationResult is the canonical pattern for zero-breaking-change extensibility; tuple-return would have broken all v1.0 callers
+- [Phase 6 Plan 06-04]: Shoreline buffer applied at UTM-grid level using JRC raw encoding (2=water) before _binarize_jrc transform; ensures buffer is in the same coordinate space as the comparison (D-16)
+- [Phase 6 Plan 06-04]: download_reference_with_retry parameter is dest= (keyword-only), not dest_path=; source= is also keyword-only per harness.py actual signature
+- [Phase 6 Plan 06-04]: matrix_writer dispatch insertion AFTER dist:nam_deferred, BEFORE cslc:selfconsist + rtc:eu (D-27 + W6 strict chain); discriminators keyed on structurally-disjoint field-sets (selected_aoi+candidates_attempted for nam; thresholds_used+loocv_gap for eu)
 
 ### Pending Todos
 
@@ -160,8 +164,8 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 ## Session Continuity
 
 Last activity: 2026-04-25 — Phase 4 Plan 04-04 complete (Wave 3: eval-script rewire + warm re-runs + manifest fix). 5 changes per script landed in run_eval_disp.py + run_eval_disp_egms.py (10 total: REFERENCE_MULTILOOK_METHOD constant + EXPECTED_WALL_S=21600 + prepare_for_reference adapter + product-quality block + ramp-attribution + DISPCellMetrics write); manifest cache_dir aligned with on-disk eval-disp-egms (hyphen); both warm re-runs completed (~6 min SoCal, ~3 min Bologna); both metrics.json files validate as DISPCellMetrics; matrix.md regenerated. Honest FAIL signal preserved: SoCal r=0.049 (v1.0=0.0365), bias=+23.6 (v1.0=+23.62); Bologna r=0.336 (v1.0=0.32), bias=+3.46 (v1.0=+3.35). Both attributed_source=inconclusive. Ruff clean on touched files. Commits 75dea9d (Task 1 SoCal eval) + ec2c07d (Task 2 Bologna eval) + ae2707f (Task 3 manifest fix) + 709c0c0 (Task 4 Rule 3 EGMS_TOKEN preflight relaxation) + 0d0df63 (Task 4 matrix.md regen). Plan 04-04 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-04-SUMMARY.md`.
-Last session: 2026-04-27T00:10:01Z
-Stopped at: Completed 06-03-PLAN.md
+Last session: 2026-04-27T01:41:06Z
+Stopped at: Completed 06-04-PLAN.md
 Resume file: None
 
 **Planned Phase:** 05 (dist-s1-opera-v0-1-effis-eu) — 9 plans — 2026-04-25T21:45:44.176Z
