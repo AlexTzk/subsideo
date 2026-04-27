@@ -12,7 +12,7 @@ CALIBRATING cells are *italicised*. See `validation/criteria.py` for the 13-entr
 | CSLC | EU | *1/1 CALIBRATING \| coh=0.87 / resid=0.0 mm/yr (Iberian)* | *amp_r=0.00 / amp_rmse=0.0 dB* |
 | DISP | NAM | *coh=0.89 ([phase3-cached]) / resid=-0.0 mm/yr / attr=inconclusive (CALIBRATING)* | 0.04904 (> 0.92 FAIL) / 23.62 (< 3 FAIL) |
 | DISP | EU | *coh=0.00 ([fresh]) / resid=+0.1 mm/yr / attr=inconclusive (CALIBRATING)* | 0.3358 (> 0.92 FAIL) / 3.461 (< 3 FAIL) |
-| DIST | NAM | RUN_FAILED (metrics.json missing) | RUN_FAILED |
-| DIST | EU | RUN_FAILED (metrics.json missing) | RUN_FAILED |
-| DSWX | NAM | RUN_FAILED (metrics.json missing) | RUN_FAILED |
+| DIST | NAM | — | DEFERRED (CMR: operational_not_found) |
+| DIST | EU | — | 0/3 PASS (3 FAIL) \| worst f1=0.000 (aveiro) |
+| DSWX | NAM | — | F1=0.925 PASS [aoi=Lake Tahoe (CA)] |
 | DSWX | EU | RUN_FAILED (metrics.json missing) | RUN_FAILED |
