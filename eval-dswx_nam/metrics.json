@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "product_quality": {
+    "measurements": {},
+    "criterion_ids": []
+  },
+  "reference_agreement": {
+    "measurements": {
+      "f1": 0.9252298474570435,
+      "precision": 0.8998526456798392,
+      "recall": 0.9520799376373043,
+      "accuracy": 0.997339026938253
+    },
+    "criterion_ids": [
+      "dswx.f1_min"
+    ]
+  },
+  "criterion_ids_applied": [
+    "dswx.f1_min"
+  ],
+  "runtime_conda_list_hash": null,
+  "selected_aoi": "Lake Tahoe (CA)",
+  "selected_scene_id": "S2B_MSIL2A_20210723T184919_N0500_R113_T10SFH_20230131T130926",
+  "cloud_cover_pct": 0.0,
+  "candidates_attempted": [
+    {
+      "aoi_name": "Lake Tahoe (CA)",
+      "scenes_found": 50,
+      "cloud_min": 0.0
+    }
+  ],
+  "region": "nam",
+  "cell_status": "PASS",
+  "named_upgrade_path": null,
+  "regression": {
+    "f1_below_regression_threshold": false,
+    "regression_diagnostic_required": [],
+    "investigation_resolved": false
+  },
+  "f1_full_pixels": 0.8612831860693165,
+  "shoreline_buffer_excluded_pixels": 243221
+}

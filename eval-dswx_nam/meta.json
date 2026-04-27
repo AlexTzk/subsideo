@@ -1,0 +1,18 @@
+{
+  "git_sha": "ef03edfc168e9d6cd4e1b18611d1eedb08726550",
+  "git_dirty": true,
+  "run_started_utc": "2026-04-27T02:09:03.821144+00:00",
+  "wall_s": 14.201160907745361,
+  "platform": "macOS-26.3.1-arm64-arm-64bit",
+  "python_version": "3.12.13 | packaged by conda-forge | (main, Mar  5 2026, 17:06:14) [Clang 19.1.7 ]",
+  "selected_aoi": "Lake Tahoe (CA)",
+  "selected_mgrs_tile": "10SFH",
+  "selected_scene_id": "S2B_MSIL2A_20210723T184919_N0500_R113_T10SFH_20230131T130926",
+  "cloud_cover_pct": 0.0,
+  "jrc_year": 2021,
+  "jrc_month": 7,
+  "input_hashes": {
+    "safe_filename_hash_prefix": "eb6332373ae556d0",
+    "threshold_module_sha256_prefix": "f185156eae80ff08"
+  }
+}
