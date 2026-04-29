@@ -35,12 +35,12 @@ def test_credential_preflight_4_vars() -> None:
 
 
 def test_grid_bounds() -> None:
-    """CONTEXT D-04 + REQUIREMENTS DSWX-04: grid bounds verification."""
+    """CONTEXT D-04 + REQUIREMENTS DSWX-04: grid bounds verification (Iteration 3 grid)."""
     src = SCRIPT.read_text()
-    assert "0.08" in src and "0.20" in src and "0.005" in src
-    assert "-0.10" in src or "-0.1" in src
-    assert "-0.65" in src and "-0.35" in src and "0.02" in src
-    assert "8400" in src  # GRIDPOINTS count assertion
+    assert "0.08" in src and "0.20" in src  # WIGT lower bound + AWGT upper ref
+    assert "-0.20" in src  # AWGT lower bound (Iteration 3 expansion)
+    assert "-0.65" in src and "0.02" in src  # PSWT2_MNDWI ref + LOO-CV gap threshold
+    assert "1395" in src  # 45 × 31 gridpoints (Iteration 3)
 
 
 def test_six_aois_with_balaton_held_out() -> None:
@@ -50,7 +50,7 @@ def test_six_aois_with_balaton_held_out() -> None:
     assert "tagus" in src
     assert "vanern" in src
     assert "garda" in src
-    assert "donana" in src
+    assert "ebro_delta" in src
     assert "balaton" in src
     assert "held_out=True" in src
 
@@ -129,7 +129,7 @@ def test_stage_5_b3_explicit_aggregate() -> None:
     src = SCRIPT.read_text()
     # Marker constructs from the B3-explicit body:
     assert "mean_f1_per_grid = (" in src
-    assert "groupby([\"WIGT\", \"AWGT\", \"PSWT2_MNDWI\"])" in src
+    assert "groupby([\"WIGT\", \"AWGT\"])" in src
     assert "joint_best_idx = mean_f1_per_grid[\"f1\"].idxmax()" in src
 
 

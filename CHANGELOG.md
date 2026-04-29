@@ -4,6 +4,54 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.1.0] - 2026-04-28
+
+v1.1 N.Am./EU Validation Parity & Scientific PASS milestone. Drives every
+product (RTC, CSLC, DISP, DIST, DSWx) to an unambiguous PASS, FAIL-with-named-upgrade-path,
+or DEFERRED-with-dated-unblock across both N.Am. and EU regions.
+
+### Validation Results
+
+- **RTC-S1 EU:** 3/5 bursts PASS across alpine/plain/arid/boreal/wildfire terrain regimes
+- **RTC-S1 N.Am.:** DEFERRED — N.Am. eval script (run_eval.py) not migrated to v1.1 harness sidecars in this milestone (EU was the focus); unblock: v1.2 N.Am. harness migration
+- **CSLC-S1 self-consistency:** 3/3 AOIs CALIBRATING (SoCal coh=0.887, Coso-Searles coh=0.804, Iberian coh=0.868); eligible for v1.2 binding (≥3 data points)
+- **DISP-S1:** SoCal r=0.049 FAIL / Bologna r=0.336 FAIL (both attributed_source=inconclusive); DISP Unwrapper Selection brief scoped for v1.2
+- **DIST-S1 N.Am.:** DEFERRED — operational `OPERA_L3_DIST-ALERT-S1_V1` not yet published in CMR; CMR auto-supersede probe active
+- **DIST-S1 EU:** 0/3 events PASS (Aveiro/Evros/Culebra); 3 attributable causes documented; chained prior_dist_s1_product retry filed upstream
+- **DSWx-S2 N.Am.:** F1=0.9252 PASS (Lake Tahoe T10SFH, July 2021)
+- **DSWx-S2 EU:** F1=0.8165 FAIL — fit-set quality review (HLS→S2 L2A spectral transfer gap; EU recalibration deferred to v1.2)
+
+### Added
+
+- `results/matrix.md` — 10-cell validation matrix (5 products × 2 regions) with
+  product-quality and reference-agreement in structurally separate columns; CALIBRATING cells
+  italicised with `binds v1.2` milestone annotation; DEFERRED cells carry dated unblock conditions
+- `docs/validation_methodology.md` — §6 (OPERA UTC-hour frame selection by
+  `harness.select_opera_frame_by_utc_hour()`) and §7 (cross-sensor precision-first
+  framing for DIST-S1 vs EFFIS); top-level TOC linking all 7 sections
+- `validation/bootstrap.py` — block-bootstrap 95% CI for DIST-S1 per-event F1 (Phase 5)
+- `validation/effis.py` — EFFIS REST API access + dual rasterise for DIST-S1 EU cross-validation (Phase 5)
+- `products/dswx_thresholds.py` — typed DSWEThresholds frozen+slots dataclass with
+  provenance metadata and EU/N.Am. region selector (Phase 6)
+- Dockerfile, Apptainer.def, env.lockfile.linux-64.txt, env.lockfile.osx-arm64.txt —
+  reproducibility recipe (Phase 1)
+
+### Deferred to v1.2
+
+- **REL-04 TrueNAS Linux audit:** Full `make eval-all` on freshly-cloned repo inside
+  the homelab TrueNAS Linux dev container. Infrastructure already committed (Dockerfile,
+  Apptainer.def, lockfiles). Unblock: provision TrueNAS Linux dev container and run
+  `docker build -f Dockerfile .` + `make eval-all` (v1.2).
+- **RTC-S1 N.Am. harness migration:** Migrate run_eval.py to validation.harness
+  (bounds_for_burst + metrics.json + meta.json write) and execute N.Am. RTC re-run (v1.2).
+- **DSWx-S2 EU recalibration:** HLS→S2 L2A spectral transfer gap diagnosed; dedicated
+  scene-level BOA offset correction required before joint WIGT×AWGT×PSWT2_MNDWI grid
+  search converges (v1.2).
+- **DIST-S1 N.Am. quantitative comparison:** Awaiting operational `OPERA_L3_DIST-ALERT-S1_V1`
+  publication in CMR (CMR auto-supersede probe active in run_eval_dist.py).
+- **DISP-S1 unwrapper selection:** PHASS+deramping / SPURT / tophu-SNAPHU / 20×20 m
+  fallback candidates scoped in DISP_UNWRAPPER_SELECTION_BRIEF.md (v1.2 milestone).
+
 ## [0.1.0] - 2026-04-09
 
 Initial release. OPERA-equivalent geospatial product pipelines for European

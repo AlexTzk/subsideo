@@ -35,14 +35,15 @@ class TestFetchOrbit:
         fetch_orbit(sensing_time, "S1A", tmp_path)
         assert mock_dl.call_args.kwargs["orbit_type"] == "precise"
 
-    def test_fallback_to_s1_orbits(self, mocker, tmp_path, sensing_time):
-        mocker.patch("eof.download.download_eofs", side_effect=ConnectionError("POD hub down"))
-        mock_s1 = mocker.patch(
-            "s1_orbits.fetch_for_scene",
-            return_value=str(tmp_path / "fallback.EOF"),
+    def test_fallback_to_asf_on_esa_failure(self, mocker, tmp_path, sensing_time):
+        fallback_path = str(tmp_path / "fallback.EOF")
+        mock_dl = mocker.patch(
+            "eof.download.download_eofs",
+            side_effect=[ConnectionError("POD hub down"), [fallback_path]],
         )
         result = fetch_orbit(sensing_time, "S1A", tmp_path)
-        mock_s1.assert_called_once_with(sensing_time, "S1A", tmp_path)
+        assert mock_dl.call_count == 2
+        assert mock_dl.call_args_list[1].kwargs.get("force_asf") is True
         assert result == Path(tmp_path / "fallback.EOF")
 
     def test_creates_output_dir(self, mocker, tmp_path, sensing_time):

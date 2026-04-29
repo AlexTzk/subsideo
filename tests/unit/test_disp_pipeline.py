@@ -186,14 +186,22 @@ def test_run_disp_mocked(tmp_path: Path, mocker: MockerFixture) -> None:
     ifg_path = _make_test_ifg_tif(dolphin_dir / "ifg_001.tif")
     cor_path = _make_test_cor_tif(dolphin_dir / "cor_001.tif", high_coherence=True)
 
-    # Mock dolphin
+    # Mock dolphin — run creates timeseries/velocity.tif to satisfy run_disp output check
     mock_outputs = MagicMock()
     mock_outputs.stitched_ifg_paths = [str(ifg_path)]
     mock_outputs.stitched_cor_paths = [str(cor_path)]
 
-    mock_dolphin_run = MagicMock(return_value=mock_outputs)
+    def _fake_dolphin_run(cfg: object) -> MagicMock:
+        ts_dir = dolphin_dir / "timeseries"
+        ts_dir.mkdir(parents=True, exist_ok=True)
+        (ts_dir / "velocity.tif").touch()
+        return mock_outputs
+
+    mock_dolphin_run = MagicMock(side_effect=_fake_dolphin_run)
     mock_dolphin_config = MagicMock()
 
+    mock_unwrap_options = MagicMock()
+    mock_unwrap_options.UnwrapMethod = MagicMock()
     mocker.patch.dict(
         "sys.modules",
         {
@@ -202,6 +210,7 @@ def test_run_disp_mocked(tmp_path: Path, mocker: MockerFixture) -> None:
             "dolphin.workflows.config": MagicMock(
                 DisplacementWorkflow=mock_dolphin_config,
             ),
+            "dolphin.workflows.config._unwrap_options": mock_unwrap_options,
             "dolphin.workflows.displacement": MagicMock(run=mock_dolphin_run),
         },
     )
@@ -305,34 +314,18 @@ def test_run_disp_qc_warning(tmp_path: Path, mocker: MockerFixture) -> None:
     ifg_path = _make_test_ifg_tif(dolphin_dir / "ifg_001.tif")
     cor_path = _make_test_cor_tif(dolphin_dir / "cor_001.tif", high_coherence=True)
 
+    # Produce a ramp .unw.tif in dolphin/unwrapped/ -> high residual after plane fit
+    unwrap_dir = dolphin_dir / "unwrapped"
+    ramp_path = _make_test_unwrapped_tif(unwrap_dir / "ramp.unw.tif", add_ramp=True)
+
+    # Create dolphin timeseries/velocity.tif so run_disp returns valid=True
+    ts_dir = dolphin_dir / "timeseries"
+    ts_dir.mkdir(parents=True, exist_ok=True)
+    (ts_dir / "velocity.tif").touch()
+
     mocker.patch(
         "subsideo.products.disp._run_dolphin_phase_linking",
         return_value=([ifg_path], [cor_path]),
-    )
-    mocker.patch(
-        "subsideo.products.disp._apply_coherence_mask",
-        return_value=[ifg_path],
-    )
-
-    # Produce a file with non-planar noise -> high residual
-    unwrap_dir = tmp_path / "out" / "unwrap"
-    ramp_path = _make_test_unwrapped_tif(unwrap_dir / "ramp.tif", add_ramp=True)
-    mocker.patch(
-        "subsideo.products.disp._run_unwrapping",
-        return_value=[ramp_path],
-    )
-
-    mintpy_dir = tmp_path / "out" / "mintpy"
-    mintpy_dir.mkdir(parents=True, exist_ok=True)
-    (mintpy_dir / "velocity.h5").touch()
-
-    mocker.patch(
-        "subsideo.products.disp._generate_mintpy_template",
-        return_value=mintpy_dir / "smallbaselineApp.cfg",
-    )
-    mocker.patch(
-        "subsideo.products.disp._run_mintpy_timeseries",
-        return_value=[mintpy_dir / "velocity.h5"],
     )
 
     result = run_disp(

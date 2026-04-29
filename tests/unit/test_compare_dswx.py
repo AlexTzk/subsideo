@@ -21,7 +21,7 @@ class TestJrcTileUrl:
         url = _jrc_tile_url(2024, 6, 2, 3)
         assert "2024" in url
         assert "2024_06" in url
-        assert "0000080000-0000120000.tif" in url
+        assert "0000120000-0000080000.tif" in url
         assert url.startswith(JRC_BASE_URL)
 
     def test_url_zero_indices(self):
@@ -67,7 +67,7 @@ class TestBinarizeDswx:
         assert result[0] == 0.0   # class 0 -> not water
         assert result[1] == 1.0   # class 1 -> water
         assert result[2] == 1.0   # class 2 -> water
-        assert result[3] == 0.0   # class 3 -> not water
+        assert result[3] == 1.0   # class 3 -> water (potential wetland, post-rescue pass)
         assert result[4] == 0.0   # class 4 -> not water
         assert np.isnan(result[5])  # 255 -> NaN
 

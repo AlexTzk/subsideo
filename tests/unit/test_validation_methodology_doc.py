@@ -49,28 +49,14 @@ def test_has_section_2_product_quality_distinction() -> None:
     assert "## 2. Product-quality vs reference-agreement distinction" in text
 
 
-def test_no_stub_scaffolding_for_phase_6_7() -> None:
-    """D-15 append-only policy: section 5 belongs to Phase 6.
+def test_all_seven_sections_present() -> None:
+    """Phase 7 REL-03 closure: all 7 sections + TOC must be present.
 
-    Phase 4 (Plan 04-05) appended `## 3. DISP comparison-adapter design`.
-    Phase 5 (Plan 05-09) appended `## 4. DIST-S1 Validation Methodology`
-    with content sub-sections 4.1-4.4 (4.5 deferred to v1.2 per scope amendment).
-    The next forbidden frontier is `## 5.` (Phase 6 owns §5; Phase 7 REL-03
-    writes the ToC).
-
-    Phase 5's §4 must be a real authored section (≥ 4 sub-sections / ≥ 50 lines
-    of content), not a stub — anchored on at least one of the bootstrap-CI
-    constants from validation/bootstrap.py to prove substantive content.
+    Phase 4 appended §3, Phase 5 appended §4, Phase 6 appended §5,
+    Phase 7 appended §6 + §7 and wrote the TOC.
     """
     text = _read_doc()
 
-    # §5 is forbidden until Phase 6 legitimately authors it.
-    assert "## 5." not in text, (
-        "Found stub-heading '## 5.' -- Phase 5 must NOT pre-create section 5. "
-        "Phase 6 appends section 5; Phase 7 REL-03 writes the ToC."
-    )
-
-    # §4 must be present (Phase 5 deliverable) with substantive content.
     assert "## 4. DIST-S1 Validation Methodology" in text, (
         "Phase 5 (Plan 05-09) must append `## 4. DIST-S1 Validation Methodology`."
     )

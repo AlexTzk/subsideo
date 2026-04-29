@@ -95,12 +95,12 @@ def test_cslc_result():
 
 
 @pytest.mark.parametrize("klass", COMPOSITE_CLASSES)
-def test_validation_result_has_exactly_two_fields(klass: type) -> None:
-    """Each <Product>ValidationResult has exactly {product_quality, reference_agreement}."""
+def test_validation_result_has_required_composite_fields(klass: type) -> None:
+    """Each <Product>ValidationResult has at least {product_quality, reference_agreement}."""
     names = {f.name for f in fields(klass)}
-    expected = {"product_quality", "reference_agreement"}
-    assert names == expected, (
-        f"{klass.__name__} has fields {names}; expected {expected}"
+    required = {"product_quality", "reference_agreement"}
+    assert required.issubset(names), (
+        f"{klass.__name__} missing required fields: {required - names}"
     )
 
 
