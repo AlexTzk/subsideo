@@ -22,21 +22,25 @@
 # Compute estimate : 5-15 minutes on M3 Max
 #
 # Resume-safe: each stage skips work if outputs already exist.
-import warnings; warnings.filterwarnings("ignore")
+import warnings
 
-EXPECTED_WALL_S = 900   # Plan 01-07 supervisor AST-parses this constant (D-11)
+warnings.filterwarnings("ignore")
+
+EXPECTED_WALL_S = 900  # Plan 01-07 supervisor AST-parses this constant (D-11)
 
 if __name__ == "__main__":
+    import hashlib
     import json as _json
     import os
+    import platform
+    import subprocess
     import sys
     import time
-    from datetime import datetime
+    from datetime import datetime, timezone
     from pathlib import Path
 
     import numpy as np
     from dotenv import load_dotenv
-
     from loguru import logger
 
     from subsideo.data.cdse import CDSEClient, extract_safe_s3_prefix
@@ -45,19 +49,27 @@ if __name__ == "__main__":
     from subsideo.products.types import DSWxConfig
     from subsideo.validation.compare_dswx import compare_dswx
     from subsideo.validation.harness import (
-        bounds_for_burst,
         bounds_for_mgrs_tile,
         credential_preflight,
-        download_reference_with_retry,
-        ensure_resume_safe,
-        select_opera_frame_by_utc_hour,
     )
+    from subsideo.validation.matrix_schema import (
+        DSWEThresholdsRef,
+        DswxEUCellMetrics,
+        LOOCVPerFold,
+        PerAOIF1Breakdown,
+        ProductQualityResultJson,
+        ReferenceAgreementResultJson,
+    )
+
+    t_start = time.time()
 
     load_dotenv()
 
     credential_preflight([
-        "CDSE_CLIENT_ID", "CDSE_CLIENT_SECRET",
-        "CDSE_S3_ACCESS_KEY", "CDSE_S3_SECRET_KEY",
+        "CDSE_CLIENT_ID",
+        "CDSE_CLIENT_SECRET",
+        "CDSE_S3_ACCESS_KEY",
+        "CDSE_S3_SECRET_KEY",
     ])
 
     # -- Stage 0: EU recalibration pre-check (W5 fix) --------------------------
@@ -67,10 +79,13 @@ if __name__ == "__main__":
     # to v1.2 with an honest BLOCKER (see CONCLUSIONS_DSWX_EU_RECALIB.md).
     # Plan 06-07 proceeds with PROTEUS defaults; Balaton F1 will be reported
     # with named_upgrade_path set accordingly.
+    # W5 sentinel check: Plan 06-06 grid search did not land.
     if not THRESHOLDS_EU.fit_set_hash:
         logger.warning(
             "THRESHOLDS_EU.fit_set_hash is empty -- running with PROTEUS defaults "
-            "(EU recalibration deferred to v1.2; see CONCLUSIONS_DSWX_EU_RECALIB.md)"
+            "(EU recalibration deferred to v1.2; see CONCLUSIONS_DSWX_EU_RECALIB.md). "
+            "Re-run scripts/recalibrate_dswe_thresholds.py before EU eval "
+            "if recalibration is needed."
         )
 
     # -- Configuration --------------------------------------------------------
@@ -87,9 +102,9 @@ if __name__ == "__main__":
     # scene must come from a month the JRC reference also covers. July is
     # typically cloud-free over Pannonia and lake level is stable.
     DATE_START = "2021-07-01"
-    DATE_END   = "2021-07-31"
-    JRC_YEAR   = 2021
-    JRC_MONTH  = 7
+    DATE_END = "2021-07-31"
+    JRC_YEAR = 2021
+    JRC_MONTH = 7
 
     # Max cloud cover for scene selection (percent)
     MAX_CLOUD_COVER = 15.0
@@ -160,8 +175,10 @@ if __name__ == "__main__":
     scored = sorted(stac_items, key=_cloud_cover)
     print(f"  {len(scored)} scenes in window; showing top 5 by cloud cover:")
     for i, it in enumerate(scored[:5]):
-        print(f"    [{i+1}] {_start_time(it)[:19]}  cc={_cloud_cover(it):5.1f}%  "
-              f"{it.get('id','?')[:55]}")
+        print(
+            f"    [{i+1}] {_start_time(it)[:19]}  cc={_cloud_cover(it):5.1f}%  "
+            f"{it.get('id', '?')[:55]}"
+        )
 
     eligible = [it for it in scored if _cloud_cover(it) <= MAX_CLOUD_COVER]
     if not eligible:
@@ -172,6 +189,7 @@ if __name__ == "__main__":
 
     scene = eligible[0]
     scene_id: str = scene.get("id", "").removesuffix(".SAFE")
+    safe_id = scene_id  # alias for meta.json
     print(f"\n  Selected: {scene_id}")
     print(f"  Cloud    : {_cloud_cover(scene):.1f}%")
     print(f"  Time     : {_start_time(scene)[:19]}")
@@ -254,23 +272,25 @@ if __name__ == "__main__":
             output_dir=dswx_out_dir,
             output_epsg=EPSG,
             output_posting_m=30.0,
+            region="eu",  # Phase 6 D-10: applies THRESHOLDS_EU (recalibration deferred)
         )
-        t0 = time.time()
-        result = run_dswx(cfg)
-        elapsed = time.time() - t0
+        t0_pipeline = time.time()
+        dswx_result = run_dswx(cfg)
+        elapsed = time.time() - t0_pipeline
         print(f"  Completed in {elapsed:.1f}s")
-        print(f"  Valid       : {result.valid}")
-        print(f"  Output      : {result.output_path}")
-        if result.validation_errors:
-            for e in result.validation_errors:
+        print(f"  Valid       : {dswx_result.valid}")
+        print(f"  Output      : {dswx_result.output_path}")
+        if dswx_result.validation_errors:
+            for e in dswx_result.validation_errors:
                 print(f"    ! {e}")
-        if not result.valid:
+        if not dswx_result.valid:
             raise SystemExit("DSWx pipeline failed -- see errors above.")
-        dswx_cog = result.output_path
+        dswx_cog = dswx_result.output_path
 
     # -- Stage 6: Output inspection -------------------------------------------
     print("\n-- Stage 6: Output Inspection --")
     import rasterio
+
     with rasterio.open(dswx_cog) as ds:
         water_class = ds.read(1)
         print(f"  shape : {water_class.shape}")
@@ -297,23 +317,193 @@ if __name__ == "__main__":
     jrc_cache = OUT / "jrc_cache"
     jrc_cache.mkdir(exist_ok=True)
 
-    result = compare_dswx(
+    # Phase 6 D-04 + B2 fix: single-return compare_dswx; access diagnostics via
+    # .diagnostics attribute (NOT tuple unpack -- zero breaking change for callers)
+    validation = compare_dswx(
         product_path=dswx_cog,
         year=JRC_YEAR,
         month=JRC_MONTH,
         cache_dir=jrc_cache,
     )
+    # B2 fix: diagnostics via attribute access
+    diagnostics = validation.diagnostics  # DSWxValidationDiagnostics | None
+
+    balaton_f1 = validation.reference_agreement.measurements["f1"]
+    balaton_precision = validation.reference_agreement.measurements["precision"]
+    balaton_recall = validation.reference_agreement.measurements["recall"]
+    balaton_accuracy = validation.reference_agreement.measurements["accuracy"]
 
     print(f"\n  {'='*60}")
-    print(f"  F1           : {result.f1:.4f}   (criterion: > 0.90)")
-    print(f"  Precision    : {result.precision:.4f}")
-    print(f"  Recall       : {result.recall:.4f}")
-    print(f"  Accuracy     : {result.overall_accuracy:.4f}")
+    print(f"  F1           : {balaton_f1:.4f}   (criterion: > 0.90)")
+    print(f"  Precision    : {balaton_precision:.4f}")
+    print(f"  Recall       : {balaton_recall:.4f}")
+    print(f"  Accuracy     : {balaton_accuracy:.4f}")
+    if diagnostics is not None:
+        print(
+            f"  F1 (full px) : {diagnostics.f1_full_pixels:.4f}"
+            "  (diagnostic; no shoreline exclusion)"
+        )
+        print(f"  Shoreline px : {diagnostics.shoreline_buffer_excluded_pixels:,d}  (excluded)")
     print(f"  {'='*60}")
-    for k, v in result.pass_criteria.items():
-        print(f"  {k:30s}: {'PASS' if v else 'FAIL'}")
-    overall = all(result.pass_criteria.values()) if result.pass_criteria else False
+    overall = float(balaton_f1) > 0.90 if not np.isnan(float(balaton_f1)) else False
+    print(f"  {'F1 > 0.90':30s}: {'PASS' if overall else 'FAIL'}")
     print(f"  {'Overall':30s}: {'PASS' if overall else 'FAIL'}")
     print(f"  {'='*60}")
 
-    sys.exit(0 if overall else 1)
+    # -- Stage 8: Threshold context print ------------------------------------
+    print("\n-- Stage 8: Threshold context --")
+    print("  region            : eu (Phase 6 D-10; PROTEUS defaults, recalibration deferred)")
+    print(f"  THRESHOLDS_EU.WIGT       : {THRESHOLDS_EU.WIGT}")
+    print(f"  THRESHOLDS_EU.AWGT       : {THRESHOLDS_EU.AWGT}")
+    print(f"  THRESHOLDS_EU.PSWT2_MNDWI: {THRESHOLDS_EU.PSWT2_MNDWI}")
+    print(f"  fit_set_hash      : {THRESHOLDS_EU.fit_set_hash!r} (empty = PROTEUS placeholder)")
+
+    # ============================================================================
+    # Stage 9: DswxEUCellMetrics write (Phase 6 D-26 + D-13 official Balaton F1)
+    # ============================================================================
+    print("\n-- Stage 9: Write DswxEUCellMetrics --")
+
+    # Read recalibration aggregate per Plan 06-06 Stage 5 + Stage 7 (B1 fix: 10 LOOCV folds).
+    # T-06-07-05 mitigation: if the file is missing or corrupt, stamp NaN diagnostics
+    # rather than aborting -- the eval still produces metrics.json with cell_status
+    # from Balaton F1 alone.
+    recalib_results_path = Path("scripts/recalibrate_dswe_thresholds_results.json")
+    if recalib_results_path.exists():
+        recalib = _json.loads(recalib_results_path.read_text())
+        # Under honest-BLOCKER closure (Plan 06-06), the results.json has
+        # fit_set_mean_f1 but no loocv_per_fold or per_aoi_breakdown -- those
+        # were never populated because the grid search did not converge.
+        fit_set_mean_f1 = float(recalib.get("fit_set_mean_f1", float("nan")))
+        loocv_mean_f1 = float(recalib.get("loocv_mean_f1", float("nan")))
+        loocv_gap = float(recalib.get("loocv_gap", float("nan")))
+        # B1 fix: loocv_per_fold has 10 entries each with left_out_aoi + left_out_season.
+        # Under BLOCKER closure these will be empty lists -- that is expected.
+        loocv_per_fold = [LOOCVPerFold(**f) for f in recalib.get("loocv_per_fold", [])]
+        per_aoi_breakdown = [
+            PerAOIF1Breakdown(**a) for a in recalib.get("per_aoi_breakdown", [])
+        ]
+    else:
+        logger.warning(
+            "scripts/recalibrate_dswe_thresholds_results.json missing; "
+            "stamping NaN diagnostics in DswxEUCellMetrics. "
+            "Plan 06-06 must complete before Plan 06-07 EU re-run."
+        )
+        fit_set_mean_f1 = float("nan")
+        loocv_mean_f1 = float("nan")
+        loocv_gap = float("nan")
+        loocv_per_fold = []
+        per_aoi_breakdown = []
+
+    # B2 fix: diagnostics from validation.diagnostics attribute (NOT tuple unpack)
+    if diagnostics is not None:
+        f1_full_pixels = float(diagnostics.f1_full_pixels)
+        shoreline_buffer_excluded_pixels = int(diagnostics.shoreline_buffer_excluded_pixels)
+    else:
+        # Should not happen post-Plan-06-04 since compare_dswx always populates,
+        # but defensive default for backward compat:
+        f1_full_pixels = float("nan")
+        shoreline_buffer_excluded_pixels = 0
+
+    # cell_status logic per CONTEXT D-15 + BOOTSTRAP §5.5:
+    # F1 > 0.90 = PASS; 0.85 <= F1 < 0.90 = FAIL + ML-replacement; F1 < 0.85 = FAIL + review
+    _f1 = float(balaton_f1)
+    if not np.isnan(_f1) and _f1 > 0.90:
+        cell_status = "PASS"
+        named_upgrade_path = None
+    elif not np.isnan(_f1) and _f1 >= 0.85:
+        cell_status = "FAIL"
+        named_upgrade_path = "ML-replacement (DSWX-V2-01)"
+    else:
+        cell_status = "FAIL"
+        named_upgrade_path = "fit-set quality review"
+
+    # Construct thresholds_used provenance stamp.
+    # Under honest-BLOCKER closure: grid_search_run_date='2026-MM-DD' (PLACEHOLDER),
+    # fit_set_hash='' (empty). Documented per CONCLUSIONS_DSWX_EU_RECALIB.md.
+    thresholds_ref = DSWEThresholdsRef(
+        region="eu",
+        grid_search_run_date=THRESHOLDS_EU.grid_search_run_date,
+        fit_set_hash=THRESHOLDS_EU.fit_set_hash,
+    )
+
+    metrics = DswxEUCellMetrics(
+        product_quality=ProductQualityResultJson(measurements={}, criterion_ids=[]),
+        reference_agreement=ReferenceAgreementResultJson(
+            measurements={
+                "f1": float(balaton_f1),  # GATE per CONTEXT D-13 (held-out Balaton)
+                "precision": float(balaton_precision),
+                "recall": float(balaton_recall),
+                "accuracy": float(balaton_accuracy),
+            },
+            criterion_ids=["dswx.f1_min"],
+        ),
+        criterion_ids_applied=["dswx.f1_min"],
+        region="eu",
+        thresholds_used=thresholds_ref,
+        fit_set_mean_f1=fit_set_mean_f1,
+        loocv_mean_f1=loocv_mean_f1,
+        loocv_gap=loocv_gap,
+        loocv_per_fold=loocv_per_fold,
+        per_aoi_breakdown=per_aoi_breakdown,
+        f1_full_pixels=f1_full_pixels,
+        shoreline_buffer_excluded_pixels=shoreline_buffer_excluded_pixels,
+        cell_status=cell_status,  # type: ignore[arg-type]
+        named_upgrade_path=named_upgrade_path,
+    )
+    out_dir = Path("./eval-dswx")
+    out_dir.mkdir(exist_ok=True)
+    (out_dir / "metrics.json").write_text(metrics.model_dump_json(indent=2))
+    print(f"  metrics.json written: {out_dir / 'metrics.json'}")
+
+    # meta.json with git SHA + input hashes (Phase 2 D-12)
+    try:
+        git_sha = (
+            subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+            .decode()
+            .strip()
+        )
+        git_dirty = bool(subprocess.call(["git", "diff", "--quiet"], stderr=subprocess.DEVNULL))
+    except subprocess.CalledProcessError:
+        git_sha = "unknown"
+        git_dirty = False
+
+    threshold_module_hash = hashlib.sha256(
+        Path("src/subsideo/products/dswx_thresholds.py").read_bytes()
+    ).hexdigest()[:16]
+
+    meta = {
+        "git_sha": git_sha,
+        "git_dirty": git_dirty,
+        "run_started_utc": datetime.fromtimestamp(t_start, tz=timezone.utc).isoformat(),
+        "wall_s": time.time() - t_start,
+        "platform": platform.platform(),
+        "python_version": sys.version,
+        "selected_aoi": AOI_NAME,
+        "mgrs_tile": MGRS_TILE,
+        "selected_scene_id": safe_id,
+        "input_hashes": {
+            "threshold_module_sha256_prefix": threshold_module_hash,
+            "fit_set_hash_from_recalibration": THRESHOLDS_EU.fit_set_hash,
+        },
+    }
+    (out_dir / "meta.json").write_text(_json.dumps(meta, indent=2))
+    print(f"  meta.json written: {out_dir / 'meta.json'}")
+
+    print("\n=== EU re-run complete ===")
+    print(f"Held-out Balaton F1 = {balaton_f1:.4f}  (criterion: > 0.90)")
+    print(f"cell_status         = {cell_status}")
+    if named_upgrade_path:
+        print(f"named_upgrade_path  = {named_upgrade_path!r}")
+    if not np.isnan(loocv_gap):
+        print(
+            f"loocv_gap           = {loocv_gap:.4f} "
+            f"({len(loocv_per_fold)} folds; B1 fix expects 10)"
+        )
+    else:
+        print("loocv_gap           = NaN (recalibration deferred; no LOO-CV performed)")
+    print(
+        f"thresholds          = WIGT={THRESHOLDS_EU.WIGT} AWGT={THRESHOLDS_EU.AWGT} "
+        f"PSWT2_MNDWI={THRESHOLDS_EU.PSWT2_MNDWI} (PROTEUS defaults)"
+    )
+
+    sys.exit(0 if cell_status == "PASS" else 1)

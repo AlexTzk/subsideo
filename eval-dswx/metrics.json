@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "product_quality": {
+    "measurements": {},
+    "criterion_ids": []
+  },
+  "reference_agreement": {
+    "measurements": {
+      "f1": 0.8164754912505078,
+      "precision": 0.9578479804276496,
+      "recall": 0.7114672824862424,
+      "accuracy": 0.9866435435487791
+    },
+    "criterion_ids": [
+      "dswx.f1_min"
+    ]
+  },
+  "criterion_ids_applied": [
+    "dswx.f1_min"
+  ],
+  "runtime_conda_list_hash": null,
+  "region": "eu",
+  "thresholds_used": {
+    "region": "eu",
+    "grid_search_run_date": "2026-MM-DD",
+    "fit_set_hash": ""
+  },
+  "fit_set_mean_f1": 0.20915070764250182,
+  "loocv_mean_f1": NaN,
+  "loocv_gap": NaN,
+  "loocv_per_fold": [],
+  "per_aoi_breakdown": [],
+  "f1_full_pixels": 0.7957210826416163,
+  "shoreline_buffer_excluded_pixels": 187556,
+  "cell_status": "FAIL",
+  "named_upgrade_path": "fit-set quality review"
+}

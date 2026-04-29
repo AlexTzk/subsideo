@@ -215,7 +215,11 @@ eval-disp-egms/*
 eval-dist/*
 eval-dist-eu/*
 eval-dist-eu-nov15/*
-eval-dswx/*
+eval-dswx/input/
+eval-dswx/output/
+eval-dswx/jrc_cache/
+eval-dswx/stac_items.json
+eval-dswx/run.log
 eval-dswx_nam/input/
 eval-dswx_nam/output/
 eval-dswx_nam/jrc/
