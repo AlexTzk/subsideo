@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "product_quality": {
+    "measurements": {},
+    "criterion_ids": []
+  },
+  "reference_agreement": {
+    "measurements": {},
+    "criterion_ids": []
+  },
+  "criterion_ids_applied": [],
+  "runtime_conda_list_hash": null,
+  "cell_status": "DEFERRED",
+  "unblock_condition": "v1.2 N.Am. RTC re-run",
+  "deferred_reason": "v1.1 N.Am. RTC eval script (run_eval.py) not migrated to v1.1 harness sidecars; EU RTC (Phase 2) was the v1.1 focus. Unblock: migrate run_eval.py to validation.harness (bounds_for_burst + metrics.json + meta.json write) and re-run N.Am. RTC eval (v1.2)."
+}
