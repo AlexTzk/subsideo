@@ -76,8 +76,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [ ] **DSWX-03**: EU fit set contains 12 (AOI, wet-scene, dry-scene) triples across 6 biome-diverse AOIs (Mediterranean reservoir, Atlantic estuary, boreal lake, Pannonian plain, Alpine valley, Iberian summer-dry); Balaton is held out as independent test set
 - [ ] **DSWX-04**: `scripts/recalibrate_dswe_thresholds.py` performs a joint grid search over `WIGT` ([0.08, 0.20] step 0.005), `AWGT` ([−0.1, +0.1] step 0.01), and `PSWT2_MNDWI` ([−0.65, −0.35] step 0.02), optimising mean F1 across the fit set
 - [ ] **DSWX-05**: Recalibrated thresholds live in `src/subsideo/products/dswx_thresholds.py` as a typed constants module with provenance metadata and EU/N.Am. region selector via `pydantic-settings`; `notebooks/dswx_recalibration.ipynb` reproduces the grid search deterministically from the cached fit set
-- [ ] **DSWX-06**: EU DSWx re-run with recalibrated thresholds reports F1 against JRC without adjusting the F1 > 0.90 bar; fit-set F1 is reported alongside LOO-CV F1 (gap < 0.02 required to rule out overfit); 0.85 ≤ F1 < 0.90 is labelled "FAIL with named ML-replacement upgrade path"; F1 < 0.85 triggers fit-set quality review
-- [ ] **DSWX-07**: The "DSWE F1 ceiling ≈ 0.92" claim in any FAIL reporting is either ground-referenced to the PROTEUS ATBD (with citation) or documented as "empirical bound observed over our 6-AOI evaluation" — no inherited game-of-telephone citation
+- [x] **DSWX-06**: EU DSWx re-run with recalibrated thresholds reports F1 against JRC without adjusting the F1 > 0.90 bar; fit-set F1 is reported alongside LOO-CV F1 (gap < 0.02 required to rule out overfit); 0.85 ≤ F1 < 0.90 is labelled "FAIL with named ML-replacement upgrade path"; F1 < 0.85 triggers fit-set quality review
+- [x] **DSWX-07**: The "DSWE F1 ceiling ≈ 0.92" claim in any FAIL reporting is either ground-referenced to the PROTEUS ATBD (with citation) or documented as "empirical bound observed over our 6-AOI evaluation" — no inherited game-of-telephone citation
 
 ### Results Matrix & Release Readiness
 
@@ -202,8 +202,8 @@ Which phases cover which requirements. Populated by roadmapper.
 | DSWX-03 | Phase 6 | Pending |
 | DSWX-04 | Phase 6 | Pending |
 | DSWX-05 | Phase 6 | Pending |
-| DSWX-06 | Phase 6 | Pending |
-| DSWX-07 | Phase 6 | Pending |
+| DSWX-06 | Phase 6 | Complete (Plan 06-07) |
+| DSWX-07 | Phase 6 | Complete (Plan 06-07) |
 | REL-01 | Phase 7 | Pending |
 | REL-02 | Phase 7 | Pending |
 | REL-03 | Phase 7 | Pending |

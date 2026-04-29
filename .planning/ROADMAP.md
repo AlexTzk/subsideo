@@ -35,8 +35,8 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 - [x] **Phase 2: RTC-S1 EU Validation** — 3-5 EU RTC bursts PASS across ≥3 terrain regimes (≥1 with >1000 m relief AND ≥1 >55°N); per-burst reporting; proves Phase 1 harness end-to-end
 - [x] **Phase 3: CSLC-S1 Self-Consistency + EU Validation** (5/5 plans, complete 2026-04-25) — SoCal / Mojave / Iberian Meseta self-consistency coherence > 0.7 and residual < 5 mm/yr (CALIBRATING); OPERA CSLC amplitude sanity r > 0.6 / RMSE < 4 dB; cross-version-phase methodology consolidated
 - [x] **Phase 4: DISP-S1 Comparison Adapter + Honest FAIL** (5/5 plans, complete 2026-04-25) — `prepare_for_reference` adapter (explicit `method=`); self-consistency at native 5×10 m; N.Am./EU re-runs with ramp-attribution diagnostic; DISP Unwrapper Selection scoping brief delivered
-- [ ] **Phase 5: DIST-S1 OPERA v0.1 + EFFIS EU** — T11SLT v0.1 comparison (or config-drift deferral) with block-bootstrap CI; CMR probe auto-supersede; EFFIS recall+precision cross-val; 3 EU events; optional chained `prior_dist_s1_product` run
-- [ ] **Phase 6: DSWx-S2 N.Am. + EU Recalibration** — N.Am. positive control; AOI research notebook; 12-pair fit set across 6 biomes (Balaton held-out); joint grid search over WIGT/AWGT/PSWT2_MNDWI; typed thresholds module with provenance; EU re-run (F1 > 0.90 bar does not move)
+- [x] **Phase 5: DIST-S1 OPERA v0.1 + EFFIS EU** (9/9 plans, complete 2026-04-25) — T11SLT v0.1 CMR deferred; CMR probe auto-supersede; EFFIS 3 EU events (aveiro 0/3 FAIL); chained_run differentiator structurally_valid
+- [x] **Phase 6: DSWx-S2 N.Am. + EU Recalibration** (7/7 plans, complete 2026-04-28) — N.Am. F1=0.9252 PASS (Lake Tahoe); EU recalibration deferred to v1.2 (HLS to S2 L2A spectral gap); Balaton F1=0.8165 FAIL (fit-set quality review); typed thresholds module; methodology §5 appended
 - [ ] **Phase 7: Results Matrix + Release Readiness** — `make eval-all` writes `results/matrix.md` (product-quality / reference-agreement columns); manifest-driven matrix writer; `docs/validation_methodology.md`; TrueNAS Linux pre-release audit; env lockfile + Dockerfile/Apptainer recipe
 
 </details>

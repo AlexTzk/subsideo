@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
 status: executing
 stopped_at: None
-last_updated: "2026-04-27T15:20:00Z"
-last_activity: 2026-04-27 -- Phase 06 Plan 06 complete (honest BLOCKER; EU recalibration deferred to v1.2; Plan 06-07 unblocked)
+last_updated: "2026-04-28T17:35:00Z"
+last_activity: 2026-04-28 -- Phase 06 Plan 07 complete (EU DSWx re-run Balaton F1=0.8165 FAIL; CONCLUSIONS_DSWX.md v1.1 appended; validation_methodology.md §5 appended; matrix.md regen; Phase 6 closed)
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 40
-  completed_plans: 39
-  percent: 97
+  completed_plans: 40
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 ## Current Position
 
-Phase: 06 (dswx-s2-n-am-eu-recalibration) — EXECUTING
-Plan: 7 of 7 (Plan 06-06 complete with honest BLOCKER; starting Plan 06-07)
-Status: Plan 06-06 complete — EU recalibration deferred to v1.2 with diagnosed root cause
-Last activity: 2026-04-27 -- Phase 06 Plan 06 complete (3-iteration grid search exhausted; fit_set_mean_f1=0.2092; HLS→S2 L2A spectral transfer gap diagnosed; THRESHOLDS_EU unchanged; CONCLUSIONS_DSWX_EU_RECALIB.md written)
+Phase: 06 (dswx-s2-n-am-eu-recalibration) — COMPLETE
+Plan: 7 of 7 (Plan 06-07 complete; Phase 6 closed)
+Status: Phase 06 complete — DSWx row fully populated in 5/5 product validation matrix
+Last activity: 2026-04-28 -- Phase 06 Plan 07 complete (EU DSWx re-run Balaton F1=0.8165 FAIL; CONCLUSIONS_DSWX.md v1.1 appended; validation_methodology.md §5 appended; matrix.md regen)
 
-**Resume path (06-07):** Plan 06-06 complete (honest BLOCKER). THRESHOLDS_EU.fit_set_hash is empty — run_eval_dswx.py Stage 0 emits a warning (not an assert failure). Proceed to Plan 06-07 (Balaton EU re-run with PROTEUS defaults + CONCLUSIONS_DSWX.md v1.1 sections + validation_methodology.md §5 + matrix.md regen). Plan 06-07 must NOT expect recalibrated THRESHOLDS_EU; use PROTEUS defaults. CONCLUSIONS_DSWX.md v1.1 sections should cite CONCLUSIONS_DSWX_EU_RECALIB.md.
+**Phase 6 close:** All 7 plans complete. dswx:eu F1=0.8165 FAIL (fit-set quality review); dswx:nam F1=0.9252 PASS (Lake Tahoe). EU recalibration deferred to v1.2 with diagnosed root cause (HLS→S2 L2A spectral transfer gap). Phase 7 (REL-* release deliverables) is the next phase.
 
 **Previous resume path (06-04):** All 5 plans complete (Waves 1 + 2 + 3 + 4). Plan 04-05 (Wave 4: docs + brief) renamed `CONCLUSIONS_DISP_EGMS.md` → `CONCLUSIONS_DISP_EU.md` via `git mv` (R100; history preserved via `git log --follow`); appended 4 v1.1 sub-sections (§11 Product Quality / §12 Reference Agreement / §13 Ramp Attribution / §14 Brief link) to both `CONCLUSIONS_DISP_N_AM.md` (258 → 356 LOC) and `CONCLUSIONS_DISP_EU.md` (304 → 404 LOC) with v1.0 baseline numbers preserved as continuity preamble; wrote `.planning/milestones/v1.1-research/DISP_UNWRAPPER_SELECTION_BRIEF.md` (129 LOC) with 4-candidate × 4-column scoping table (PHASS+post-deramping S/SPURT native M/tophu+SNAPHU L/20×20 m fallback L) and attribution-driven prioritisation recommending ERA5 toggle (DISP-V2-02) FIRST in v1.2; appended §3 multilook ADR to `docs/validation_methodology.md` (247 → 365 LOC) with 5-part PITFALLS+FEATURES dialogue and explicit "Native 5×10 m stays production default" per DISP-05; §4 + §5 NOT created per Phase 3 D-15 append-only. **Phase 4 closure complete.** Honest FAIL signal preserved + scoped: SoCal r=0.049 / Bologna r=0.336 (both FAIL > 0.92), both attributed_source='inconclusive', cross-cell pattern flags atmospheric long-wavelength curvature as primary v1.2 candidate. Ready for verifier per `.planning/config.json` `workflow.verifier: true`.
 
@@ -147,6 +147,11 @@ Recent decisions affecting current work (v1.1):
 - [Phase 6 Plan 06-05]: MGRS seed tiles 10SFH (Lake Tahoe) + 15RYP (Lake Pontchartrain) added to _mgrs_tiles.geojson with pyproj-computed WGS84 bounds from UTM zone 10N/15N
 - [Phase 6 Plan 06-05]: gdal_JP2OpenJPEG.dylib missing from subsideo conda env; fixed by copying from conda pkg cache (micromamba 2.5.0 pip-inspect subprocess bug prevents normal install)
 - [Phase 6 Plan 06-05]: W2 fix confirmed: f1_full_pixels=0.8613 + shoreline_buffer_excluded_pixels=243221 live in metrics.json directly (no diagnostics.json sidecar)
+- [Phase 6 Plan 06-07]: EU re-run Balaton F1=0.8165 (shoreline-excluded) FAIL; named_upgrade_path='fit-set quality review' (F1<0.85); PROTEUS defaults applied (recalibration deferred to v1.2)
+- [Phase 6 Plan 06-07]: ATBD probe Path (c) succeeded: OPERA Cal/Val F1_OSW=0.8786 mean (N=52 scenes); '0.92 ceiling' was OSW class accuracy misattributed as F1; gate at 0.90 is above Cal/Val baseline
+- [Phase 6 Plan 06-07]: DswxEUCellMetrics constructor requires ProductQualityResultJson/ReferenceAgreementResultJson (Pydantic BaseModel from matrix_schema), NOT the dataclasses from results.py
+- [Phase 6 Plan 06-07]: .gitignore: replace blanket eval-dswx/* with specific subdirectory excludes to allow metrics.json + meta.json tracking (per eval-dswx_nam pattern)
+- [Phase 6 Plan 06-07]: Phase 6 closed — DSWx row complete in 5/5 product validation matrix; Phase 7 (REL-*) is next
 
 ### Pending Todos
 
@@ -171,8 +176,8 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 ## Session Continuity
 
 Last activity: 2026-04-25 — Phase 4 Plan 04-04 complete (Wave 3: eval-script rewire + warm re-runs + manifest fix). 5 changes per script landed in run_eval_disp.py + run_eval_disp_egms.py (10 total: REFERENCE_MULTILOOK_METHOD constant + EXPECTED_WALL_S=21600 + prepare_for_reference adapter + product-quality block + ramp-attribution + DISPCellMetrics write); manifest cache_dir aligned with on-disk eval-disp-egms (hyphen); both warm re-runs completed (~6 min SoCal, ~3 min Bologna); both metrics.json files validate as DISPCellMetrics; matrix.md regenerated. Honest FAIL signal preserved: SoCal r=0.049 (v1.0=0.0365), bias=+23.6 (v1.0=+23.62); Bologna r=0.336 (v1.0=0.32), bias=+3.46 (v1.0=+3.35). Both attributed_source=inconclusive. Ruff clean on touched files. Commits 75dea9d (Task 1 SoCal eval) + ec2c07d (Task 2 Bologna eval) + ae2707f (Task 3 manifest fix) + 709c0c0 (Task 4 Rule 3 EGMS_TOKEN preflight relaxation) + 0d0df63 (Task 4 matrix.md regen). Plan 04-04 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-04-SUMMARY.md`.
-Last session: 2026-04-27T15:20:00Z
-Stopped at: Completed 06-06-PLAN.md
+Last session: 2026-04-28T17:35:00Z
+Stopped at: Completed 06-07-PLAN.md (Phase 6 closed)
 Resume file: None
 
 **Planned Phase:** 05 (dist-s1-opera-v0-1-effis-eu) — 9 plans — 2026-04-25T21:45:44.176Z
