@@ -87,7 +87,8 @@ def _render_measurement(cid: str, measurements: dict[str, float]) -> str:
     passed = _COMPARATOR_FNS[crit.comparator](val, crit.threshold)
     verdict = "PASS" if passed else "FAIL"
     if crit.type == "CALIBRATING":
-        verdict = f"{verdict} (CALIBRATING)"
+        milestone = crit.binding_after_milestone or "future milestone"
+        verdict = f"{verdict} (CALIBRATING — binds {milestone})"
     return f"{val:.4g} ({crit.comparator} {crit.threshold:.4g} {verdict})"
 
 
@@ -298,6 +299,7 @@ def _render_cslc_selfconsist_cell(
     if fail_count:
         tags.append(f"{fail_count}/{metrics.total} FAIL")
     status_label = ", ".join(tags)
+    status_label += " — binds v1.2"  # Phase 7 D-05
 
     # PQ worst-case across AOIs
     pq_agg = metrics.product_quality_aggregate
@@ -426,7 +428,10 @@ def _render_disp_cell(
     # CALIBRATING italics; warning glyph if cell_status == BLOCKER (mirrors
     # CSLC self-consist any_blocker convention)
     warn = " ⚠" if m.cell_status == "BLOCKER" else ""
-    pq_col = f"*{pq_body} (CALIBRATING)*{warn}"
+    pq_col = (
+        f"*{pq_body} (CALIBRATING — needs 3rd AOI before binding;"
+        f" see DISP_UNWRAPPER_SELECTION_BRIEF.md)*{warn}"
+    )
 
     # --- RA side (BINDING, non-italics) ---
     ra = m.reference_agreement
@@ -496,6 +501,25 @@ def _is_dist_nam_shape(metrics_path: Path) -> bool:
         and "reference_source" in raw
         and "cmr_probe_outcome" in raw
     )
+
+
+def _is_rtc_nam_deferred_shape(metrics_path: Path) -> bool:
+    """Return True when metrics.json carries the RTC:NAM DEFERRED shape (Phase 7).
+
+    Discriminator: presence of ``unblock_condition`` key in raw JSON. This field
+    is unique to the RTC:NAM DEFERRED sidecar and structurally disjoint from all
+    other cell schemas (per_burst, per_aoi, ramp_attribution, per_event,
+    reference_source+cmr_probe_outcome, selected_aoi+candidates_attempted,
+    thresholds_used+loocv_gap).
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.debug("_is_rtc_nam_deferred_shape: cannot read {}: {}", metrics_path, e)
+        return False
+    return isinstance(raw, dict) and "unblock_condition" in raw
 
 
 def _is_dswx_nam_shape(metrics_path: Path) -> bool:
@@ -602,6 +626,29 @@ def _render_dist_nam_deferred_cell(metrics_path: Path) -> tuple[str, str] | None
     return pq_col, ra_col
 
 
+def _render_rtc_nam_deferred_cell(metrics_path: Path) -> tuple[str, str] | None:
+    """Render the rtc:nam DEFERRED cell (Phase 7 D-01 / D-02).
+
+    pq_col: '—' (no product-quality gate; N.Am. RTC eval not re-run in v1.1).
+    ra_col: 'DEFERRED — <unblock_condition>' where unblock_condition is read
+    from the sidecar. Consistent with dist:nam DEFERRED rendering pattern but
+    without the CMR probe outcome suffix.
+    """
+    import json as _json
+
+    try:
+        raw = _json.loads(metrics_path.read_text())
+    except (OSError, ValueError) as e:
+        logger.warning(
+            "Failed to read deferred rtc:nam metrics from {}: {}", metrics_path, e
+        )
+        return None
+    unblock = raw.get("unblock_condition", "see deferred_reason field")
+    pq_col = "—"
+    ra_col = f"DEFERRED — {unblock}"
+    return pq_col, ra_col
+
+
 def _render_dswx_nam_cell(metrics_path: Path) -> tuple[str, str] | None:
     """Render Phase 6 N.Am. DSWx positive-control cell as (pq_col, ra_col).
 
@@ -703,6 +750,21 @@ def write_matrix(manifest_path: Path, out_path: Path) -> None:
         metrics_path = _validate_metrics_path(
             str(cell["metrics_file"]), manifest_path
         )
+
+        # Phase 7 RTC:NAM DEFERRED branch: metrics.json with an ``unblock_condition`` key.
+        # Inserted BEFORE disp:* per Phase 7 D-01 (RTC:NAM was missing entirely;
+        # unblock_condition discriminator is structurally disjoint from all existing
+        # discriminators — insertion position is flexible; placed first in chain for clarity).
+        if metrics_path.exists() and _is_rtc_nam_deferred_shape(metrics_path):
+            cols = _render_rtc_nam_deferred_cell(metrics_path)
+            if cols is not None:
+                pq_col, ra_col = cols
+                lines.append(
+                    f"| {product} | {region} | {_escape_table_cell(pq_col)} | "
+                    f"{_escape_table_cell(ra_col)} |"
+                )
+                continue
+            # Fall through to default rendering on parse failure.
 
         # Phase 4 DISP branch: metrics.json with a ``ramp_attribution`` key.
         # Checked BEFORE the cslc_selfconsist (per_aoi) and rtc_eu (per_burst)
