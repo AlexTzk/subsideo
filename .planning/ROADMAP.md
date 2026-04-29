@@ -272,5 +272,5 @@ DSWX-01 (05), DSWX-02 (01), DSWX-03 (01, 06), DSWX-04 (03, 06), DSWX-05 (02, 03,
 | 3. CSLC-S1 Self-Consistency + EU Validation | v1.1 | 0/0 | Not started | - |
 | 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 5/5 | Complete (honest FAIL on r > 0.92 + bias < 3 mm/yr; cells MIXED with attributed_source=inconclusive; v1.2 follow-up scoped via DISP_UNWRAPPER_SELECTION_BRIEF.md) | 2026-04-25 |
 | 5. DIST-S1 OPERA v0.1 + EFFIS EU | v1.1 | 9/9 | Complete (infrastructure shipped; EU honest FAIL 0/3 PASS — 3 attributable causes documented for v1.2; DIST-01/02/03 deferred-with-evidence to v1.2) | 2026-04-26 |
-| 6. DSWx-S2 N.Am. + EU Recalibration | v1.1 | 6/7 | Executing (Plan 06-06 honest BLOCKER documented; Plan 06-07 starting) | - |
+| 6. DSWx-S2 N.Am. + EU Recalibration | v1.1 | 7/7 | Complete (N.Am. F1=0.9252 PASS; EU recalib deferred v1.2 HLS→S2 gap; Balaton F1=0.8165 FAIL fit-set quality review) | 2026-04-27 |
 | 7. Results Matrix + Release Readiness | v1.1 | 0/0 | Not started | - |
