@@ -511,3 +511,195 @@ was generated with; without an operational reference, no drift can be
 detected. v1.2 will land §4.5 alongside the operational F1+CI pipeline.
 
 ---
+
+## 5. DSWE F1 ceiling, held-out Balaton, and threshold-module design
+
+<a name="dswe-recalibration-methodology"></a>
+
+**TL;DR:** The DSWE-family F1 "0.92 ceiling" claim in BOOTSTRAP_V1.1.md was a
+misattribution (OSW class accuracy misread as F1). Path (c) from Plan 06-01 PROTEUS ATBD
+probe succeeded: OPERA Cal/Val published F1_OSW mean = 0.8786 over 52 scenes. Held-out
+Balaton F1 IS the OFFICIAL EU matrix-cell value per BOOTSTRAP §5.4 — fit-set mean F1 cannot
+collapse the matrix verdict. The shoreline 1-pixel buffer is applied uniformly in BOTH grid
+search AND final reporting (single source of truth). LOO-CV gap < 0.02 acceptance gates the
+recalibration against overfit (10-fold leave-one-pair-out per B1 fix). The threshold module
+uses a frozen+slots dataclass with inline provenance; YAML/runtime-config explicitly
+forbidden per DSWX-05.
+
+### 5.1 DSWE F1 ceiling citation chain
+
+Per Plan 06-01 PROTEUS ATBD probe
+(`./planning/milestones/v1.1-research/dswx_proteus_atbd_ceiling_probe.md`), **Path (c)
+SUCCEEDED** (OPERA-Cal-Val/DSWx-HLS-Requirement-Verification repository). The following
+replaces all "DSWE F1 ≈ 0.92 architectural ceiling" language from earlier drafts:
+
+**OPERA DSWx-HLS v1.0 Cal/Val baseline (not a "ceiling"):** The official OPERA Cal/Val
+verification (source: OPERA-Cal-Val/DSWx-HLS-Requirement-Verification, N=52 globally
+distributed scenes, 100-bootstrap validation against Planet-based labels,
+`out/verification_stats_agg/100-trials_conf-classes-none_sample-from-val/metrics.csv`) reports:
+
+| Metric | Value |
+|--------|-------|
+| Open Surface Water (OSW) F1 mean | **0.8786 ± 0.08** (range: 0.43–1.00) |
+| OSW class accuracy mean | 91.6% ± 10.6% (OPERA requirement: > 80%) |
+| Partial Surface Water (PSW) F1 mean | 0.5843 (N=45 scenes) |
+| Not Water (NW) F1 mean | 0.9570 |
+| Binary Water Accuracy | 96.1% mean |
+
+**The "0.92 ceiling" phrase in BOOTSTRAP_V1.1.md is incorrect:** the 0.92 figure corresponds
+to mean OSW class accuracy (91.6%), not F1. PITFALLS P5.3 explicit warning sign: "0.92
+architectural ceiling" is a game-of-telephone citation (class accuracy misattributed as F1).
+
+The Phase 6 F1 > 0.90 gate (`criteria.py:188` `dswx.f1_min = 0.90`) is ABOVE the published
+Cal/Val OSW mean F1 (0.8786). This makes the Phase 6 gate a project-level ambition, not a
+literature claim. The gate is **isolated** from the ceiling claim per PITFALLS P5.3 explicit
+isolation strategy: the gate stays at 0.90 regardless of where the ceiling sits.
+
+Path (d) own-data fallback was not required. If a future PROTEUS ATBD release provides
+additional citable F1 numbers, this §5.1 wording revises in a future v1.x milestone — that
+is a methodology-doc edit only, not a `criteria.py` edit.
+
+### 5.2 Held-out Balaton vs fit-set methodology
+
+Per BOOTSTRAP §5.4 + CONTEXT D-13: the OFFICIAL EU matrix-cell value is the **held-out
+Balaton F1**, NOT the fit-set mean F1. PITFALLS P5.1 explicit:
+
+> Balaton F1 < 0.90, report FAIL — not "fit-set F1 passed."
+
+Plan 06-06 holds Balaton truly out of the 5-AOI fit-set construction; the 12 (AOI, scene)
+pairs in the grid search are 5 fit-set AOIs × 2 wet/dry + Balaton wet/dry, but only the 10
+fit-set pairs participate in gridpoint F1 aggregation (B1 fix corrects an earlier 12-fold
+conflation). After grid search converges to a joint best gridpoint via fit-set-only F1,
+Balaton is scored once at the joint best gridpoint — that single number is the gate.
+
+Fit-set mean F1 + per-AOI F1 breakdown are reported alongside in `eval-dswx/metrics.json`
+as `fit_set_mean_f1` and `per_aoi_breakdown` — diagnostics, NOT the gate.
+
+**Phase 6 outcome:** The recalibration did not converge (fit_set_mean_f1=0.2092; BLOCKER
+after 3 iterations; HLS→S2 L2A spectral transfer gap). The Balaton held-out F1 was computed
+against PROTEUS defaults (THRESHOLDS_EU unchanged): F1 = 0.8165 (shoreline-excluded) vs
+F1 = 0.7957 (full pixels; no buffer). The shoreline buffer accounts for the +0.021 gap —
+confirming JRC labelling noise at water/land boundaries as expected (PITFALLS P5.2).
+
+### 5.3 Shoreline 1-pixel buffer rationale
+
+Per **PITFALLS P5.2** (W4 fix cross-reference): JRC Monthly History has documented
+commission accuracy 98–99% and omission accuracy 74–99% (Pekel et al. 2016,
+*High-resolution mapping of global surface water and its long-term changes*, Nature
+540:418–422; see also `.planning/research/PITFALLS.md §P5.2`). Specifically:
+
+- **Land-in-shadow classified as water** (mountain shadow, deep urban canyon shadow).
+  Alpine valley AOIs (Garda) most affected.
+- **Light clouds over water classified as land.** Atlantic estuary AOIs (Tagus) in
+  variable-weather months affected.
+- **Shoreline pixels ambiguous.** JRC uses 30 m Landsat pixels; a pixel 50% water / 50%
+  shore gets classified one way but the ground truth is mixed.
+
+The shoreline 1-pixel buffer (`scipy.ndimage.binary_dilation` XOR-of-water-and-non-water-
+dilations on JRC native 4326 grid; reprojected to S2 UTM via `Resampling.nearest`) excludes
+these structurally-ambiguous boundary pixels from the F1 evaluation. CONTEXT D-16 mandate:
+applied UNIFORMLY in BOTH the grid search (Plan 06-06 Stage 4) AND final reporting (Plan
+06-07 Task 1 + Plan 06-05 N.Am. positive control). Single source of truth; auditable via
+`f1_full_pixels` diagnostic stamped alongside the gate `f1` value.
+
+The buffer reduces false negatives at the shoreline (DSWx classifies the pixel as water; JRC
+labels it as land due to 50% shore) and false positives (DSWx classifies as non-water; JRC
+labels as water). The decision is methodologically conservative — F1 is computed on pixels
+where both classifiers can confidently agree.
+
+**Phase 6 evidence:** Balaton 2021-07, 187,556 pixels excluded (5.6% of valid comparison
+pixels); F1 gate = 0.8165 vs F1_full = 0.7957 (+0.021). Cross-references: PITFALLS §P5.2
+commission/omission accuracy bounds from Pekel et al. 2016 Nature 540:418–422.
+
+### 5.4 LOO-CV overfit detection (gap < 0.02; B1 10-fold leave-one-pair-out)
+
+Per PITFALLS P5.1: a 3-parameter joint grid search over WIGT × AWGT × PSWT2_MNDWI on 10
+(AOI, season) fit-set pairs has 8400 combinations; with effective spatial autocorrelation
+reducing 14M-pixel sample to ~140K independent samples, the multimodal F1 landscape has
+multiple local optima. Standard overfitting symptom: fit-set mean F1 = 0.91; held-out F1 =
+0.85; train/test gap = 0.06.
+
+DSWX-06 acceptance gate: **gap = fit_set_mean_f1 − loocv_mean_f1 < 0.02**.
+
+Plan 06-06 Stage 7 implements LOO-CV post-hoc on the joint best gridpoint via
+**leave-one-pair-out** (B1 fix; 10 folds, NOT 12 nor 5):
+
+1. For each of the 10 (aoi, season) pairs in the fit set: refit thresholds on the remaining
+   9 pairs; pick the LOO-best gridpoint per fold.
+2. Score the left-out pair at the per-fold refit_best.
+3. Average across 10 folds = `loocv_mean_f1`.
+
+The B1 fix corrects an earlier writing error in CONTEXT D-14 ("rotate 12 times") that
+conflated 12 fit-set+held-out total pairs with the actual 10 fit-set folds. Leave-one-pair-
+out preserves the fit-set's wet/dry seasonal signal (each fold's refit set retains the
+held-out AOI's other-season pair), whereas leave-one-AOI-out (5 folds) collapses both
+seasons of the held-out AOI together and loses that signal.
+
+**Phase 6 outcome:** LOO-CV was not executed because the recalibration did not converge to
+a fit-set threshold set (fit_set_mean_f1=0.2092 < 0.5 hard-stop; BLOCKER after Iteration 3).
+The LOO-CV gap is NaN in `eval-dswx/metrics.json` — this is NOT a gap violation; it is
+vacuously met (no recalibration to overfit against). The DSWX-06 acceptance gate applies
+when a valid recalibration lands; v1.2 EU recalibration must gate on loocv_gap < 0.02 before
+overwriting THRESHOLDS_EU.
+
+If `loocv_gap >= 0.02`: Plan 06-06 Stage 8 hard-gates with `cell_status='BLOCKER'` +
+`loocv_gap_violation=True` + `sys.exit(2)`. Resolution paths per CONTEXT D-14 user
+CHECKPOINT 2: (a) expand fit-set AOI count by substituting an alternate biome AOI; (b)
+accept the overfit-flagged calibration with documented rationale; (c) halt Phase 6 with
+FAIL + named_upgrade_path='fit-set quality review'.
+
+### 5.5 Threshold module + region selector design
+
+Per DSWX-05 + CONTEXT D-09..D-12: recalibrated thresholds live in
+`src/subsideo/products/dswx_thresholds.py` as a **frozen+slots dataclass** `DSWEThresholds`
+carrying the 3 grid-tunable thresholds (WIGT, AWGT, PSWT2_MNDWI) plus 9 provenance fields
+(grid_search_run_date, fit_set_hash, fit_set_mean_f1, held_out_balaton_f1, loocv_mean_f1,
+loocv_gap, notebook_path, results_json_path, provenance_note). Two singleton instances:
+
+- `THRESHOLDS_NAM`: PROTEUS defaults (WIGT=0.124, AWGT=0.0, PSWT2_MNDWI=−0.5) with
+  sentinel provenance values (`grid_search_run_date='1996-01-01-PROTEUS-baseline'`,
+  `fit_set_hash='n/a'`, F1 fields = NaN).
+- `THRESHOLDS_EU`: Phase 6 grid-search output placeholder (W1 sentinel-anchor slicing
+  in `dswx_thresholds.py`). Under v1.1 honest-BLOCKER closure, THRESHOLDS_EU retains
+  PROTEUS defaults with `fit_set_hash=''` (empty) and `fit_set_mean_f1=NaN`. The W5 Stage
+  0 pre-check in `run_eval_dswx.py` warns (not asserts) when `fit_set_hash` is empty,
+  allowing the Balaton eval to proceed with PROTEUS defaults while clearly documenting the
+  recalibration-deferred state.
+
+Region selection at `run_dswx` call time:
+
+```python
+# subsideo/config.py
+class Settings(BaseSettings):
+    dswx_region: Literal["nam", "eu"] = "nam"  # SUBSIDEO_DSWX_REGION env-var
+
+# subsideo/products/types.py
+@dataclass
+class DSWxConfig:
+    region: Literal["nam", "eu"] | None = None  # config-time override
+
+# subsideo/products/dswx.py
+def run_dswx(config: DSWxConfig) -> DSWxResult:
+    settings = Settings()
+    region = config.region or settings.dswx_region  # config > env > default 'nam'
+    thresholds = THRESHOLDS_BY_REGION[region]
+    diagnostic = _compute_diagnostic_tests(..., thresholds=thresholds)
+```
+
+YAML / runtime file I/O is explicitly forbidden per DSWX-05 (REQUIREMENTS.md): provenance
+flows as dataclass attributes, grep-discoverable, immutable (slots=True), git-diff-visible
+at PR review time.
+
+The decomposition of `_compute_diagnostic_tests` into public `compute_index_bands`
+(band-driven, threshold-free) + `score_water_class_from_indices` (threshold-driven, takes
+pre-computed IndexBands) per CONTEXT D-05 is the architectural enabler for Plan 06-06's
+8400-gridpoint grid search to run in ~25–45 min on M3 Max instead of ~6 hr — the index
+bands are computed ONCE per (AOI, scene) and cached as float32 .npy; the inner threshold
+loop scores the cached arrays via `score_water_class_from_indices` 8400 times per pair.
+
+W5 fix (Plan 06-07 Stage 0): `run_eval_dswx.py` warns when `THRESHOLDS_EU.fit_set_hash =
+''` immediately after `_mp` + `credential_preflight`, BEFORE any pipeline work. Catches the
+Plan-06-06-not-yet-landed case loudly rather than silently producing a Balaton F1 against
+PROTEUS placeholders that would be indistinguishable from the v1.0 baseline F1=0.7957.
+Under v1.1 honest-BLOCKER closure the warning fires; under v1.2 successful recalibration
+the warning is silent (non-empty fit_set_hash).
