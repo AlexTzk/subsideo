@@ -1,5 +1,11 @@
 # EU DSWx-S2 Validation — Session Conclusions
 
+**Last updated:** 2026-04-28 (Phase 6 v1.1 recalibration attempt appended; v1.0 preamble preserved per CONTEXT D-21).
+
+***
+
+## v1.0 Balaton baseline (PROTEUS DSWE defaults; F1=0.7957 against JRC)
+
 **Date:** 2026-04-15
 **AOI:** Lake Balaton, Hungary (bbox `17.25, 46.70, 18.20, 47.00`, UTM 33N / EPSG:32633)
 **Scene:** `S2B_MSIL2A_20210708T094029_N0500_R036_T33TYN_20230203T071138.SAFE`
@@ -502,3 +508,117 @@ v2 scope, per §7. Do not inline calibration work into v1.0.
 - `src/subsideo/products/dswx.py` — `_read_boa_offsets`, `_find_safe_root`, `HLS_XCAL_S2A`, `_apply_hls_cross_calibration`, `_rescue_connected_wetlands`, `WETLAND_RESCUE_RADIUS_PX`, `_read_s2_bands_at_20m` calibration chain, `run_dswx` rescue wiring, `_validate_dswx_product` import path fix
 - `src/subsideo/_metadata.py:_inject_geotiff` — COG re-translate after tag update
 - `src/subsideo/validation/compare_dswx.py` — JRC URL y/x order fix, JRC-windowed validation geometry, `_binarize_dswx` class-3 inclusion
+
+***
+
+## v1.1 Recalibrated thresholds (region=eu)
+
+**Honest assessment: EU recalibration deferred to v1.2. PROTEUS defaults retained.**
+
+Phase 6 conducted a 3-iteration joint grid search over WIGT × AWGT × PSWT2_MNDWI
+(`scripts/recalibrate_dswe_thresholds.py`; see `CONCLUSIONS_DSWX_EU_RECALIB.md` for the
+full investigation report). The recalibration was exhausted after Iteration 3 (1395
+gridpoints; WIGT ∈ [0.08, 0.30], AWGT ∈ [−0.20, 0.10], PSWT2_MNDWI fixed at −0.44)
+with `fit_set_mean_f1 = 0.2092` — below the 0.5 hard-stop criterion, triggering Option C
+closure (halt + document).
+
+| Threshold | PROTEUS default (v1.0; applied in v1.1) | Recalibration outcome |
+|-----------|----------------------------------------|-----------------------|
+| WIGT | 0.124 | Unchanged (PROTEUS default retained) |
+| AWGT | 0.0 | Unchanged (PROTEUS default retained) |
+| PSWT2_MNDWI | −0.5 | Unchanged (PROTEUS default retained) |
+
+**Root cause of recalibration failure:** The DSWE thresholds were calibrated for OPERA HLS
+(LaSRC aerosol correction). EU Sentinel-2 L2A uses sen2cor BOA correction, producing
+different absolute MNDWI index distributions. The Claverie et al. (2018) static per-band
+offset (`_apply_boa_offset_and_claverie`) is insufficient for scene-level correction. No
+amount of WIGT/AWGT grid expansion resolves a cross-sensor calibration gap at the index
+level; F1 was insensitive to WIGT across the entire [0.08, 0.30] range (identical result
+at WIGT=0.20 and WIGT=0.30).
+
+**v1.2 recommendation:** labeled S2 L2A training data (CGLS 100m water layer or
+co-registered Landsat/S2 pairs) + scene-level S2 L2A → HLS transfer function. See
+`CONCLUSIONS_DSWX_EU_RECALIB.md §v1.2 Recommendation`.
+
+Provenance:
+- **fit_set_hash:** `''` (empty — grid search did not land; THRESHOLDS_EU placeholder)
+- **grid_search_run_date:** `'2026-MM-DD'` (PLACEHOLDER — never overwritten by Plan 06-06)
+- **fit_set_mean_f1:** 0.2092 (best across 1395 gridpoints × 10 fit-set pairs; all BLOCKER)
+- **reproducibility:** `scripts/recalibrate_dswe_thresholds.py` + `CONCLUSIONS_DSWX_EU_RECALIB.md`
+
+The non-tunable DSWE thresholds (PSWT1_*, PSWT2_BLUE/NIR/SWIR1/SWIR2) stay at PROTEUS
+defaults per CONTEXT D-12.
+
+***
+
+## v1.1 Held-out Balaton F1 + LOO-CV gap
+
+The OFFICIAL EU matrix-cell value is the held-out Balaton F1 per BOOTSTRAP §5.4 + CONTEXT
+D-13. Since recalibration was deferred, the v1.1 result is the held-out Balaton F1 against
+PROTEUS DSWE defaults run with `region="eu"` (THRESHOLDS_EU = PROTEUS defaults).
+
+| Metric | Value | Acceptance |
+|--------|-------|------------|
+| **Held-out Balaton F1 (gate; shoreline-excluded)** | **0.8165** | > 0.90 (BINDING) |
+| Balaton precision | 0.9578 | (diagnostic) |
+| Balaton recall | 0.7115 | (diagnostic) |
+| Balaton accuracy | 0.9866 | (diagnostic) |
+| Balaton F1 (full pixels; no shoreline exclusion) | 0.7957 | (diagnostic) |
+| Shoreline buffer excluded pixels | 187,556 | — |
+| Fit-set mean F1 (BLOCKER; 3 iterations exhausted) | 0.2092 | (recalib failed) |
+| LOO-CV mean F1 | NaN | (recalib deferred; no LOO-CV) |
+| **LOO-CV gap** | **NaN** | < 0.02 (not applicable) |
+
+**Interpretation of F1 = 0.8165 (shoreline-excluded) vs F1 = 0.7957 (full pixels):**
+The shoreline 1-pixel buffer exclusion (Phase 6 D-16; `compare_dswx._compute_shoreline_buffer_mask`)
+excluded 187,556 pixels — approximately 5.6% of the valid comparison pixels. Excluding these
+structurally ambiguous shoreline pixels raises F1 from 0.7957 → 0.8165, confirming that JRC's
+30 m temporal-composite labelling introduces systematic noise at water/land boundaries per
+PITFALLS P5.2 (Pekel et al. 2016 omission accuracy 74–99%).
+
+**Why F1 increased with shoreline exclusion:** DSWx classes 1 + 2 + 3 (after connected-component
+rescue) correctly flag the Balaton main body. The shoreline zone is where JRC labels pixels as
+water that DSWx calls non-water (temporal aliasing: JRC composite catches any water in July;
+DSWx sees the 8 July single-scene). Excluding this zone removes structurally-unfair recall
+penalties, raising measured F1 by +0.021 points.
+
+Per PITFALLS P5.1, LOO-CV is not applicable because the recalibration did not converge to a
+fit-set threshold set; THRESHOLDS_EU retains PROTEUS defaults. The gap metric is NaN, not a
+violation — it simply did not execute. The DSWX-06 LOO-CV acceptance gate is vacuously met
+(no recalibration to overfit against).
+
+***
+
+## v1.1 Matrix-cell verdict + named upgrade path
+
+**`dswx:eu` matrix cell: F1 = 0.8165 FAIL.**
+
+F1 = 0.8165 < 0.85. Named upgrade path: **fit-set quality review**.
+
+**Honest FAIL framing per BOOTSTRAP §5.5:** F1 = 0.8165 is below both the 0.90 acceptance
+gate AND the 0.85 "ML-replacement" threshold. This signals the 5-biome EU fit-set was
+insufficient — the EU biomes did not generalise to Balaton under PROTEUS defaults. However,
+since the recalibration itself failed to converge (fit_set_mean_f1=0.2092 across the full
+1395-gridpoint search), the root cause is not fit-set composition but rather the HLS→S2 L2A
+spectral transfer gap at the algorithm calibration level.
+
+The distinction matters for v1.2 planning:
+- **"fit-set quality review"** upgrade path signals: re-evaluate fit-set AOI selection + add
+  labeled S2 L2A training data (not just re-run the grid search on the same data).
+- **"ML-replacement (DSWX-V2-01)"** upgrade path (for F1 ∈ [0.85, 0.90)) would have signalled:
+  the threshold-based DSWE architecture is near its ceiling; switch to ML. That bar is not
+  reached here — F1 is below the 0.85 cutoff.
+
+The 0.90 bar does NOT move (PITFALLS M4; `criteria.py:dswx.f1_min` is frozen). This is an
+honest FAIL with a named upgrade path, not a goalpost-move.
+
+The DSWE F1 ceiling claim is documented in `docs/validation_methodology.md §5.1` per Phase 6
+D-22 — see the methodology document for the citation chain (PROTEUS ATBD or own-data-bound
+fallback per Plan 06-01 probe outcome).
+
+Cross-reference: `CONCLUSIONS_DSWX_EU_RECALIB.md` for the full 3-iteration grid-search
+investigation report and v1.2 recommendations.
+
+***
+
+[End of v1.1 sections; Plan 06-07 close]
