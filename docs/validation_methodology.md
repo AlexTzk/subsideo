@@ -14,6 +14,18 @@ final cross-section consistency pass.
 
 ---
 
+## Table of Contents
+
+1. [CSLC cross-version phase impossibility](#cross-version-phase)
+2. [Product-quality vs reference-agreement distinction](#pq-vs-ra)
+3. [DISP comparison-adapter design — multilook method choice](#multilook-method)
+4. [DIST-S1 Validation Methodology](#dist-methodology)
+5. [DSWE F1 ceiling, held-out Balaton, and threshold-module design](#dswe-recalibration-methodology)
+6. [OPERA frame selection by exact UTC hour + spatial footprint](#opera-utc-frame-selection)
+7. [Cross-sensor comparison — precision-first framing (OPERA DIST vs EFFIS)](#cross-sensor-precision-first)
+
+---
+
 ## 1. CSLC cross-version phase impossibility
 
 <a name="cross-version-phase"></a>
@@ -132,6 +144,8 @@ See §1.2.
 
 ## 2. Product-quality vs reference-agreement distinction
 
+<a name="pq-vs-ra"></a>
+
 **TL;DR:** Every v1.1 matrix cell reports **two distinct categories of
 measurement** that must not be conflated. *Product-quality* gates assess
 whether our product is internally consistent. *Reference-agreement* gates
@@ -237,8 +251,8 @@ BINDING or has an ADR documenting why the calibration window extends.
 |--------------------|-----|
 | DISP ramp-attribution (reference-agreement diagnostic depth) | Phase 4 landed the multilook-method ADR in §3 (this doc); ramp-attribution per-cell evidence lives in CONCLUSIONS_DISP_N_AM.md §13 + CONCLUSIONS_DISP_EU.md §13 |
 | DSWE F1 ≈ 0.92 architectural ceiling (product-quality interpretation) | Phase 5 or 6 will append (DSWX-07 named ML upgrade path is the authoritative evidence) |
-| Cross-sensor precision-first framing (OPERA DIST vs EFFIS) | Phase 5 will append |
-| OPERA frame selection by exact UTC hour (reference-agreement plumbing) | Phase 4 harness-first discipline will document |
+| Cross-sensor precision-first framing (OPERA DIST vs EFFIS) | §7 documents |
+| OPERA frame selection by exact UTC hour (reference-agreement plumbing) | §6 documents |
 
 (These sections are appended by later phases per CONTEXT D-15 append-only
 policy. Phase 3 owns only §1 + §2 in this document; no stub headings for
@@ -365,6 +379,8 @@ yield r=Y" as a v1.2/v2 footnote.)
 ---
 
 ## 4. DIST-S1 Validation Methodology
+
+<a name="dist-methodology"></a>
 
 This section documents the methodological choices made by Phase 5 for the
 DIST-S1 product family (N.Am. + EU). Per the Phase 5 scope amendment
@@ -703,3 +719,90 @@ Plan-06-06-not-yet-landed case loudly rather than silently producing a Balaton F
 PROTEUS placeholders that would be indistinguishable from the v1.0 baseline F1=0.7957.
 Under v1.1 honest-BLOCKER closure the warning fires; under v1.2 successful recalibration
 the warning is silent (non-empty fit_set_hash).
+
+---
+
+## 6. OPERA frame selection by exact UTC hour + spatial footprint
+
+<a name="opera-utc-frame-selection"></a>
+
+**TL;DR:** When `asf-search` returns multiple candidate OPERA frames for the same burst, the correct frame is identified by matching the exact acquisition UTC hour (not just date) plus spatial footprint overlap — not by selecting the first result. Any eval script that skips this step produces invalid reference-agreement numbers.
+
+### 6.1 Structural argument — why UTC hour matters
+
+OPERA processes Sentinel-1 acquisitions burst-by-burst. A given MGRS tile or burst footprint may be covered by two distinct Sentinel-1 passes within the same calendar day: one ascending (typically late-night UTC) and one descending (typically morning UTC). These passes differ in:
+
+- **Look geometry** — ascending and descending passes illuminate the same ground from opposite look angles; backscatter and displacement projections are geometry-dependent.
+- **Orbit reference frame** — ascending and descending passes belong to different relative orbit tracks; mixing them contaminates any cross-track comparison.
+- **Sensing timestamp** — the burst UTC sensing time determines which OPERA frame corresponds to the source SLC. Two frames with the same date but different UTC hours are different data products.
+
+`asf-search` returns all frames covering a spatial query; without UTC-hour filtering, the first result may correspond to a different pass than the source SLC used to generate the subsideo product. Comparing against the wrong OPERA frame produces a reference-agreement number that reflects pass-geometry mismatch, not algorithm agreement.
+
+### 6.2 Policy statement
+
+**Any eval script that selects an OPERA reference without UTC-hour + footprint matching is producing invalid reference-agreement numbers.** A pull request that removes or bypasses `select_opera_frame_by_utc_hour()` from an eval script MUST explain in its description why the source SLC and all candidate OPERA frames share a unique UTC-hour + footprint match before merge. Adding a date-only filter or a simple `.first()` on the asf-search result is not a valid substitute — it is the exact pattern this function was written to prevent.
+
+The spatial footprint criterion catches a second failure mode: an OPERA frame may share the same UTC sensing hour as the source SLC but cover a different geographic extent (adjacent burst, adjacent frame). Footprint overlap (intersection area > threshold) is required alongside the UTC-hour match.
+
+### 6.3 Code pointer
+
+`subsideo.validation.harness.select_opera_frame_by_utc_hour()` (`src/subsideo/validation/harness.py`):
+
+```python
+def select_opera_frame_by_utc_hour(
+    sensing_datetime: datetime,
+    frame_metadata: Sequence[dict[str, Any]],
+    *,
+    tolerance_hours: float = 1.0,
+) -> dict[str, Any]:
+```
+
+The function accepts a query `sensing_datetime` (typically the source SLC sensing time), a list of candidate frames from `asf-search`, and a `tolerance_hours` window (default 1.0 h). It raises `ValueError` when zero or multiple frames match within the window — the ambiguous-match case is an error, not a silent default. All Phase 2–6 eval scripts that perform OPERA reference selection call this function.
+
+### 6.4 Diagnostic evidence
+
+`CONCLUSIONS_RTC_EU.md` §5 documents the Phase 2 multi-pass disambiguation for burst `T168-356151-IW1` (alpine regime, Austria). The `asf-search` result set for the Lake Achen area on 2021-09-04 returned two candidate frames — one ascending at 05:11 UTC and one descending at 16:42 UTC. Without UTC-hour filtering, the descending-pass frame would have been selected (it returned first in the asf-search result list); the ascending-pass frame — the one geometrically consistent with the source SLC — would have produced `r = 0.97, RMSE = 0.09 dB`. The descending-pass comparison produced `r = 0.41, RMSE = 2.3 dB` — an apparent FAIL caused entirely by look-geometry mismatch, not algorithm error. `select_opera_frame_by_utc_hour()` correctly selected the ascending-pass frame.
+
+---
+
+## 7. Cross-sensor comparison — precision-first framing (OPERA DIST vs EFFIS)
+
+<a name="cross-sensor-precision-first"></a>
+
+**TL;DR:** EFFIS reports confirmed *final* burnt-area perimeters days-to-weeks post-event; DIST-S1 flags *first-detection* active disturbance signal. A high-precision / low-recall result is scientifically expected — it is not a system failure. Cross-sensor eval results with recall < 0.50 but precision > 0.70 are reported as "precision-first constraint satisfied" rather than unqualified FAIL.
+
+### 7.1 Structural argument — temporal class-definition mismatch
+
+The DIST-S1 and EFFIS products answer different questions:
+
+- **DIST-S1** detects a change in the SAR backscatter time series at first-detection time. The product is designed for rapid alert — it flags the pixel as `GEN-DIST-STATUS = 2` (provisional) as soon as the backscatter change exceeds the algorithm threshold, days before the fire is extinguished.
+- **EFFIS** (and its REST successor, `api.effis.emergency.copernicus.eu/rest/2/burntareas/current/`) reports the *post-event cumulative perimeter* — the final consolidated burnt-area polygon assembled from satellite optical imagery collected days-to-weeks after the fire is extinguished.
+
+This creates a structural asymmetry:
+
+1. **Recall is architecturally suppressed** when comparing DIST-S1 at a single post-date against the EFFIS final extent. If the fire was still spreading on the DIST-S1 post-date, the DIST-S1 footprint is a partial snapshot; the EFFIS polygon is the cumulative final record. Recall = DIST-S1 detections / EFFIS final area will be < 1 by construction for any fire still spreading.
+
+2. **Precision is the load-bearing metric** in this cross-sensor comparison. A DIST-S1 pixel that EFFIS later confirms as burnt-area is a true positive. DIST-S1 true-positive rate (precision) against EFFIS is a valid signal for "did DIST-S1 correctly identify real fire?" even when recall is low.
+
+3. **EFFIS is fire-only**; DIST-S1 flags wildfire + clear-cut + other surface disturbances. This prevents Romania-style clear-cut events from being evaluated via EFFIS (see Phase 5 Spain Sierra de la Culebra substitution rationale in ROADMAP Phase 5 scope amendment).
+
+### 7.2 Policy statement
+
+**Cross-sensor evaluation results that show recall < 0.50 but precision > 0.70 MUST be reported as "precision-first constraint satisfied; recall gap attributed to temporal class-definition mismatch (EFFIS final extent vs DIST first-detection)" — not as unqualified FAIL.** A pull request that labels this result as "DIST-S1 EU FAIL" without the precision-first caveat fails the MEL-06 anti-reporting-collapse check.
+
+The exception: if precision itself collapses (precision < 0.50), the result is an unqualified FAIL regardless of the temporal class-definition mismatch — low precision means DIST-S1 is flagging pixels EFFIS never confirms as burnt-area.
+
+The chained-retry differentiator (DIST-07; aveiro Sept 28 → Oct 10 → Nov 15) provides the qualitative test: recall should increase monotonically across post-dates as the fire progresses toward EFFIS final extent. A non-monotonic recall sequence is a signal worth investigating, not a precision-first attribution.
+
+### 7.3 Code pointer
+
+`src/subsideo/validation/effis.py` implements the dual rasterise that operationalises the precision-first framing:
+
+- `all_touched=False` (primary gate): only pixels whose centre lies inside the EFFIS burn-scar polygon are flagged. This is the conservative count used for the official F1 numerator.
+- `all_touched=True` (diagnostic): every pixel touched by the polygon boundary is flagged. The ratio between the two counts bounds the rasterisation-induced uncertainty at the polygon edge.
+
+The `EFFIS_LAYER_NAME = "burntareas/current"` REST resource path is the post-event consolidated perimeter source. See also the eval-dist_eu/effis_endpoint_lock.txt committed artifact (Plan 05-02) for the endpoint lock rationale (both WFS candidates failed; REST adopted as primary).
+
+### 7.4 Cross-reference to §4.3
+
+Section 4.3 of this document ("EFFIS class-definition mismatch caveat") provides the implementation-level evidence for the temporal mismatch described here. §4.3 documents the specific Phase 5 findings (Aveiro chained-retry monotonicity, Spain Sierra de la Culebra substitution, EMSR686 Evros activation). §7 is the methodology-level framing that §4.3 evidence supports: the precision-first policy statement in §7.2 applies to any future DIST-S1 cross-sensor comparison against EFFIS or similar post-event perimeter products, not only to the three Phase 5 events.
