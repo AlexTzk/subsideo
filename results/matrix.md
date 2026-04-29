@@ -15,4 +15,4 @@ CALIBRATING cells are *italicised*. See `validation/criteria.py` for the 13-entr
 | DIST | NAM | — | DEFERRED (CMR: operational_not_found) |
 | DIST | EU | — | 0/3 PASS (3 FAIL) \| worst f1=0.000 (aveiro) |
 | DSWX | NAM | — | F1=0.925 PASS [aoi=Lake Tahoe (CA)] |
-| DSWX | EU | RUN_FAILED (metrics.json missing) | RUN_FAILED |
+| DSWX | EU | — | F1=0.816 FAIL — named upgrade: fit-set quality review \| LOOCV gap=nan |
