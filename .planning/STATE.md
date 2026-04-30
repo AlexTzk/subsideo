@@ -4,14 +4,14 @@ milestone: v1.2
 milestone_name: CSLC Binding & DISP Science Pass
 status: planning
 stopped_at: ~
-last_updated: "2026-04-30T19:14:41.000Z"
-last_activity: 2026-04-30 -- Phase 8 planned; four executable plans ready for CSLC gate promotion and AOI hardening
+last_updated: "2026-04-30T23:59:00.000Z"
+last_activity: 2026-04-30 -- Phase 8 completed; CSLC gate-promotion inputs hardened and Phase 9 ready
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 0
-  percent: 0
+  completed_plans: 4
+  percent: 20
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** v1.2 planning — CSLC binding and DISP science-pass remediation
+**Current focus:** v1.2 execution — CSLC binding and DISP science-pass remediation
 
 ## Current Position
 
-Phase: 08 (cslc-gate-promotion-and-aoi-hardening) — PLANNED
-Plan: 08-01 — ready to execute
-Status: Four Phase 8 plans generated; awaiting `$gsd-execute-phase 8`
-Last activity: 2026-04-30 -- Phase 8 planned with 4 plans across 2 waves
+Phase: 09 (cslc-egms-third-number-and-binding-reruns) — READY TO PLAN
+Plan: Phase 8 complete; next plan is Phase 9
+Status: Phase 8 completed all 4 plans; ready for `$gsd-plan-phase 9`
+Last activity: 2026-04-30 -- Phase 8 executed and closed with focused + broad unit suites passing
 
 **v1.2 scope:** Focus on CSLC and DISP. CSLC enters with strong v1.1 self-consistency baselines (SoCal coh=0.887 / residual=-0.109 mm/yr; Mojave coh=0.804 / residual=+1.127 mm/yr; Iberian coh=0.868 / residual=+0.347 mm/yr) and needs BINDING gate promotion plus deferred EGMS/AOI hardening. DISP enters with structurally complete N.Am./EU validation but reference-agreement FAILs (SoCal r=0.049, Bologna r=0.336), while stable-terrain residuals remain near zero; v1.2 starts with ERA5/ramp diagnostics before choosing an unwrapper/resolution candidate.
 
@@ -40,7 +40,7 @@ Last activity: 2026-04-30 -- Phase 8 planned with 4 plans across 2 waves
 
 - Total plans completed: 32 (v1.1); 21 (v1.0, shipped)
 - Average duration: —
-- Total execution time: 0 hours
+- Total execution time: ~3 hours
 
 **By Phase:**
 
@@ -49,6 +49,7 @@ Last activity: 2026-04-30 -- Phase 8 planned with 4 plans across 2 waves
 | 01 | 9 | - | - |
 | 04 | 5 | - | - |
 | 05 | 9 | - | - |
+| 08 | 4 | ~180min | ~45min |
 
 **Recent Trend:**
 
@@ -155,7 +156,7 @@ Recent decisions affecting current work (v1.1):
 
 ### Pending Todos
 
-- Execute Phase 8 plans with `$gsd-execute-phase 8`.
+- Plan Phase 9 with `$gsd-plan-phase 9`.
 
 ### Blockers/Concerns
 
@@ -175,9 +176,9 @@ Recent decisions affecting current work (v1.1):
 
 ## Session Continuity
 
-Last activity: 2026-04-30 — Phase 8 plan-phase complete. Generated CONTEXT/DISCUSSION artifacts plus RESEARCH, PATTERNS, and four executable plans under `.planning/milestones/v1.2-phases/08-cslc-gate-promotion-and-aoi-hardening/`. Wave 1 covers projected-metre stable-terrain buffers and retention diagnostics (08-01), acquisition-backed AOI probe regeneration and stale test repair (08-02), and SAFE cache self-healing plus CR-01/CR-02/HI-01 regression tests (08-03). Wave 2 documents the CSLC BINDING threshold proposal and runs closure tests (08-04). Requirements covered: CSLC-07, CSLC-08, CSLC-09, CSLC-12, RTCSUP-01, RTCSUP-03. Next step: `$gsd-execute-phase 8`.
-Last session: 2026-04-30T19:14:41.000Z
+Last activity: 2026-04-30 — Phase 8 execution complete. Delivered projected-metre stable-terrain buffers and retention diagnostics (08-01), acquisition-backed AOI probe regeneration and stale fallback repair (08-02), SAFE cache self-healing plus CR-01/CR-02/HI-01 regression tests (08-03), and CSLC BINDING threshold proposal/conclusions/methodology closure with focused + broad unit suites passing (08-04). Requirements covered: CSLC-07, CSLC-08, CSLC-09, CSLC-12, RTCSUP-01, RTCSUP-03. Next step: `$gsd-plan-phase 9`.
+Last session: 2026-04-30T23:59:00.000Z
 Stopped at: ~
 Resume file: None
 
-**Planned Phase:** 08 (cslc-gate-promotion-and-aoi-hardening) — 4 plans — 2026-04-30T19:14:41.000Z
+**Completed Phase:** 08 (cslc-gate-promotion-and-aoi-hardening) — 4 plans — 2026-04-30T23:59:00.000Z

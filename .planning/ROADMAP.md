@@ -45,9 +45,9 @@ Full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 </details>
 
 <details open>
-<summary>🟡 v1.2 CSLC Binding & DISP Science Pass (Phases 8-12) — PLANNED</summary>
+<summary>🟡 v1.2 CSLC Binding & DISP Science Pass (Phases 8-12) — IN PROGRESS</summary>
 
-- [ ] **Phase 8: CSLC Gate Promotion & AOI Hardening** (0/4 plans, planned 2026-04-30) — fix stable-terrain buffer geometry, regenerate acquisition-backed AOI probe artifacts, add EU fallback AOIs, reject truncated SAFE caches, fix v1.1 audit-flagged shared-infra defects (CR-01/CR-02/HI-01), retire v1.1 stale tests, and propose BINDING CSLC gate thresholds.
+- [x] **Phase 8: CSLC Gate Promotion & AOI Hardening** (4/4 plans, complete 2026-04-30) — fixed stable-terrain buffer geometry, regenerated acquisition-backed AOI probe artifacts, added EU fallback AOIs, rejected truncated SAFE caches, fixed v1.1 audit-flagged shared-infra defects (CR-01/CR-02/HI-01), retired stale fallback tests, and proposed BINDING CSLC gate thresholds.
 - [ ] **Phase 9: CSLC EGMS Third Number & Binding Reruns** — adapt EGMS L2a integration, populate the EU stable-PS residual, restore Mojave amplitude sanity if possible, rerun CSLC N.Am./EU, and promote CSLC matrix cells out of CALIBRATING.
 - [ ] **Phase 10: DISP Atmospheric & Provenance Diagnostics** — run ERA5/tropospheric diagnostics on cached SoCal/Bologna stacks, use RTC-style DEM/orbit provenance checks only where needed, and decide whether atmospheric curvature explains the v1.1 ramp pattern.
 - [ ] **Phase 11: DISP Candidate Evaluation** — test PHASS deramping plus at least one candidate from SPURT native, tophu/SNAPHU tiled, or 20 x 20 m fallback while preserving native 5 x 10 m production output.
@@ -76,10 +76,10 @@ Full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 **Plans**: 4 plans across 2 waves
 
 Plans:
-- [ ] 08-01-PLAN.md — Projected-metre stable-terrain buffers and CSLC mask-retention diagnostics [Wave 1] [CSLC-08, CSLC-07]
-- [ ] 08-02-PLAN.md — v1.2 acquisition-backed CSLC AOI probe artifact plus stale fallback-test repair [Wave 1] [CSLC-09, CSLC-12]
-- [ ] 08-03-PLAN.md — SAFE cache integrity helper, eval/download validation wiring, and CR-01/CR-02/HI-01 regression tests [Wave 1] [RTCSUP-01, RTCSUP-03]
-- [ ] 08-04-PLAN.md — CSLC BINDING threshold rationale, conclusions/methodology notes, and Phase 8 closure tests [Wave 2] [CSLC-07, CSLC-12, RTCSUP-01, RTCSUP-03]
+- [x] 08-01-PLAN.md — Projected-metre stable-terrain buffers and CSLC mask-retention diagnostics [Wave 1] [CSLC-08, CSLC-07]
+- [x] 08-02-PLAN.md — v1.2 acquisition-backed CSLC AOI probe artifact plus stale fallback-test repair [Wave 1] [CSLC-09, CSLC-12]
+- [x] 08-03-PLAN.md — SAFE cache integrity helper, eval/download validation wiring, and CR-01/CR-02/HI-01 regression tests [Wave 1] [RTCSUP-01, RTCSUP-03]
+- [x] 08-04-PLAN.md — CSLC BINDING threshold rationale, conclusions/methodology notes, and Phase 8 closure tests [Wave 2] [CSLC-07, CSLC-12, RTCSUP-01, RTCSUP-03]
 
 **Requirements coverage audit** (all 6 Phase 8 requirement IDs):
 CSLC-07 (01, 04), CSLC-08 (01), CSLC-09 (02), CSLC-12 (02, 04), RTCSUP-01 (03, 04), RTCSUP-03 (03, 04). Every requirement appears in at least one plan.
