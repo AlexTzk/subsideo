@@ -149,6 +149,35 @@ def test_download_cloudfront_403_raises(tmp_path: Path) -> None:
         )
 
 
+def test_download_unclassified_http_500_fails_fast(tmp_path: Path) -> None:
+    """CR-02: statuses outside retry_on/abort_on raise, not silent retries."""
+    from subsideo.validation.harness import (
+        ReferenceDownloadError,
+        download_reference_with_retry,
+    )
+
+    fake_resp = MagicMock()
+    fake_resp.status_code = 500
+    fake_resp.__enter__ = lambda self: self
+    fake_resp.__exit__ = lambda *a, **k: None
+
+    fake_session = MagicMock()
+    fake_session.get.return_value = fake_resp
+
+    with pytest.raises(ReferenceDownloadError) as exc_info:
+        download_reference_with_retry(
+            "https://example.com/file.zip",
+            tmp_path / "file.zip",
+            source="CDSE",
+            session=fake_session,
+            max_retries=3,
+        )
+
+    assert exc_info.value.status == 500
+    assert exc_info.value.source == "CDSE"
+    assert fake_session.get.call_count == 1
+
+
 def test_ensure_resume_safe_missing_cache(tmp_path: Path) -> None:
     """Non-existent cache dir → returns False."""
     from subsideo.validation.harness import ensure_resume_safe
