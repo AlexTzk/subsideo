@@ -87,6 +87,7 @@ if __name__ == "__main__":
     from subsideo.validation.harness import (
         bounds_for_burst,
         credential_preflight,
+        validate_safe_path,
     )
 
     load_dotenv()
@@ -466,6 +467,10 @@ if __name__ == "__main__":
 
         if not (safe_dir / "manifest.safe").exists():
             print("SKIP (manifest.safe missing after download)")
+            failed_scenes.append(date_tag)
+            continue
+        if not validate_safe_path(safe_dir):
+            print("SKIP (SAFE integrity validation failed)")
             failed_scenes.append(date_tag)
             continue
         safe_path = safe_dir

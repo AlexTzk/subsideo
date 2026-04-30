@@ -66,6 +66,7 @@ if __name__ == "__main__":
         ensure_resume_safe,
         find_cached_safe,
         select_opera_frame_by_utc_hour,
+        validate_safe_path,
     )
     from subsideo.validation.matrix_schema import (
         BurstResult,
@@ -444,6 +445,10 @@ if __name__ == "__main__":
                         f"no zip in {local_input}"
                     )
                 safe_path = zips[-1]
+            if not validate_safe_path(safe_path, remove_invalid=True):
+                raise RuntimeError(
+                    f"SAFE failed integrity validation before RTC processing: {safe_path}"
+                )
             logger.info(
                 "SAFE ready for {}: {} ({:.2f} GB)",
                 cfg.burst_id, safe_path, safe_path.stat().st_size / 1e9,

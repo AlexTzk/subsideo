@@ -82,6 +82,7 @@ if __name__ == "__main__":
     from subsideo.validation.harness import (
         bounds_for_burst,
         credential_preflight,
+        validate_safe_path,
     )
 
     load_dotenv()
@@ -377,6 +378,10 @@ if __name__ == "__main__":
 
         if not safe_path.exists():
             print("SKIP (no SAFE file)")
+            failed_scenes.append(date_tag)
+            continue
+        if not validate_safe_path(safe_path, remove_invalid=True):
+            print("SKIP (invalid SAFE cache/download)")
             failed_scenes.append(date_tag)
             continue
 

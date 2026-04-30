@@ -62,6 +62,7 @@ if __name__ == "__main__":
         credential_preflight,
         find_cached_safe,
         select_opera_frame_by_utc_hour,
+        validate_safe_path,
     )
     from subsideo.validation.matrix_schema import (
         AOIResult,
@@ -229,8 +230,6 @@ if __name__ == "__main__":
         re-raised. CDSE STAC returned 0 items for 2024 Iberian queries,
         ASF serves the same S1 SLCs reliably.
         """
-        import zipfile  # noqa: PLC0415
-
         import asf_search as asf  # noqa: PLC0415
         from shapely.geometry import box as _shapely_box  # noqa: PLC0415
 
@@ -296,17 +295,13 @@ if __name__ == "__main__":
                 raise RuntimeError(
                     f"ASF download failed for {granule_id}: no zip in {dest_dir}"
                 )
+            safe_path = zips[-1]
 
-        try:
-            with zipfile.ZipFile(safe_path) as zf:
-                if not any(".SAFE" in n for n in zf.namelist()):
-                    raise zipfile.BadZipFile("no .SAFE entries inside zip")
-        except zipfile.BadZipFile as err:
-            safe_path.unlink(missing_ok=True)
+        if not validate_safe_path(safe_path, remove_invalid=True):
             raise RuntimeError(
-                f"Downloaded SAFE {safe_path.name} is corrupt ({err}); "
-                "deleted — caller should retry the epoch"
-            ) from err
+                f"Downloaded SAFE {safe_path.name} failed integrity validation; "
+                "deleted if it was an invalid zip"
+            )
         return safe_path
 
     def _compute_ifg_coherence_stack(
@@ -764,6 +759,9 @@ if __name__ == "__main__":
                     cfg.cached_safe_search_dirs,
                 )
                 if safe is None:
+                    safe = _download_safe_for_epoch(cfg.burst_id, epoch, CACHE / "input")
+                elif not validate_safe_path(safe):
+                    logger.warning("Ignoring invalid cached SAFE hit {}", safe)
                     safe = _download_safe_for_epoch(cfg.burst_id, epoch, CACHE / "input")
                 # fetch_orbit takes (sensing_time, satellite, output_dir); pass epoch
                 # explicitly rather than the SAFE path.

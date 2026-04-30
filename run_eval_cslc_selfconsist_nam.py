@@ -74,6 +74,7 @@ if __name__ == "__main__":
         credential_preflight,
         find_cached_safe,
         select_opera_frame_by_utc_hour,
+        validate_safe_path,
     )
     from subsideo.validation.matrix_schema import (
         AOIResult,
@@ -371,8 +372,6 @@ if __name__ == "__main__":
         target is track 144). Validates the zip before returning; corrupt
         partial downloads are deleted + re-raised.
         """
-        import zipfile
-
         from shapely.geometry import box as _shapely_box
 
         # Parse track from burst_id (format: t{NNN}_{NNNNNN}_{iwN})
@@ -440,20 +439,13 @@ if __name__ == "__main__":
                 raise RuntimeError(
                     f"ASF download failed for {granule_id}: no zip in {dest_dir}"
                 )
-
-        # Validate the zip — partial/HTML-error downloads previously passed
-        # silently and only blew up deep inside compass ("File is not a zip file").
-        try:
-            with zipfile.ZipFile(safe_path) as zf:
-                if not any(".SAFE" in n for n in zf.namelist()):
-                    raise zipfile.BadZipFile("no .SAFE entries inside zip")
-        except zipfile.BadZipFile as err:
-            safe_path.unlink(missing_ok=True)
-            raise RuntimeError(
-                f"Downloaded SAFE {safe_path.name} is corrupt ({err}); "
-                "deleted — caller should retry the epoch"
-            ) from err
             safe_path = zips[-1]
+
+        if not validate_safe_path(safe_path, remove_invalid=True):
+            raise RuntimeError(
+                f"Downloaded SAFE {safe_path.name} failed integrity validation; "
+                "deleted if it was an invalid zip"
+            )
         return safe_path
 
     def _compute_slope_deg(dem_path: Path) -> tuple[np.ndarray, object, object]:
@@ -885,6 +877,9 @@ if __name__ == "__main__":
                 granule_hint = _safe_granule_for_epoch(cfg.burst_id, epoch)
                 safe = find_cached_safe(granule_hint, list(cfg.cached_safe_search_dirs))
                 if safe is None:
+                    safe = _download_safe_for_epoch(cfg.burst_id, epoch, CACHE / "input")
+                elif not validate_safe_path(safe):
+                    logger.warning("Ignoring invalid cached SAFE hit {}", safe)
                     safe = _download_safe_for_epoch(cfg.burst_id, epoch, CACHE / "input")
                 orbit = fetch_orbit(
                     sensing_time=epoch,

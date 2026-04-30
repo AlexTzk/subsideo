@@ -420,4 +420,8 @@ class CDSEClient:
                     f"after {max_retries} retries"
                 )
 
+        from subsideo.validation.harness import validate_safe_path
+
+        if not validate_safe_path(local_safe):
+            raise RuntimeError(f"Downloaded SAFE tree failed integrity validation: {local_safe}")
         return local_safe
