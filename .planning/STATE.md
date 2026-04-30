@@ -4,12 +4,12 @@ milestone: v1.2
 milestone_name: CSLC Binding & DISP Science Pass
 status: planning
 stopped_at: ~
-last_updated: "2026-04-30T00:00:00.000Z"
-last_activity: 2026-04-30 -- Milestone v1.2 started; requirements and roadmap defined for CSLC/DISP focus
+last_updated: "2026-04-30T19:14:41.000Z"
+last_activity: 2026-04-30 -- Phase 8 planned; four executable plans ready for CSLC gate promotion and AOI hardening
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 4
   completed_plans: 0
   percent: 0
 ---
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 ## Current Position
 
-Phase: 08 (cslc-gate-promotion-and-aoi-hardening) — NOT STARTED
-Plan: —
-Status: Defining first v1.2 phase plan
-Last activity: 2026-04-30 -- Milestone v1.2 started
+Phase: 08 (cslc-gate-promotion-and-aoi-hardening) — PLANNED
+Plan: 08-01 — ready to execute
+Status: Four Phase 8 plans generated; awaiting `$gsd-execute-phase 8`
+Last activity: 2026-04-30 -- Phase 8 planned with 4 plans across 2 waves
 
 **v1.2 scope:** Focus on CSLC and DISP. CSLC enters with strong v1.1 self-consistency baselines (SoCal coh=0.887 / residual=-0.109 mm/yr; Mojave coh=0.804 / residual=+1.127 mm/yr; Iberian coh=0.868 / residual=+0.347 mm/yr) and needs BINDING gate promotion plus deferred EGMS/AOI hardening. DISP enters with structurally complete N.Am./EU validation but reference-agreement FAILs (SoCal r=0.049, Bologna r=0.336), while stable-terrain residuals remain near zero; v1.2 starts with ERA5/ramp diagnostics before choosing an unwrapper/resolution candidate.
 
@@ -155,7 +155,7 @@ Recent decisions affecting current work (v1.1):
 
 ### Pending Todos
 
-None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
+- Execute Phase 8 plans with `$gsd-execute-phase 8`.
 
 ### Blockers/Concerns
 
@@ -175,9 +175,9 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 
 ## Session Continuity
 
-Last activity: 2026-04-25 — Phase 4 Plan 04-04 complete (Wave 3: eval-script rewire + warm re-runs + manifest fix). 5 changes per script landed in run_eval_disp.py + run_eval_disp_egms.py (10 total: REFERENCE_MULTILOOK_METHOD constant + EXPECTED_WALL_S=21600 + prepare_for_reference adapter + product-quality block + ramp-attribution + DISPCellMetrics write); manifest cache_dir aligned with on-disk eval-disp-egms (hyphen); both warm re-runs completed (~6 min SoCal, ~3 min Bologna); both metrics.json files validate as DISPCellMetrics; matrix.md regenerated. Honest FAIL signal preserved: SoCal r=0.049 (v1.0=0.0365), bias=+23.6 (v1.0=+23.62); Bologna r=0.336 (v1.0=0.32), bias=+3.46 (v1.0=+3.35). Both attributed_source=inconclusive. Ruff clean on touched files. Commits 75dea9d (Task 1 SoCal eval) + ec2c07d (Task 2 Bologna eval) + ae2707f (Task 3 manifest fix) + 709c0c0 (Task 4 Rule 3 EGMS_TOKEN preflight relaxation) + 0d0df63 (Task 4 matrix.md regen). Plan 04-04 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-04-SUMMARY.md`.
-Last session: 2026-04-30T00:03:26.390Z
-Stopped at: context exhaustion at 77% (2026-04-30)
+Last activity: 2026-04-30 — Phase 8 plan-phase complete. Generated CONTEXT/DISCUSSION artifacts plus RESEARCH, PATTERNS, and four executable plans under `.planning/milestones/v1.2-phases/08-cslc-gate-promotion-and-aoi-hardening/`. Wave 1 covers projected-metre stable-terrain buffers and retention diagnostics (08-01), acquisition-backed AOI probe regeneration and stale test repair (08-02), and SAFE cache self-healing plus CR-01/CR-02/HI-01 regression tests (08-03). Wave 2 documents the CSLC BINDING threshold proposal and runs closure tests (08-04). Requirements covered: CSLC-07, CSLC-08, CSLC-09, CSLC-12, RTCSUP-01, RTCSUP-03. Next step: `$gsd-execute-phase 8`.
+Last session: 2026-04-30T19:14:41.000Z
+Stopped at: ~
 Resume file: None
 
-**Planned Phase:** 05 (dist-s1-opera-v0-1-effis-eu) — 9 plans — 2026-04-25T21:45:44.176Z
+**Planned Phase:** 08 (cslc-gate-promotion-and-aoi-hardening) — 4 plans — 2026-04-30T19:14:41.000Z
