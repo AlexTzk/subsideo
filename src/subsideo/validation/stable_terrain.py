@@ -191,6 +191,9 @@ def _buffered_geometry_mask(
         # GeoDataFrame or any iterable of geometries
         gs = gpd.GeoSeries(geometry, crs=crs)
 
+    if getattr(gs, "crs", None) is not None and str(gs.crs) != str(crs):
+        gs = gs.to_crs(crs)
+
     # buffer() on a metric CRS produces polygons in the same CRS
     buffered = gs.buffer(buffer_m)
     geoms = [(g, 1) for g in buffered.geometry if g is not None and not g.is_empty]

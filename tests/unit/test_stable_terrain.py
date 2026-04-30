@@ -148,6 +148,103 @@ def test_waterbody_buffer_excludes_ring() -> None:
     assert (~mask_default).sum() > 0
 
 
+def test_coast_buffer_reprojects_epsg4326_geoseries_to_utm11() -> None:
+    """EPSG:4326 coast geometries must be buffered in UTM metres, not degrees."""
+    gpd = pytest.importorskip("geopandas", reason="geopandas needed for CRS reprojection")
+    affine_mod = pytest.importorskip("affine", reason="affine needed for raster transform")
+    pyproj_mod = pytest.importorskip("pyproj", reason="pyproj needed for test coordinates")
+    pytest.importorskip("shapely", reason="shapely needed for geometry")
+    pytest.importorskip("rasterio", reason="rasterio needed for rasterize")
+
+    from rasterio.crs import CRS
+    from shapely.geometry import LineString
+
+    from subsideo.validation.stable_terrain import build_stable_mask
+
+    raster_crs = CRS.from_string("EPSG:32611")
+    transformer = pyproj_mod.Transformer.from_crs("EPSG:4326", raster_crs, always_xy=True)
+    center_x, center_y = transformer.transform(-117.1, 34.0)
+    transform = (
+        affine_mod.Affine.translation(center_x - 5000, center_y + 5000)
+        * affine_mod.Affine.scale(100, -100)
+    )
+    coastline = gpd.GeoSeries(
+        [LineString([(-117.1, 33.96), (-117.1, 34.04)])],
+        crs="EPSG:4326",
+    )
+
+    worldcover = np.full((100, 100), 60, dtype=np.int16)
+    slope = np.zeros((100, 100), dtype=np.float32)
+    mask = build_stable_mask(
+        worldcover,
+        slope,
+        coastline=coastline,
+        transform=transform,
+        crs=raster_crs,
+        coast_buffer_m=1000.0,
+    )
+
+    assert (~mask).sum() > 0
+    assert bool(mask[0, 0]) or bool(mask[-1, -1])
+
+
+def test_waterbody_buffer_reprojects_epsg4326_geoseries_to_utm30() -> None:
+    """EPSG:4326 water polygons must respect metric buffers on Iberian UTM grids."""
+    gpd = pytest.importorskip("geopandas", reason="geopandas needed for CRS reprojection")
+    affine_mod = pytest.importorskip("affine", reason="affine needed for raster transform")
+    pyproj_mod = pytest.importorskip("pyproj", reason="pyproj needed for test coordinates")
+    pytest.importorskip("shapely", reason="shapely needed for geometry")
+    pytest.importorskip("rasterio", reason="rasterio needed for rasterize")
+
+    from rasterio.crs import CRS
+    from shapely.geometry import Polygon
+
+    from subsideo.validation.stable_terrain import build_stable_mask
+
+    raster_crs = CRS.from_string("EPSG:32630")
+    transformer = pyproj_mod.Transformer.from_crs("EPSG:4326", raster_crs, always_xy=True)
+    center_x, center_y = transformer.transform(-4.0, 41.0)
+    transform = (
+        affine_mod.Affine.translation(center_x - 5000, center_y + 5000)
+        * affine_mod.Affine.scale(100, -100)
+    )
+    water = gpd.GeoSeries(
+        [
+            Polygon(
+                [
+                    (-4.005, 40.995),
+                    (-3.995, 40.995),
+                    (-3.995, 41.005),
+                    (-4.005, 41.005),
+                    (-4.005, 40.995),
+                ]
+            )
+        ],
+        crs="EPSG:4326",
+    )
+
+    worldcover = np.full((100, 100), 60, dtype=np.int16)
+    slope = np.zeros((100, 100), dtype=np.float32)
+    mask_default = build_stable_mask(
+        worldcover,
+        slope,
+        waterbodies=water,
+        transform=transform,
+        crs=raster_crs,
+    )
+    mask_larger = build_stable_mask(
+        worldcover,
+        slope,
+        waterbodies=water,
+        transform=transform,
+        crs=raster_crs,
+        water_buffer_m=1500.0,
+    )
+
+    assert (~mask_default).sum() > 0
+    assert (~mask_larger).sum() >= (~mask_default).sum()
+
+
 def test_output_dtype_is_bool() -> None:
     from subsideo.validation.stable_terrain import build_stable_mask
 
