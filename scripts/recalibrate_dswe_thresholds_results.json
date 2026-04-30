@@ -3,26 +3,26 @@
   "edge_check": {
     "status": "at_edge_WIGT",
     "joint_best": [
-      0.20000000000000012,
-      0.00999999999999994
+      0.3,
+      2.7755575615628914e-17
     ]
   },
   "joint_best_gridpoint": {
-    "WIGT": 0.20000000000000012,
-    "AWGT": 0.00999999999999994,
+    "WIGT": 0.3,
+    "AWGT": 2.7755575615628914e-17,
     "PSWT2_MNDWI": -0.44
   },
   "pswt2_mndwi_treatment": "fixed_at_opera_ref",
   "pswt2_mndwi_fixed_value": -0.44,
-  "fit_set_mean_f1": 0.2091501987386608,
+  "fit_set_mean_f1": 0.20915070764250182,
   "grid_bounds": {
     "WIGT": [
       0.08,
-      0.20000000000000012
+      0.3
     ],
     "AWGT": [
-      -0.1,
-      0.0999999999999999
+      -0.2,
+      0.1
     ]
   },
   "named_upgrade_path": "grid expansion required"

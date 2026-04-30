@@ -265,3 +265,13 @@ __pycache__/
 
 # Phase 6: cached reference material from 06-01 PROTEUS ATBD probe (23MB, re-downloadable)
 .planning/milestones/*/proteus_atbd_cache/
+
+# v1.1 closure eval caches — heavy rasters/intermediates; only metadata/metrics/log at root are committed
+eval-dswx-fitset/
+eval-dist-park-fire/dist_output/
+eval-dist-park-fire/opera_reference/
+eval-dist_eu/aveiro/
+eval-dist_eu/evros/
+eval-dist_eu/spain_culebra/
+# Allow small reference files at the eval cache roots (overrides global *.log rule)
+!eval-dist-park-fire/run.log

@@ -1,0 +1,70 @@
+======================================================================
+DIST-S1 Validation: subsideo vs OPERA N.Am. Reference
+======================================================================
+  AOI        : Park Fire, California (2024)
+  MGRS tile  : 10TFK
+  Rel. orbit : 115
+  Post date  : 2024-08-05
+  BBox       : (-122.0, 39.5, -121.5, 40.2)
+  EPSG       : 32610
+  Period     : 2024-07-01 -> 2024-08-15
+  Output dir : eval-dist
+
+-- Stage 1: Authentication --
+  Earthdata auth : OK
+  ASF session    : OK
+
+-- Stage 2: Search OPERA DIST-S1 reference --
+  OPERA_L3_DIST-ALERT-S1_V1: 0 hit(s)
+  OPERA_L3_DIST-S1_V1: 0 hit(s)
+  OPERA_L3_DIST-ANN-S1_V1: 0 hit(s)
+  OPERA_L3_DIST_PROVISIONAL_V0: 0 hit(s)
+
+  !! OPERA DIST-S1 reference products NOT available in Earthdata/ASF DAAC
+  !! Proceeding with pipeline run only -- comparison deferred.
+
+-- Stage 3: Download reference COG + probe RTC availability --
+
+  Probing OPERA RTC-S1 input availability...
+  RTC-S1 products on T115: 29
+  RTC-S1 products across all tracks: 78
+
+-- Stage 4: dist_s1 input preparation --
+  Mode: Option A (dist_s1 auto-fetches RTC from ASF DAAC)
+  mgrs_tile_id=10TFK, post_date=2024-08-05, track=115
+
+-- Stage 5: DIST-S1 Pipeline --
+  Already present: eval-dist/dist_output/OPERA_L3_DIST-ALERT-S1_T10TFK_20240809T141544Z_20260415T174051Z_S1A_30_v0.1/OPERA_L3_DIST-ALERT-S1_T10TFK_20240809T141544Z_20260415T174051Z_S1A_30_v0.1_GEN-DIST-STATUS.tif
+  Size: 0.3 MB
+
+  DIST-S1 COG: eval-dist/dist_output/OPERA_L3_DIST-ALERT-S1_T10TFK_20240809T141544Z_20260415T174051Z_S1A_30_v0.1/OPERA_L3_DIST-ALERT-S1_T10TFK_20240809T141544Z_20260415T174051Z_S1A_30_v0.1_GEN-DIST-STATUS.tif
+
+-- Stage 6: Output Inspection --
+  shape : (3660, 3660)
+  CRS   : EPSG:32610
+  dtype : uint8
+  bounds: BoundingBox(left=600000.0, bottom=4390200.0, right=709800.0, top=4500000.0)
+
+  GEN-DIST-STATUS class histogram:
+      0 no disturbance           :    6,858,730  ( 51.20%)
+      1 first detection (prov.)  :      341,019  (  2.55%)
+      4 confirmed (prov low)     :      152,448  (  1.14%)
+    255 nodata                   :    6,043,403  ( 45.11%)
+
+-- Stage 7: Validation vs OPERA DIST-S1 --
+
+  ============================================================
+  OPERA DIST-S1 reference: NOT AVAILABLE
+  Verdict : STRUCTURALLY COMPLETE
+  ============================================================
+
+  The subsideo DIST-S1 pipeline ran end-to-end and produced a
+  valid COG output. Comparison against the OPERA reference is
+  deferred until DIST-S1 is published to NASA Earthdata (the
+  probe at Stage 2 found only HLS-based DIST products and the
+  DISP-S1 collection).
+
+  Our output: eval-dist/dist_output/OPERA_L3_DIST-ALERT-S1_T10TFK_20240809T141544Z_20260415T174051Z_S1A_30_v0.1/OPERA_L3_DIST-ALERT-S1_T10TFK_20240809T141544Z_20260415T174051Z_S1A_30_v0.1_GEN-DIST-STATUS.tif
+  Drop an OPERA DIST-S1 .tif in eval-dist/opera_reference and re-run this
+  script to perform the full comparison.
+  ============================================================

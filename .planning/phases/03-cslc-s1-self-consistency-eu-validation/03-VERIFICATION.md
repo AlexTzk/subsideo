@@ -6,7 +6,7 @@ verification_date: 2026-04-24
 re_verification: true
 previous_status: partial
 previous_score: "10/17 verified, 1 partial, 4 deferred-by-user-decision (pre-deferral baseline; the 03-VERIFICATION.md text-summary 12/17 conflated 'roadmap-track verified' rows with must-have rows — see Re-verification metadata below for the canonical recount)"
-status: human_needed
+status: passed
 must_haves_verified: 16
 must_haves_total: 18
 must_haves_partial: 1
@@ -47,12 +47,28 @@ human_verification:
   - test: "Decide whether to proceed to Phase 4 with two outstanding follow-ups deferred (Iberian fallback re-derivation; EGMS L2a third-number adapter)."
     expected: "User accepts deferred follow-ups as Phase 3 sign-off conditions OR schedules them as gap-closure work. CONCLUSIONS_CSLC_SELFCONSIST_EU.md §8 #1 + #2 list these explicitly."
     why_human: "Scope decision — neither follow-up is a Phase 3 contractual must-have; both are recommendations from the rollout."
-tags: [verification, post-deferral, human-sign-off, calibrating-rollout, methodology-consolidated]
+human_sign_off_completed:
+  date: 2026-04-29
+  aoi_assessments:
+    - aoi: "Mojave/Coso-Searles"
+      verdict: "scientifically convincing candidate-threshold PASS"
+      rationale: "Large stable-pixel sample, strong coherence, low residual velocity"
+    - aoi: "Iberian/Meseta-North"
+      verdict: "scientifically convincing candidate-threshold PASS"
+      rationale: "Large stable-pixel sample, strong coherence, low residual velocity"
+    - aoi: "SoCal"
+      verdict: "inconclusive — not PASS, not FAIL"
+      note: "486 valid CSLC pixels; gate statistic driven by ~12 persistently coherent pixels; sample too small for robust judgment; CALIBRATING verdict accepted"
+  png_inspection: "no bimodal P2.1 contamination detected; stable masks confirmed on actual stable terrain (bedrock + steppe)"
+  deferred_accepted:
+    - "Iberian Alentejo + MassifCentral fallback re-derivation (CONCLUSIONS EU §8 #1)"
+    - "EGMS L2a stable-PS residual third-number adapter (CONCLUSIONS EU §8 #2)"
+tags: [verification, post-deferral, human-sign-off-complete, calibrating-rollout, methodology-consolidated]
 ---
 
 # Phase 03 Verification — CSLC-S1 Self-Consistency + EU Validation
 
-## Status: human_needed (re-verification after compute landed)
+## Status: passed — human sign-off recorded 2026-04-29
 
 Phase 3 plans 03-01 through 03-05 are now all in a closed-loop state on disk:
 
@@ -295,7 +311,27 @@ Neither is a Phase 3 contractual must-have. Both are recommendations from the ro
 
 ---
 
-*This VERIFICATION.md re-verifies Phase 3 after the user-deferred Wave 2 Task 2 compute and Wave 3 methodology-doc work landed (commits f6d5492, 5e1dcc0, 5cef9dc, 9009189). The previous "What Was Done" section is preserved verbatim above; the "Post-deferral completion" section (top) documents the resolution of items 15, 16, 17, plus the two carryover/stale tests (#14 + #18). Status is `human_needed` because scientific-narrative sign-off and PNG inspection cannot be verified programmatically — no functional gaps remain.*
+## Human Sign-Off (2026-04-29)
 
-*Re-verified: 2026-04-24*
+Visual inspection of all 6 sanity artifacts (`coherence_histogram.png` + `stable_mask_over_basemap.png` for SoCal, Mojave/Coso-Searles, Iberian) and review of CONCLUSIONS_CSLC_SELFCONSIST_{NAM,EU}.md §5–§8 completed by domain expert.
+
+| AOI | Verdict | Notes |
+|-----|---------|-------|
+| Mojave/Coso-Searles | Scientifically convincing candidate-threshold PASS | Large stable-pixel sample, strong coherence, low residual velocity |
+| Iberian/Meseta-North | Scientifically convincing candidate-threshold PASS | Large stable-pixel sample, strong coherence, low residual velocity |
+| SoCal | Inconclusive — not PASS, not FAIL | 486 valid CSLC pixels; gate statistic driven by ~12 persistently coherent pixels. Sample too small to support a robust judgment. CALIBRATING verdict stands. |
+
+No bimodal P2.1 contamination detected in any histogram. Stable masks confirmed to fall on actual stable terrain. SoCal CALIBRATING verdict accepted — the 486-pixel limitation is the correct and honest characterization.
+
+Deferred follow-ups accepted as out-of-scope for Phase 3 closure:
+- Iberian Alentejo + MassifCentral burst re-derivation (CONCLUSIONS EU §8 #1)
+- EGMS L2a stable-PS residual third-number adapter (CONCLUSIONS EU §8 #2)
+
+Phase 3 closure complete.
+
+---
+
+*This VERIFICATION.md re-verifies Phase 3 after the user-deferred Wave 2 Task 2 compute and Wave 3 methodology-doc work landed (commits f6d5492, 5e1dcc0, 5cef9dc, 9009189). The previous "What Was Done" section is preserved verbatim above; the "Post-deferral completion" section documents the resolution of items 15, 16, 17, plus the two carryover/stale tests (#14 + #18). Human sign-off recorded 2026-04-29 — see §Human Sign-Off above.*
+
+*Re-verified: 2026-04-24 (compute); human sign-off: 2026-04-29*
 *Re-verifier: Claude (gsd-verifier subagent, post-deferral re-verification mode)*

@@ -47,7 +47,7 @@ cells:
     cache_dir: eval-cslc-selfconsist-eu
     metrics_file: eval-cslc-selfconsist-eu/metrics.json
     meta_file: eval-cslc-selfconsist-eu/meta.json
-    conclusions_doc: CONCLUSIONS_CSLC_EU.md
+    conclusions_doc: CONCLUSIONS_CSLC_SELFCONSIST_EU.md
 
   # --- DISP ---
   - product: disp

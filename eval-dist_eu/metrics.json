@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "product_quality": {
+    "measurements": {},
+    "criterion_ids": []
+  },
+  "reference_agreement": {
+    "measurements": {
+      "worst_f1": 0.0
+    },
+    "criterion_ids": [
+      "dist.f1_min",
+      "dist.accuracy_min"
+    ]
+  },
+  "criterion_ids_applied": [
+    "dist.f1_min",
+    "dist.accuracy_min"
+  ],
+  "runtime_conda_list_hash": null,
+  "pass_count": 0,
+  "total": 3,
+  "all_pass": false,
+  "cell_status": "FAIL",
+  "worst_event_id": "aveiro",
+  "worst_f1": 0.0,
+  "any_chained_run_failed": false,
+  "per_event": [
+    {
+      "event_id": "aveiro",
+      "status": "FAIL",
+      "f1": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "precision": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "recall": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "accuracy": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "rasterisation_diagnostic": {
+        "all_touched_false_f1": 0.0,
+        "all_touched_true_f1": 0.0,
+        "delta_f1": 0.0
+      },
+      "bootstrap_config": {
+        "block_size_m": 1000,
+        "n_bootstrap": 500,
+        "ci_level": 0.95,
+        "n_blocks_kept": 0,
+        "n_blocks_dropped": 0,
+        "rng_seed": 0
+      },
+      "effis_query_meta": {
+        "wfs_endpoint": "",
+        "layer_name": "",
+        "filter_string": "",
+        "response_feature_count": 0,
+        "fetched_at": "2026-04-26T04:09:38.921881+00:00"
+      },
+      "chained_run": null,
+      "error": "RuntimeError('dist_s1 produced no GEN-DIST-STATUS.tif under eval-dist_eu/aveiro/dist_output for aveiro 2024-09-28')",
+      "traceback": "Traceback (most recent call last):\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_dist_eu.py\", line 476, in <module>\n    row = process_event(cfg)\n          ^^^^^^^^^^^^^^^^^^\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_dist_eu.py\", line 363, in process_event\n    raise RuntimeError(\nRuntimeError: dist_s1 produced no GEN-DIST-STATUS.tif under eval-dist_eu/aveiro/dist_output for aveiro 2024-09-28\n"
+    },
+    {
+      "event_id": "evros",
+      "status": "FAIL",
+      "f1": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "precision": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "recall": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "accuracy": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "rasterisation_diagnostic": {
+        "all_touched_false_f1": 0.0,
+        "all_touched_true_f1": 0.0,
+        "delta_f1": 0.0
+      },
+      "bootstrap_config": {
+        "block_size_m": 1000,
+        "n_bootstrap": 500,
+        "ci_level": 0.95,
+        "n_blocks_kept": 0,
+        "n_blocks_dropped": 0,
+        "rng_seed": 0
+      },
+      "effis_query_meta": {
+        "wfs_endpoint": "",
+        "layer_name": "",
+        "filter_string": "",
+        "response_feature_count": 0,
+        "fetched_at": "2026-04-26T04:09:38.921881+00:00"
+      },
+      "chained_run": null,
+      "error": "RuntimeError('dist_s1 produced no GEN-DIST-STATUS.tif under eval-dist_eu/evros/dist_output for evros 2023-09-05')",
+      "traceback": "Traceback (most recent call last):\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_dist_eu.py\", line 476, in <module>\n    row = process_event(cfg)\n          ^^^^^^^^^^^^^^^^^^\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_dist_eu.py\", line 363, in process_event\n    raise RuntimeError(\nRuntimeError: dist_s1 produced no GEN-DIST-STATUS.tif under eval-dist_eu/evros/dist_output for evros 2023-09-05\n"
+    },
+    {
+      "event_id": "spain_culebra",
+      "status": "FAIL",
+      "f1": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "precision": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "recall": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "accuracy": {
+        "point": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "rasterisation_diagnostic": {
+        "all_touched_false_f1": 0.0,
+        "all_touched_true_f1": 0.0,
+        "delta_f1": 0.0
+      },
+      "bootstrap_config": {
+        "block_size_m": 1000,
+        "n_bootstrap": 500,
+        "ci_level": 0.95,
+        "n_blocks_kept": 0,
+        "n_blocks_dropped": 0,
+        "rng_seed": 0
+      },
+      "effis_query_meta": {
+        "wfs_endpoint": "",
+        "layer_name": "",
+        "filter_string": "",
+        "response_feature_count": 0,
+        "fetched_at": "2026-04-26T04:09:38.921881+00:00"
+      },
+      "chained_run": null,
+      "error": "ValueError('Mismatch - no LUT data found for MGRS tile ids 29TQG and track numbers 125. Available track numbers for tile 29TQG are 1, 52, 74, 147, 154.')",
+      "traceback": "Traceback (most recent call last):\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_dist_eu.py\", line 476, in <module>\n    row = process_event(cfg)\n          ^^^^^^^^^^^^^^^^^^\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_dist_eu.py\", line 359, in process_event\n    _run_dist_for_event_post(cfg, primary_post, primary_dist_dir, prior_product=None)\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_dist_eu.py\", line 282, in _run_dist_for_event_post\n    run_dist_s1_workflow(\n  File \"/Users/alex/.local/share/mamba/envs/subsideo/lib/python3.12/site-packages/dist_s1/workflows.py\", line 632, in run_dist_s1_workflow\n    run_config = run_dist_s1_sas_prep_workflow(\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/alex/.local/share/mamba/envs/subsideo/lib/python3.12/site-packages/dist_s1/workflows.py\", line 515, in run_dist_s1_sas_prep_workflow\n    run_config = run_dist_s1_localization_workflow(\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/alex/.local/share/mamba/envs/subsideo/lib/python3.12/site-packages/dist_s1/workflows.py\", line 146, in run_dist_s1_localization_workflow\n    run_config = localize_rtc_s1(\n                 ^^^^^^^^^^^^^^^^\n  File \"/Users/alex/.local/share/mamba/envs/subsideo/lib/python3.12/site-packages/dist_s1/localize_rtc_s1.py\", line 100, in localize_rtc_s1\n    df_product = enumerate_one_dist_s1_product(\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/alex/.local/share/mamba/envs/subsideo/lib/python3.12/site-packages/dist_s1_enumerator/dist_enum.py\", line 112, in enumerate_one_dist_s1_product\n    df_rtc_post = get_rtc_s1_metadata_from_acq_group(\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/alex/.local/share/mamba/envs/subsideo/lib/python3.12/site-packages/dist_s1_enumerator/asf.py\", line 271, in get_rtc_s1_metadata_from_acq_group\n    burst_ids = get_burst_ids_in_mgrs_tiles(mgrs_tile_ids, track_numbers=track_numbers)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/alex/.local/share/mamba/envs/subsideo/lib/python3.12/site-packages/dist_s1_enumerator/mgrs_burst_data.py\", line 132, in get_burst_ids_in_mgrs_tiles\n    raise ValueError(\nValueError: Mismatch - no LUT data found for MGRS tile ids 29TQG and track numbers 125. Available track numbers for tile 29TQG are 1, 52, 74, 147, 154.\n"
+    }
+  ]
+}
