@@ -245,6 +245,24 @@ dataclass prevents the M6 perpetual-CALIBRATING anti-pattern: at v1.2 start,
 `make eval-all` refuses to run unless every CALIBRATING gate either flips to
 BINDING or has an ADR documenting why the calibration window extends.
 
+### CSLC v1.2 binding proposal (Phase 8)
+
+Phase 8 proposes promoting CSLC self-consistency with the same gate metric,
+`median_of_persistent`, rather than swapping metrics to fit the observed rows.
+The Phase 9 candidate threshold is coherence `>= 0.75`, paired with a
+stable-terrain residual threshold `<= 2.0 mm/yr`. Those thresholds remain
+product-quality gates: they measure internal phase stability and residual
+velocity over stable terrain, while OPERA amplitude sanity and any external
+reference comparison stay in the separate reference-agreement category.
+
+The proposal is conservative relative to the v1.1 calibration points:
+SoCal `median_of_persistent=0.887` and residual `-0.109 mm/yr`,
+Mojave/Coso-Searles `0.804` and `+1.127 mm/yr`, and Iberian Meseta-North
+`0.868` and `+0.347 mm/yr`. Phase 8 records the candidate threshold and
+hardens the inputs; Phase 9 performs the final reruns and either promotes,
+narrows, or blocks the BINDING gate based on regenerated AOI windows and
+stable-mask diagnostics.
+
 ### 2.6 Cross-reference to other sections
 
 | Distinction aspect | Future section (deferred per D-15) |
