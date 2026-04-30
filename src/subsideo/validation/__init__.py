@@ -17,6 +17,7 @@ from subsideo.validation.harness import (
     ensure_resume_safe,
     find_cached_safe,
     select_opera_frame_by_utc_hour,
+    validate_safe_path,
 )
 from subsideo.validation.matrix_schema import (
     MetaJson,
@@ -60,5 +61,6 @@ __all__ = [
     "measurement_key",
     "residual_mean_velocity",
     "select_opera_frame_by_utc_hour",
+    "validate_safe_path",
     "write_matrix",
 ]

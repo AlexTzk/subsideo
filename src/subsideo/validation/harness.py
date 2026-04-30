@@ -31,7 +31,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import time
+import zipfile
 from collections.abc import Sequence
 from datetime import datetime
 from importlib.resources import files as _pkg_files
@@ -464,6 +466,8 @@ def ensure_resume_safe(
 def find_cached_safe(
     granule_id: str,
     search_dirs: Sequence[Path],
+    *,
+    require_valid: bool = True,
 ) -> Path | None:
     """Return the first S1 SAFE path matching ``granule_id`` across ``search_dirs``.
 
@@ -493,6 +497,11 @@ def find_cached_safe(
         eval-dist-eu-nov15/input]``. Missing or unreadable directories
         are silently skipped (warn-logged, never raised).
 
+    require_valid : bool, default True
+        Validate matching ``*.zip`` / ``*.SAFE`` candidates before returning
+        them. Invalid candidates are skipped so later search directories can
+        self-heal interrupted cache reuse.
+
     Returns
     -------
     Path | None
@@ -506,6 +515,9 @@ def find_cached_safe(
         try:
             for p in sorted(d.iterdir()):
                 if granule_id in p.stem:
+                    if require_valid and not validate_safe_path(p):
+                        logger.warning("find_cached_safe skipping invalid SAFE cache hit: {}", p)
+                        continue
                     logger.debug(
                         "find_cached_safe hit: granule_id={} path={}", granule_id, p
                     )
@@ -514,6 +526,67 @@ def find_cached_safe(
             logger.warning("find_cached_safe: cannot read {}: {}", d, e)
             continue
     return None
+
+
+def validate_safe_path(path: Path, *, remove_invalid: bool = False) -> bool:
+    """Return True when ``path`` looks like a readable Sentinel-1 SAFE input.
+
+    Supports both ASF ``*.zip`` archives and CDSE-style ``*.SAFE`` directories.
+    This is an integrity guard for interrupted downloads; it does not attempt
+    full product validation.
+    """
+    path = Path(path)
+    valid = False
+    reason = ""
+
+    if not path.exists():
+        reason = "path does not exist"
+    elif path.suffix == ".zip":
+        try:
+            with zipfile.ZipFile(path) as zf:
+                names = zf.namelist()
+            has_safe_root = any(".SAFE/" in name or name.endswith(".SAFE/") for name in names)
+            has_required_member = any(
+                "manifest.safe" in name or "/measurement/" in name or "/annotation/" in name
+                for name in names
+            )
+            valid = has_safe_root and has_required_member
+            if not valid:
+                reason = "zip lacks .SAFE root or required manifest/measurement/annotation member"
+        except zipfile.BadZipFile:
+            reason = "bad zip file"
+        except OSError as exc:
+            reason = f"zip unreadable: {exc}"
+    elif path.suffix == ".SAFE" or path.is_dir():
+        manifest = path / "manifest.safe"
+        roots = [path / "measurement", path / "annotation"]
+        has_payload = False
+        for root in roots:
+            if not root.exists() or not root.is_dir():
+                continue
+            try:
+                has_payload = any(p.is_file() and p.stat().st_size > 0 for p in root.rglob("*"))
+            except OSError:
+                has_payload = False
+            if has_payload:
+                break
+        valid = manifest.exists() and has_payload
+        if not valid:
+            reason = "SAFE directory lacks manifest.safe or non-empty measurement/annotation file"
+    else:
+        reason = "path is neither .zip nor .SAFE directory"
+
+    if not valid:
+        logger.warning("Invalid SAFE path {}: {}", path, reason)
+        if remove_invalid:
+            try:
+                if path.is_file():
+                    path.unlink()
+                elif path.suffix == ".SAFE" and path.is_dir():
+                    shutil.rmtree(path)
+            except OSError as exc:
+                logger.warning("Could not remove invalid SAFE path {}: {}", path, exc)
+    return valid
 
 
 # ----------------------------------------------------------------------------
