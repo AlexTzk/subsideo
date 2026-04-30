@@ -539,6 +539,7 @@ if __name__ == "__main__":
         transform: object,
         crs: object,
         out_dir: Path,
+        stable_mask_diagnostics: dict[str, object] | None = None,
     ) -> None:
         """Write P2.1 stable-mask sanity artifacts for one AOI.
 
@@ -616,6 +617,8 @@ if __name__ == "__main__":
             "bounding_box": "derived_from_burst_bounds",
             "regime": "from_AOIConfig",
         }
+        if stable_mask_diagnostics:
+            metadata.update(stable_mask_diagnostics)
         (out_dir / "mask_metadata.json").write_text(
             json_mod.dumps(metadata, indent=2)
         )
@@ -855,6 +858,40 @@ if __name__ == "__main__":
             water_buffer_m=500.0,
             slope_max_deg=10.0,
         )
+        stable_mask_class60_count = int((wc_on_dem == 60).sum())
+        stable_mask_slope_ok_count = int(np.isfinite(slope_deg).sum())
+        stable_mask_no_buffers = build_stable_mask(
+            wc_on_dem,
+            slope_deg,
+            transform=dem_transform,
+            crs=dem_crs,
+            slope_max_deg=10.0,
+        )
+        stable_mask_coast_only = build_stable_mask(
+            wc_on_dem,
+            slope_deg,
+            coast,
+            None,
+            transform=dem_transform,
+            crs=dem_crs,
+            coast_buffer_m=5000.0,
+            slope_max_deg=10.0,
+        )
+        stable_mask_diagnostics: dict[str, object] = {
+            "stable_mask_class60_count": stable_mask_class60_count,
+            "stable_mask_slope_ok_count": stable_mask_slope_ok_count,
+            "stable_mask_coast_excluded_count": int(
+                stable_mask_no_buffers.sum() - stable_mask_coast_only.sum()
+            ),
+            "stable_mask_water_excluded_count": int(
+                stable_mask_coast_only.sum() - stable_mask.sum()
+            ),
+            "stable_mask_final_count": int(stable_mask.sum()),
+            "stable_mask_retention_pct": float(
+                int(stable_mask.sum()) / max(stable_mask_class60_count, 1)
+            ),
+            "stable_mask_buffer_crs": str(dem_crs),
+        }
         n_stable = int(stable_mask.sum())
         if n_stable < 1000:
             raise RuntimeError(
@@ -1054,6 +1091,7 @@ if __name__ == "__main__":
             transform=cslc_transform,
             crs=cslc_crs,
             out_dir=CACHE / "sanity" / cfg.aoi_name,
+            stable_mask_diagnostics=stable_mask_diagnostics,
         )
 
         # 10. Build AOIResult -- CALIBRATING per D-03 first-rollout
