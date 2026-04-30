@@ -2,7 +2,7 @@
 #
 # Phase 3 (v1.1) deliverable. Proves CSLC self-consistency across 15-epoch
 # SoCal stack (CSLC-03 calibration anchor) + Mojave fallback-chain (CSLC-04
-# first-PASS/CALIBRATING wins; BLOCKER on exhaustion of all 4 fallbacks).
+# first-PASS/CALIBRATING wins; BLOCKER on exhaustion of accepted fallbacks).
 #
 # Produces one cell-level eval-cslc-selfconsist-nam/metrics.json
 # (CSLCSelfConsistNAMCellMetrics) + per-AOI P2.1 sanity artifacts.
@@ -198,18 +198,17 @@ if __name__ == "__main__":
         run_amplitude_sanity=True,  # SoCal runs D-07 amplitude sanity on first epoch
     )
 
-    # Per-AOI 15-epoch sensing windows (locked from Plan 03-02 probe artifact;
+    # Per-AOI 15-epoch sensing windows (locked from
+    # .planning/milestones/v1.2-research/cslc_gate_promotion_aoi_candidates.md;
     # section anchors MOJAVE_COSO_EPOCHS / MOJAVE_PAHRANAGAT_EPOCHS / etc.).
     # BLOCKER 1 fix: every Mojave fallback uses a 15-epoch stack in the same
     # shape as SoCal — compute_residual_velocity requires >=3 epochs;
     # compute_ifg_coherence_stack requires >=2 epochs. The fallback policy
     # (CONTEXT D-11) picks WHICH burst; it does not relax the stack shape.
 
-    # All four tuples below were regenerated via asf.search on 2026-04-24
-    # (the original probe had fabricated dates / mixed tracks / synthetic
-    # placeholders). Each tuple is the last 15 real acquisitions for that
-    # specific track/burst through 2024-06-30, extending back into late 2023
-    # where H1 2024 alone had fewer than 15 acquisitions.
+    # Phase 8 regenerated these AOIs via live ASF search. Hualapai was rejected
+    # in the v1.2 artifact because H1 2024 returned only 14 unique S1A dates,
+    # so it is not wired into the runnable fallback chain.
 
     # ### MOJAVE_COSO_EPOCHS — Mojave/Coso-Searles (track 064)
     MOJAVE_COSO_EPOCHS: tuple[datetime, ...] = (
@@ -268,30 +267,11 @@ if __name__ == "__main__":
         datetime(2024, 6, 19, 1, 51, 10),
     )
 
-    # ### MOJAVE_HUALAPAI_EPOCHS — Mojave/Hualapai (track 100)
-    MOJAVE_HUALAPAI_EPOCHS: tuple[datetime, ...] = (
-        datetime(2023, 12, 24, 13, 35, 57),
-        datetime(2024, 1, 5, 13, 35, 57),
-        datetime(2024, 1, 17, 13, 35, 56),
-        datetime(2024, 1, 29, 13, 35, 56),
-        datetime(2024, 2, 10, 13, 35, 55),
-        datetime(2024, 2, 22, 13, 35, 55),
-        datetime(2024, 3, 5, 13, 35, 55),
-        datetime(2024, 3, 17, 13, 35, 56),
-        datetime(2024, 3, 29, 13, 35, 56),
-        datetime(2024, 4, 10, 13, 35, 55),
-        datetime(2024, 4, 22, 13, 35, 56),
-        datetime(2024, 5, 4, 13, 35, 57),
-        datetime(2024, 5, 28, 13, 35, 57),
-        datetime(2024, 6, 9, 13, 35, 56),
-        datetime(2024, 6, 21, 13, 35, 56),
-    )
-
     # Mojave fallback chain — probe-locked order (D-11, highest score first):
     # Attempt 1: Coso/Searles (score 302.40)
     # Attempt 2: Pahranagat   (score 135.30)
     # Attempt 3: Amargosa     (score 224.75)
-    # Attempt 4: Hualapai     (score 141.20; SYNTHETIC FALLBACK)
+    # Rejected: Hualapai (ASF returned 14/15 unique dates; see v1.2 artifact)
     _MOJAVE_FALLBACKS: tuple[AOIConfig, ...] = (
         AOIConfig(
             aoi_name="Mojave/Coso-Searles",
@@ -318,15 +298,6 @@ if __name__ == "__main__":
             sensing_window=MOJAVE_AMARGOSA_EPOCHS,
             output_epsg=32611,    # UTM 11N
             centroid_lat=36.47,
-            cached_safe_search_dirs=(Path("eval-cslc-selfconsist-nam/input"),),
-        ),
-        AOIConfig(
-            aoi_name="Mojave/Hualapai",
-            regime="plateau-bedrock",
-            burst_id="t100_213507_iw2",
-            sensing_window=MOJAVE_HUALAPAI_EPOCHS,
-            output_epsg=32612,    # UTM 12N (different zone)
-            centroid_lat=35.70,
             cached_safe_search_dirs=(Path("eval-cslc-selfconsist-nam/input"),),
         ),
     )

@@ -108,7 +108,7 @@ def test_supervisor_can_parse_expected_wall_s() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 2: single-AOI AOIS list + IberianAOI fallback_chain has 2 entries
+# Test 2: single-AOI AOIS list + v1.2 artifact-backed fallback policy
 # ---------------------------------------------------------------------------
 
 
@@ -136,11 +136,12 @@ def test_single_aoi_list(script_src: str, script_ast: ast.Module) -> None:
     assert found_aois, "AOIS assignment not found in script"
 
 
-def test_iberian_aoi_fallback_chain_two_entries(script_src: str) -> None:
-    """IberianAOI.fallback_chain structure: Alentejo and MassifCentral defined."""
-    assert "Alentejo" in script_src, "Iberian/Alentejo missing from script"
-    assert "MassifCentral" in script_src, "Iberian/MassifCentral missing from script"
-    assert "_IBERIAN_FALLBACKS" in script_src, "_IBERIAN_FALLBACKS not defined"
+def test_iberian_fallback_policy_references_v12_artifact(script_src: str) -> None:
+    """Phase 8 keeps only artifact-backed EU fallback policy in comments."""
+    assert "cslc_gate_promotion_aoi_candidates.md" in script_src
+    assert "Ebro Basin" in script_src
+    assert "La Mancha" in script_src
+    assert "_IBERIAN_FALLBACKS" not in script_src
 
 
 # ---------------------------------------------------------------------------
@@ -328,27 +329,16 @@ def test_env07_diff_discipline() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 8: fallback chain two-entry logic
+# Test 8: fallback-chain policy
 # ---------------------------------------------------------------------------
 
 
-def test_iberian_fallback_chain_two_candidates(script_src: str) -> None:
-    """Iberian fallback chain must have exactly 2 candidates (Alentejo, MassifCentral)."""
-    assert "Iberian/Alentejo" in script_src or "Alentejo" in script_src
-    assert "Iberian/MassifCentral" in script_src or "MassifCentral" in script_src
-
-    # Parse AST to count elements in _IBERIAN_FALLBACKS tuple
-    tree = ast.parse(script_src)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            for tgt in node.targets:
-                if isinstance(tgt, ast.Name) and tgt.id == "_IBERIAN_FALLBACKS":
-                    val = node.value
-                    if isinstance(val, (ast.Tuple, ast.List)):
-                        assert len(val.elts) == 2, (
-                            f"_IBERIAN_FALLBACKS must have 2 entries "
-                            f"(Alentejo + MassifCentral), got {len(val.elts)}"
-                        )
+def test_no_invalid_v11_eu_fallback_bursts_remain(script_src: str) -> None:
+    """Stale v1.1 Alentejo/MassifCentral burst IDs must not remain wired."""
+    assert "t008_016940_iw2" not in script_src
+    assert "t131_279647_iw2" not in script_src
+    assert "Iberian/Alentejo" not in script_src
+    assert "Iberian/MassifCentral" not in script_src
 
 
 def test_fallback_chain_uses_process_aoi_recursion(script_src: str) -> None:
@@ -388,20 +378,17 @@ def test_iberian_burst_id(script_src: str) -> None:
     )
 
 
-def test_all_three_epoch_tuples_present(script_src: str) -> None:
-    """IBERIAN_PRIMARY/ALENTEJO/MASSIF_CENTRAL_EPOCHS all present."""
+def test_iberian_primary_epoch_tuple_present(script_src: str) -> None:
+    """Only the executable Iberian primary epoch tuple remains wired."""
     assert "IBERIAN_PRIMARY_EPOCHS" in script_src
-    assert "IBERIAN_ALENTEJO_EPOCHS" in script_src
-    assert "IBERIAN_MASSIF_CENTRAL_EPOCHS" in script_src
+    assert "IBERIAN_ALENTEJO_EPOCHS" not in script_src
+    assert "IBERIAN_MASSIF_CENTRAL_EPOCHS" not in script_src
 
 
-def test_all_run_amplitude_sanity_true(script_src: str) -> None:
-    """All 3 EU AOIConfig entries must set run_amplitude_sanity=True."""
+def test_primary_run_amplitude_sanity_true(script_src: str) -> None:
+    """The executable EU primary AOI must set run_amplitude_sanity=True."""
     count = script_src.count("run_amplitude_sanity=True")
-    assert count == 3, (
-        f"Expected 3 occurrences of run_amplitude_sanity=True "
-        f"(Iberian + Alentejo + MassifCentral), got {count}"
-    )
+    assert count == 1, f"Expected primary-only run_amplitude_sanity=True, got {count}"
 
 
 def test_cslc_eu_metrics_class(script_src: str) -> None:

@@ -11,7 +11,9 @@
 #
 # Orchestration:
 #   - Declarative AOIS: list[AOIConfig] = [IberianAOI] (D-05)
-#   - IberianAOI.fallback_chain = (Alentejo, MassifCentral) from probe artifact
+#   - IberianAOI runs as the executable primary path; Phase 8 artifact names
+#     Ebro Basin and La Mancha as acquisition-backed EU fallback AOIs pending
+#     burst-id derivation before they are wired into fallback_chain
 #   - Per-AOI try/except isolation (D-06)
 #   - Per-burst whole-pipeline skip + per-stage ensure_resume_safe (D-08)
 #   - Cached-SAFE reuse via harness.find_cached_safe (D-02)
@@ -24,9 +26,8 @@
 #   Warm re-run: <= 5 min (all CSLCs + EGMS CSVs cached).
 import warnings; warnings.filterwarnings("ignore")  # noqa: E702, I001
 
-# Iberian 15-epoch SoCal-style stack + 2-candidate fallback-chain
-# (worst-case 2 x 12 h) + EGMStoolkit L2a download + per-stage
-# ensure_resume_safe + supervisor 2x margin. Warm re-run <= 5 min.
+# Iberian 15-epoch SoCal-style stack + EGMStoolkit L2a download + per-stage
+# ensure_resume_safe + supervisor margin. Warm re-run <= 5 min.
 EXPECTED_WALL_S = 60 * 60 * 14   # 50400s (CONTEXT D-Claude's-Discretion EU budget)
 
 
@@ -91,7 +92,7 @@ if __name__ == "__main__":
     class AOIConfig:
         """Per-AOI declarative config for run_eval_cslc_selfconsist_eu.AOIS (D-05)."""
 
-        aoi_name: str                          # "Iberian" | "Iberian/Alentejo" | etc.
+        aoi_name: str                          # "Iberian" or a future artifact-backed fallback
         regime: str                            # e.g. "iberian-meseta-sparse-vegetation"
         burst_id: str                          # JPL lowercase; "" for parent rows
         sensing_window: tuple                  # tuple[datetime, ...] -- 15 entries per leaf
@@ -105,12 +106,13 @@ if __name__ == "__main__":
         # -- so the EU fork sets True on all Iberian AOIs without editing the conditional.
         run_amplitude_sanity: bool = False
 
-    # AOIS -- locked from .planning/milestones/v1.1-research/cslc_selfconsist_aoi_candidates.md
-    # (Plan 03-02 user-approved 2026-04-24).
+    # AOIS -- refreshed against
+    # .planning/milestones/v1.2-research/cslc_gate_promotion_aoi_candidates.md.
 
-    # BLOCKER 3 cross-reference: per-AOI epoch tuples sourced from the probe
-    # artifact sections `### IBERIAN_PRIMARY_EPOCHS`, `### IBERIAN_ALENTEJO_EPOCHS`,
-    # `### IBERIAN_MASSIF_CENTRAL_EPOCHS`. 15 concrete datetime literals per tuple.
+    # BLOCKER 3 cross-reference: the primary epoch tuple is sourced from the
+    # refreshed artifact's `### Iberian Meseta-North` section. The artifact also
+    # accepts Ebro Basin and La Mancha as EU fallback AOIs, but their burst IDs
+    # must be derived from the EU burst DB before they can be safely wired here.
     # The IBERIAN_EPOCHS alias below (= IBERIAN_PRIMARY_EPOCHS) is kept for readability.
     # 15-epoch Meseta-North sensing window for burst t103_219329_iw1.
     # Verified via ASF search on 2026-04-24 (the 03-02 probe emitted multi-
@@ -136,84 +138,16 @@ if __name__ == "__main__":
         datetime(2024, 6, 21, 18, 3, 19),
     )
 
-    IBERIAN_ALENTEJO_EPOCHS: tuple[datetime, ...] = (
-        # Copy-pasted verbatim from `### IBERIAN_ALENTEJO_EPOCHS -- Iberian/Alentejo`.
-        datetime(2024, 1, 1, 18, 35, 22),
-        datetime(2024, 1, 2, 6, 35, 22),
-        datetime(2024, 1, 7, 6, 43, 36),
-        datetime(2024, 1, 8, 18, 27, 21),
-        datetime(2024, 1, 13, 18, 35, 22),
-        datetime(2024, 1, 14, 6, 35, 22),
-        datetime(2024, 1, 19, 6, 43, 35),
-        datetime(2024, 1, 20, 18, 27, 20),
-        datetime(2024, 1, 25, 18, 35, 22),
-        datetime(2024, 1, 26, 6, 35, 22),
-        datetime(2024, 1, 31, 6, 43, 35),
-        datetime(2024, 2, 1, 18, 27, 20),
-        datetime(2024, 2, 6, 18, 35, 21),
-        datetime(2024, 2, 7, 6, 35, 21),
-        datetime(2024, 2, 12, 6, 43, 35),
-    )
-
-    IBERIAN_MASSIF_CENTRAL_EPOCHS: tuple[datetime, ...] = (
-        # Copy-pasted verbatim from `### IBERIAN_MASSIF_CENTRAL_EPOCHS -- Iberian/MassifCentral`.
-        datetime(2024, 1, 1, 5, 52, 18),
-        datetime(2024, 1, 2, 17, 40, 2),
-        datetime(2024, 1, 6, 6, 0, 27),
-        datetime(2024, 1, 9, 17, 31, 55),
-        datetime(2024, 1, 13, 5, 52, 17),
-        datetime(2024, 1, 14, 17, 40, 1),
-        datetime(2024, 1, 18, 6, 0, 26),
-        datetime(2024, 1, 21, 17, 31, 55),
-        datetime(2024, 1, 25, 5, 52, 17),
-        datetime(2024, 1, 26, 17, 40, 1),
-        datetime(2024, 1, 30, 6, 0, 26),
-        datetime(2024, 2, 2, 17, 31, 54),
-        datetime(2024, 2, 6, 5, 52, 17),
-        datetime(2024, 2, 7, 17, 40, 0),
-        datetime(2024, 2, 11, 6, 0, 25),
-    )
-
     # Alias for the primary burst (used in IberianAOI below). Each fallback binds
-    # its OWN per-AOI window -- Alentejo and Massif Central have different S1A
-    # relative orbits than the Meseta primary, so their 15-epoch lists differ.
+    # its own per-AOI window once future work derives safe EU burst IDs.
     IBERIAN_EPOCHS = IBERIAN_PRIMARY_EPOCHS
 
-    # EU burst DB note: Alentejo and MassifCentral burst_ids are derived at eval
-    # time using opera_utils.burst_frame_db.get_burst_id_geojson() over the bbox
-    # centroid per probe artifact guidance (section "Note on EU burst_id"). The
-    # values below are the probe-artifact-locked candidates pending user confirmation.
-    _IBERIAN_FALLBACKS = (
-        AOIConfig(
-            aoi_name="Iberian/Alentejo",
-            regime="interior-portugal-plateau",
-            burst_id="t008_016940_iw2",   # EU burst DB derivation at eval time (probe artifact)
-            sensing_window=IBERIAN_ALENTEJO_EPOCHS,
-            output_epsg=32629,
-            centroid_lat=38.55,
-            cached_safe_search_dirs=(Path("eval-cslc-selfconsist-eu/input"),),
-            run_amplitude_sanity=True,   # EU AOIs run D-07 amplitude sanity
-        ),
-        AOIConfig(
-            aoi_name="Iberian/MassifCentral",
-            regime="massif-central-plateau",
-            burst_id="t131_279647_iw2",   # EU burst DB derivation at eval time (probe artifact)
-            sensing_window=IBERIAN_MASSIF_CENTRAL_EPOCHS,
-            output_epsg=32631,
-            centroid_lat=45.15,
-            cached_safe_search_dirs=(Path("eval-cslc-selfconsist-eu/input"),),
-            run_amplitude_sanity=True,
-        ),
-    )
-
     # Minimum-viable EU path (03-04 Task 2): only the Meseta-North primary
-    # runs. The probe-artifact fallback bursts t008_016940_iw2 (supposed to
-    # be Alentejo but actually in New Zealand, EPSG 32760) and
-    # t131_279647_iw2 (supposed to be Massif Central but actually in Arctic
-    # Norway, EPSG 32633) were misbound in the 03-02 probe. Deriving real
-    # Alentejo + Massif Central bursts is deferred to a follow-up. The
-    # fallback_chain=() below makes IberianAOI run as a leaf with the real
-    # (verified) Meseta-North burst t103_219329_iw1 (EPSG 32630).
+    # runs. Phase 8 rejected the stale Alentejo and Massif Central v1.1 rows
+    # and accepted Ebro Basin + La Mancha as acquisition-backed fallback AOIs,
+    # but those rows still need EU burst DB derivation before use. The
+    # fallback_chain=() below keeps IberianAOI as a leaf with the real
+    # Meseta-North burst t103_219329_iw1 (EPSG 32630).
     IberianAOI = AOIConfig(
         aoi_name="Iberian",
         regime="iberian-meseta-sparse-vegetation",
