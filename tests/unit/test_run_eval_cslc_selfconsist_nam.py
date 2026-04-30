@@ -25,8 +25,8 @@ PROBE_PATH = (
     Path(__file__).resolve().parents[2]
     / ".planning"
     / "milestones"
-    / "v1.1-research"
-    / "cslc_selfconsist_aoi_candidates.md"
+    / "v1.2-research"
+    / "cslc_gate_promotion_aoi_candidates.md"
 )
 
 
@@ -207,21 +207,26 @@ def _parse_probe_fallback_order(probe_path: Path) -> list[str]:
 
 
 def test_mojave_fallback_chain_order(script_src: str) -> None:
-    """T-4: Mojave fallback_chain tuple has 4 elements in probe-locked order.
+    """T-4: Mojave fallback_chain follows the v1.2 acquisition-backed artifact.
 
-    Expected order: Coso/Searles → Pahranagat → Amargosa → Hualapai (D-11).
-    The test reads the probe artifact to get the expected order (not a hard-coded list),
-    so a user revision in 03-02 propagates cleanly.
+    Hualapai is intentionally excluded after Phase 8 because the regenerated
+    artifact found only 14 unique S1A dates, below the 15-epoch requirement.
     """
     # Verify fallback_chain exists
     assert "fallback_chain" in script_src, "fallback_chain not found in script"
 
-    # Verify the four candidate AOIs are present
-    expected_names = ["Mojave/Coso-Searles", "Mojave/Pahranagat", "Mojave/Amargosa", "Mojave/Hualapai"]
+    artifact_src = PROBE_PATH.read_text()
+
+    # Verify the acquisition-backed candidate AOIs are present
+    expected_names = [
+        "Mojave/Coso-Searles",
+        "Mojave/Pahranagat",
+        "Mojave/Amargosa",
+    ]
     for name in expected_names:
         assert name in script_src, f"AOI name '{name}' not found in script"
 
-    # Verify ordering: Coso appears before Pahranagat before Amargosa before Hualapai
+    # Verify ordering: Coso appears before Pahranagat before Amargosa
     positions = {name: script_src.index(f'aoi_name="{name}"') for name in expected_names}
     assert positions["Mojave/Coso-Searles"] < positions["Mojave/Pahranagat"], (
         "Coso must appear before Pahranagat in fallback_chain"
@@ -229,15 +234,14 @@ def test_mojave_fallback_chain_order(script_src: str) -> None:
     assert positions["Mojave/Pahranagat"] < positions["Mojave/Amargosa"], (
         "Pahranagat must appear before Amargosa in fallback_chain"
     )
-    assert positions["Mojave/Amargosa"] < positions["Mojave/Hualapai"], (
-        "Amargosa must appear before Hualapai in fallback_chain"
-    )
 
     # Verify burst IDs from probe artifact
     assert "t064_135527_iw2" in script_src, "Coso burst_id t064_135527_iw2 not found"
     assert "t173_370296_iw2" in script_src, "Pahranagat burst_id t173_370296_iw2 not found"
     assert "t064_135530_iw3" in script_src, "Amargosa burst_id t064_135530_iw3 not found"
-    assert "t100_213507_iw2" in script_src, "Hualapai burst_id t100_213507_iw2 not found"
+    assert "Mojave/Hualapai" not in script_src
+    assert "Mojave/Hualapai" in artifact_src
+    assert "insufficient acquisition-backed sensing window" in artifact_src
 
 
 # ---------------------------------------------------------------------------
@@ -698,13 +702,12 @@ def test_sanity_artifact_paths_exist_after_socal_success(
 
 
 def test_all_mojave_epochs_have_15_entries(script_src: str) -> None:
-    """All MOJAVE_*_EPOCHS tuples must have exactly 15 datetime entries (BLOCKER 1)."""
+    """All accepted v1.2 MOJAVE_*_EPOCHS tuples have exactly 15 entries."""
     import re
     for name in (
         "MOJAVE_COSO_EPOCHS",
         "MOJAVE_PAHRANAGAT_EPOCHS",
         "MOJAVE_AMARGOSA_EPOCHS",
-        "MOJAVE_HUALAPAI_EPOCHS",
     ):
         m = re.search(
             rf"{name}\s*:\s*tuple\[datetime,\s*\.\.\.\s*\]\s*=\s*(?P<body>.+?)(?=\n[A-Z_][A-Za-z_]*\s*:|\n\n)",
@@ -714,6 +717,11 @@ def test_all_mojave_epochs_have_15_entries(script_src: str) -> None:
         assert m is not None, f"{name}: tuple body not found in script"
         n = len(re.findall(r"datetime\s*\(", m.group("body")))
         assert n == 15, f"{name}: expected 15 datetime entries, got {n}"
+
+    artifact_src = PROBE_PATH.read_text()
+    assert "MOJAVE_HUALAPAI_EPOCHS" not in script_src
+    assert "Mojave/Hualapai" in artifact_src
+    assert "insufficient acquisition-backed sensing window" in artifact_src
 
 
 def test_run_amplitude_sanity_field_and_flag(script_src: str) -> None:
