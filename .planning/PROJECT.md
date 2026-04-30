@@ -30,7 +30,9 @@ Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial produ
 
 ### Active
 
-*(No active requirements — v1.2 requirements to be defined via `/gsd-new-milestone`)*
+- **CSLC-S1 v1.2**: promote self-consistency gates from CALIBRATING to BINDING; fix stable-terrain buffer geometry; regenerate real acquisition-backed AOI probes; populate EU EGMS L2a stable-PS residual; restore Mojave amplitude sanity where possible.
+- **DISP-S1 v1.2**: run ERA5 and deramping diagnostics from cached SoCal/Bologna stacks; evaluate unwrapper/resolution candidates from the v1.1 brief; preserve native 5 x 10 m production output while improving reference agreement.
+- **RTC-S1 support only**: fix shared cache/provenance diagnostics only when they directly support CSLC/DISP validation or explain shared orbit/DEM/terrain failure modes.
 
 ### Validated (v1.1 additions)
 
@@ -43,20 +45,20 @@ Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial produ
 - ✓ DSWx-S2 N.Am. F1=0.9252 PASS (Lake Tahoe); typed threshold constants; EU honest FAIL F1=0.8165 with named upgrade path — v1.1
 - ✓ 10-cell manifest-driven results matrix + 808-line validation_methodology.md; 554 unit tests; Dockerfile + Apptainer — v1.1
 
-## Current Milestone: v1.1 N.Am./EU Validation Parity & Scientific PASS
+## Current Milestone: v1.2 CSLC Binding & DISP Science Pass
 
-**Goal:** Drive every product to an unambiguous per-region PASS, an honest FAIL with named upgrade path, or a deferral with dated unblock condition — using OPERA/EGMS as validators, not quality ceilings.
+**Goal:** Promote CSLC-S1 from CALIBRATING to BINDING product-quality validation and turn DISP-S1's v1.1 honest FAIL into an actionable science pass or a narrowed, evidence-backed blocker.
 
-**Target deliverables:**
-- All 5 products × 2 regions × 2 criteria columns produce numbers (no n/a)
-- Reference-agreement metrics reported separately from product-quality gates; neither tightens based on the reference's own score
-- Cross-cutting infrastructure fragility (numpy 2.x patches, macOS mp, missing deps, rio-cogeo imports) resolved at environment level
-- Single-command re-run path from cached intermediates for every eval
-- Closure test: fresh clone → `micromamba env create -f conda-env.yml` → `make eval-all` → filled results matrix
+**Target features:**
+- CSLC-S1 BINDING gate promotion from the v1.1 SoCal, Mojave/Coso-Searles, and Iberian baselines plus added/validated EU AOIs
+- Stable-terrain and AOI-probe hardening: projected metre buffers, real ASF/CDSE acquisition windows, validated fallback chains, and EGMS L2a third-number integration
+- DISP-S1 diagnostics and candidate selection: ERA5 toggle, PHASS deramping, at least one alternative unwrapper/resolution candidate, and unchanged `prepare_for_reference(method=...)` comparison discipline
+- Updated CSLC/DISP matrix rows with product-quality and reference-agreement kept separate, no empty cells, and explicit PASS/FAIL/defer outcomes
+- RTC-S1 support only where shared cache, DEM/orbit provenance, or terrain diagnostics directly de-risk CSLC/DISP validation
 
-**Explicitly out of scope for v1.1:** global expansion beyond N.Am./EU, ML-based replacements for threshold algorithms, new OPERA product classes, multi-burst mosaicking, DISP unwrapper selection (spun out to dedicated follow-up milestone).
+**Explicitly out of scope for v1.2:** DIST-S1 operational validation, DSWx EU recalibration, global expansion, new OPERA product classes, ML replacements, and RTC product improvement work unless it directly affects CSLC/DISP validation.
 
-**Estimated effort:** 22-27 working days single-developer.
+**Estimated effort:** 15-20 working days single-developer.
 
 ### Out of Scope
 
@@ -68,7 +70,7 @@ Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial produ
 
 ## Current State
 
-Shipped v1.1 with ~22,600 LOC Python (source + tests) across 184+ files. 308 v1.1 commits over 21 days (2026-04-08 → 2026-04-29).
+Shipped v1.1 with ~22,600 LOC Python (source + tests) across 184+ files. 308 v1.1 commits over 21 days (2026-04-08 → 2026-04-29). v1.2 now focuses on CSLC and DISP because those are the two products with immediate calibration/promotion work and clear science-pass blockers.
 
 **v1.1 Results Matrix:**
 
@@ -139,4 +141,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-30 after v1.1 milestone — 8 requirements moved to Validated; Current State reflects shipped matrix; v1.2 requirements to be defined via /gsd-new-milestone*
+*Last updated: 2026-04-30 for v1.2 milestone planning — Active requirements focus on CSLC/DISP, with RTC support limited to shared validation dependencies*
