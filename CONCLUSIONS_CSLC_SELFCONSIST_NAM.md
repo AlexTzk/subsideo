@@ -339,3 +339,9 @@ Phase 3 plans 03-01 through 03-05 are now all in a closed-loop state on disk:
 **Approved 2026-04-25** — user accepts Phase 3 contractual closure with the two named follow-ups deferred to post-phase work and pre-existing test failures scheduled for housekeeping. Scientific sign-off on narratives and visual PNG inspection confirmed by user; CSLC-03/04/05 flipped from Pending → Validated (CALIBRATING) and CSLC-05 flagged Validated-with-deferral for EGMS.
 
 ---
+
+## Phase 8 v1.2 input-hardening note
+
+Phase 8 replaces the old degree-space stable-terrain buffer behavior with CRS-aware metre buffering: coast and water geometries that carry a CRS are reprojected before buffering, then returned to the AOI CRS for raster masking. SoCal and Mojave/Coso-Searles rerun inputs now emit stable-mask retention diagnostics in `mask_metadata.json`, including class-60, slope-ok, coast-excluded, water-excluded, final-count, retention percent, and buffer CRS fields.
+
+Canonical AOI windows now come from `.planning/milestones/v1.2-research/cslc_gate_promotion_aoi_candidates.md`; candidates without at least 15 real acquisition-backed dates are rejected rather than filled with fabricated sensing windows. The proposed Phase 9 binding candidate is `median_of_persistent >= 0.75` and residual <= 2.0 mm/yr, pending final Phase 9 reruns/promotion.

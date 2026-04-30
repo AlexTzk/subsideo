@@ -349,3 +349,9 @@ Phase 3 plans 03-01 through 03-05 are now all in a closed-loop state on disk:
 **Approved 2026-04-25** — user accepts Phase 3 contractual closure with the two named follow-ups deferred to post-phase work and pre-existing test failures scheduled for housekeeping. Scientific sign-off on narratives and visual PNG inspection confirmed by user; CSLC-03/04/05 flipped from Pending → Validated (CALIBRATING) and CSLC-05 flagged Validated-with-deferral for EGMS.
 
 ---
+
+## Phase 8 v1.2 input-hardening note
+
+Phase 8 keeps Iberian Meseta-North as the primary EU calibration AOI and regenerates fallback candidates from `.planning/milestones/v1.2-research/cslc_gate_promotion_aoi_candidates.md`. The artifact accepts Ebro Basin and La Mancha as EU fallback AOIs with real acquisition-backed sensing windows, while old Alentejo and Massif Central rows are rejected in the artifact's `Rejected Candidates` section because the v1.1 burst bindings were stale.
+
+The EU handoff also inherits the CRS-aware stable-terrain buffer fix and stable-mask retention diagnostics used by the N.Am. path. The proposed Phase 9 binding candidate is `median_of_persistent >= 0.75` and residual <= 2.0 mm/yr, with final promotion blocked until Phase 9 reruns confirm the regenerated AOI and stable-mask diagnostics.
