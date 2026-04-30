@@ -7,7 +7,7 @@ subsideo builds a Python library that produces OPERA-equivalent SAR/InSAR geospa
 ## Milestones
 
 - ✅ **v1.0 Initial Release** — Phases 1-9 (shipped 2026-04-09)
-- 🚧 **v1.1 N.Am./EU Validation Parity & Scientific PASS** — Phases 1-7
+- ✅ **v1.1 N.Am./EU Validation Parity & Scientific PASS** — Phases 1-7 (shipped 2026-04-29)
 
 ## Phases
 
@@ -28,16 +28,18 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 </details>
 
-<details open>
-<summary>🚧 v1.1 N.Am./EU Validation Parity & Scientific PASS (Phases 1-7) — IN PROGRESS</summary>
+<details>
+<summary>✅ v1.1 N.Am./EU Validation Parity & Scientific PASS (Phases 1-7) — SHIPPED 2026-04-29</summary>
 
-- [ ] **Phase 1: Environment Hygiene, Framework Consolidation & Guardrail Scaffolding** — pin numpy<2, centralise `_cog`/`_mp`, build `validation.harness` + shared stable-terrain/self-consistency modules, land `criteria.py` CALIBRATING/BINDING, split result dataclasses, split tests dir, Makefile + manifest + env lockfile
+Full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
+
+- [x] **Phase 1: Environment Hygiene, Framework Consolidation & Guardrail Scaffolding** (9/9 plans, complete 2026-04-22) — pin numpy<2, centralise `_cog`/`_mp`, build `validation.harness` + shared stable-terrain/self-consistency modules, land `criteria.py` CALIBRATING/BINDING, split result dataclasses, split tests dir, Makefile + manifest + env lockfile
 - [x] **Phase 2: RTC-S1 EU Validation** — 3-5 EU RTC bursts PASS across ≥3 terrain regimes (≥1 with >1000 m relief AND ≥1 >55°N); per-burst reporting; proves Phase 1 harness end-to-end
-- [x] **Phase 3: CSLC-S1 Self-Consistency + EU Validation** (5/5 plans, complete 2026-04-25) — SoCal / Mojave / Iberian Meseta self-consistency coherence > 0.7 and residual < 5 mm/yr (CALIBRATING); OPERA CSLC amplitude sanity r > 0.6 / RMSE < 4 dB; cross-version-phase methodology consolidated
+- [x] **Phase 3: CSLC-S1 Self-Consistency + EU Validation** (5/5 plans, complete 2026-04-25) — SoCal coh=0.887/−0.109 mm/yr + Mojave coh=0.804/+1.127 mm/yr + Iberian coh=0.868/+0.347 mm/yr; all CALIBRATING — SoCal / Mojave / Iberian Meseta self-consistency coherence > 0.7 and residual < 5 mm/yr (CALIBRATING); OPERA CSLC amplitude sanity r > 0.6 / RMSE < 4 dB; cross-version-phase methodology consolidated
 - [x] **Phase 4: DISP-S1 Comparison Adapter + Honest FAIL** (5/5 plans, complete 2026-04-25) — `prepare_for_reference` adapter (explicit `method=`); self-consistency at native 5×10 m; N.Am./EU re-runs with ramp-attribution diagnostic; DISP Unwrapper Selection scoping brief delivered
 - [x] **Phase 5: DIST-S1 OPERA v0.1 + EFFIS EU** (9/9 plans, complete 2026-04-25) — T11SLT v0.1 CMR deferred; CMR probe auto-supersede; EFFIS 3 EU events (aveiro 0/3 FAIL); chained_run differentiator structurally_valid
 - [x] **Phase 6: DSWx-S2 N.Am. + EU Recalibration** (7/7 plans, complete 2026-04-28) — N.Am. F1=0.9252 PASS (Lake Tahoe); EU recalibration deferred to v1.2 (HLS to S2 L2A spectral gap); Balaton F1=0.8165 FAIL (fit-set quality review); typed thresholds module; methodology §5 appended
-- [ ] **Phase 7: Results Matrix + Release Readiness** — `make eval-all` writes `results/matrix.md` (product-quality / reference-agreement columns); manifest-driven matrix writer; `docs/validation_methodology.md`; TrueNAS Linux pre-release audit; env lockfile + Dockerfile/Apptainer recipe
+- [x] **Phase 7: Results Matrix + Release Readiness** — `make eval-all` writes `results/matrix.md` (product-quality / reference-agreement columns); manifest-driven matrix writer; `docs/validation_methodology.md`; TrueNAS Linux pre-release audit; env lockfile + Dockerfile/Apptainer recipe (3/3 plans, complete 2026-04-29; REL-04 TrueNAS deferred to v1.2 with dated unblock)
 
 </details>
 
@@ -221,7 +223,7 @@ Plans:
 - [x] 06-04-PLAN.md — compare_dswx shoreline 1-pixel buffer (D-16 uniform application) + JRC retry refactor via harness.download_reference_with_retry(source='jrc') + matrix_writer dswx render branches (_is_dswx_*_shape + _render_dswx_*_cell; AFTER dist:* per D-27) [Wave 2] [DSWX-06]
 - [x] 06-05-PLAN.md — N.Am. positive control: run_eval_dswx_nam.py NEW (10-stage CANDIDATES iteration + INVESTIGATION_TRIGGER halt) + execute eval + CONCLUSIONS_DSWX_N_AM.md NEW + USER CHECKPOINT [Wave 3] [DSWX-01] — F1=0.9252 PASS (Lake Tahoe T10SFH); EU recalibration cleared; checkpoint APPROVED
 - [x] 06-06-PLAN.md — Recalibration pipeline: 3-iteration grid search exhausted; honest BLOCKER (fit_set_mean_f1=0.2092 across all 1395 gridpoints); HLS→S2 L2A spectral transfer gap diagnosed; THRESHOLDS_EU unchanged (PROTEUS defaults); CONCLUSIONS_DSWX_EU_RECALIB.md written; Stage 0 assert relaxed to warning; Plan 06-07 unblocked [Wave 4] [DSWX-03, DSWX-04, DSWX-05, DSWX-06]
-- [ ] 06-07-PLAN.md — EU re-run + reporting: run_eval_dswx.py 5 changes (region='eu', tuple-unpack, DswxEUCellMetrics, recalibration results read) + execute Balaton EU re-run + CONCLUSIONS_DSWX.md v1.0 baseline preamble + 3 v1.1 sections + docs/validation_methodology.md §5 (5 sub-sections) + matrix.md regen [Wave 5] [DSWX-06, DSWX-07]
+- [x] 06-07-PLAN.md — EU re-run + reporting: run_eval_dswx.py 5 changes (region='eu', tuple-unpack, DswxEUCellMetrics, recalibration results read) + execute Balaton EU re-run + CONCLUSIONS_DSWX.md v1.0 baseline preamble + 3 v1.1 sections + docs/validation_methodology.md §5 (5 sub-sections) + matrix.md regen [Wave 5] [DSWX-06, DSWX-07]
 
 **Requirements coverage audit** (all 7 Phase 6 requirement IDs):
 DSWX-01 (05), DSWX-02 (01), DSWX-03 (01, 06), DSWX-04 (03, 06), DSWX-05 (02, 03, 06), DSWX-06 (02, 04, 06, 07), DSWX-07 (01, 07). Every requirement appears in at least one plan.
@@ -250,7 +252,15 @@ DSWX-01 (05), DSWX-02 (01), DSWX-03 (01, 06), DSWX-04 (03, 06), DSWX-05 (02, 03,
   4. User runs full `make eval-all` on a freshly-cloned repo inside the homelab TrueNAS Linux dev container and cold-env completes under 12 h; warm-env re-run completes under 10 min (REL-04)
   5. User runs `micromamba env create -f conda-env.yml` on a clean machine and it completes successfully; `pytest` passes as the final closure test (REL-06)
 
-**Plans**: TBD
+**Plans**: 3 plans across 2 waves
+
+Plans:
+- [x] 07-01-PLAN.md — RTC:NAM DEFERRED sidecar + matrix_writer DEFERRED branch + CALIBRATING binds v1.2 annotations (3 sites) + matrix.md regen [Wave 1] [REL-01, REL-02, REL-05]
+- [x] 07-02-PLAN.md — validation_methodology.md §6 + §7 + TOC + §2.6 stale forward-ref fixes + missing anchors (pq-vs-ra, dist-methodology) [Wave 1] [REL-03]
+- [x] 07-03-PLAN.md — pytest closure test + CHANGELOG.md v1.1 entry (REL-04 TrueNAS deferral note) [Wave 2] [REL-04, REL-06]
+
+**Requirements coverage audit** (all 6 Phase 7 requirement IDs):
+REL-01 (01), REL-02 (01), REL-03 (02), REL-04 (03), REL-05 (01), REL-06 (03). Every requirement appears in at least one plan.
 
 </details>
 
@@ -267,10 +277,10 @@ DSWX-01 (05), DSWX-02 (01), DSWX-03 (01, 06), DSWX-04 (03, 06), DSWX-05 (02, 03,
 | 7. CLI Gaps & Code Cleanup | v1.0 | 1/1 | Complete | 2026-04-06 |
 | 8. Planning Artifact Cleanup | v1.0 | 1/1 | Complete | 2026-04-06 |
 | 9. Fix Report Criteria Keys & Cleanup | v1.0 | 1/1 | Complete | 2026-04-06 |
-| 1. Environment Hygiene, Framework Consolidation & Guardrail Scaffolding | v1.1 | 0/9 | Planned | - |
+| 1. Environment Hygiene, Framework Consolidation & Guardrail Scaffolding | v1.1 | 9/9 | Complete | 2026-04-22 |
 | 2. RTC-S1 EU Validation | v1.1 | 5/5 | Complete (3/5 PASS w/ investigation) | 2026-04-23 |
-| 3. CSLC-S1 Self-Consistency + EU Validation | v1.1 | 0/0 | Not started | - |
+| 3. CSLC-S1 Self-Consistency + EU Validation | v1.1 | 5/5 | Complete (SoCal/Mojave/Iberian CALIBRATING PASS) | 2026-04-25 |
 | 4. DISP-S1 Comparison Adapter + Honest FAIL | v1.1 | 5/5 | Complete (honest FAIL on r > 0.92 + bias < 3 mm/yr; cells MIXED with attributed_source=inconclusive; v1.2 follow-up scoped via DISP_UNWRAPPER_SELECTION_BRIEF.md) | 2026-04-25 |
 | 5. DIST-S1 OPERA v0.1 + EFFIS EU | v1.1 | 9/9 | Complete (infrastructure shipped; EU honest FAIL 0/3 PASS — 3 attributable causes documented for v1.2; DIST-01/02/03 deferred-with-evidence to v1.2) | 2026-04-26 |
 | 6. DSWx-S2 N.Am. + EU Recalibration | v1.1 | 7/7 | Complete (N.Am. F1=0.9252 PASS; EU recalib deferred v1.2 HLS→S2 gap; Balaton F1=0.8165 FAIL fit-set quality review) | 2026-04-27 |
-| 7. Results Matrix + Release Readiness | v1.1 | 0/0 | Not started | - |
+| 7. Results Matrix + Release Readiness | v1.1 | 3/3 | Complete (10-cell matrix filled; methodology doc §6+§7; pytest 554/554; REL-04 TrueNAS deferred v1.2) | 2026-04-29 |

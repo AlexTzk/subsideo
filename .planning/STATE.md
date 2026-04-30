@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: N.Am./EU Validation Parity & Scientific PASS
-status: executing
-stopped_at: None
-last_updated: "2026-04-28T17:35:00Z"
-last_activity: 2026-04-28 -- Phase 06 Plan 07 complete (EU DSWx re-run Balaton F1=0.8165 FAIL; CONCLUSIONS_DSWX.md v1.1 appended; validation_methodology.md §5 appended; matrix.md regen; Phase 6 closed)
+status: shipped
+stopped_at: ~
+last_updated: "2026-04-30T00:00:00.000Z"
+last_activity: 2026-04-30 -- v1.1 milestone closed; archived to .planning/milestones/; git tag v1.1; REQUIREMENTS.md removed (fresh for v1.2)
 progress:
   total_phases: 7
-  completed_phases: 6
-  total_plans: 40
-  completed_plans: 40
+  completed_phases: 7
+  total_plans: 43
+  completed_plans: 43
   percent: 100
 ---
 
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 06 — dswx-s2-n-am-eu-recalibration
+**Current focus:** v1.2 planning — run /gsd-new-milestone to start next milestone
 
 ## Current Position
 
@@ -176,8 +176,8 @@ None yet (roadmap just created; awaiting `/gsd:plan-phase 1`).
 ## Session Continuity
 
 Last activity: 2026-04-25 — Phase 4 Plan 04-04 complete (Wave 3: eval-script rewire + warm re-runs + manifest fix). 5 changes per script landed in run_eval_disp.py + run_eval_disp_egms.py (10 total: REFERENCE_MULTILOOK_METHOD constant + EXPECTED_WALL_S=21600 + prepare_for_reference adapter + product-quality block + ramp-attribution + DISPCellMetrics write); manifest cache_dir aligned with on-disk eval-disp-egms (hyphen); both warm re-runs completed (~6 min SoCal, ~3 min Bologna); both metrics.json files validate as DISPCellMetrics; matrix.md regenerated. Honest FAIL signal preserved: SoCal r=0.049 (v1.0=0.0365), bias=+23.6 (v1.0=+23.62); Bologna r=0.336 (v1.0=0.32), bias=+3.46 (v1.0=+3.35). Both attributed_source=inconclusive. Ruff clean on touched files. Commits 75dea9d (Task 1 SoCal eval) + ec2c07d (Task 2 Bologna eval) + ae2707f (Task 3 manifest fix) + 709c0c0 (Task 4 Rule 3 EGMS_TOKEN preflight relaxation) + 0d0df63 (Task 4 matrix.md regen). Plan 04-04 SUMMARY at `.planning/phases/04-disp-s1-comparison-adapter-honest-fail/04-04-SUMMARY.md`.
-Last session: 2026-04-28T17:35:00Z
-Stopped at: Completed 06-07-PLAN.md (Phase 6 closed)
+Last session: 2026-04-30T00:03:26.390Z
+Stopped at: context exhaustion at 77% (2026-04-30)
 Resume file: None
 
 **Planned Phase:** 05 (dist-s1-opera-v0-1-effis-eu) — 9 plans — 2026-04-25T21:45:44.176Z

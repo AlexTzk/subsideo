@@ -30,15 +30,18 @@ Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial produ
 
 ### Active
 
-v1.1 — N.Am./EU Validation Parity & Scientific PASS:
+*(No active requirements — v1.2 requirements to be defined via `/gsd-new-milestone`)*
 
-- ☐ Environment hygiene: numpy<2 pin, tophu first-class dep, centralised rio_cogeo helper, macOS multiprocessing fix, validation harness, programmatic DEM bounds, eval-all Makefile
-- ☐ RTC-S1 EU reproducibility validation across 3-5 EU bursts (Alpine, Po plain, Iberian, Scandinavian, Portuguese)
-- ☐ CSLC-S1 self-consistency product-quality gate (coherence > 0.7 stable terrain, residual mean velocity < 5 mm/yr) on SoCal + Mojave (US) + Iberian Meseta (EU)
-- ☐ DISP-S1 native-resolution validation + comparison adapter; honest FAIL with named DISP Unwrapper Selection follow-up milestone
-- ☐ DIST-S1 OPERA v0.1 sample comparison (LA T11SLT) with config-drift gate; EFFIS same-resolution cross-validation; 2 additional EU events
-- ☐ DSWx-S2 N.Am. validation + EU recalibration (DSWE threshold grid search across 6 biome-diverse fit-set AOIs; F1 > 0.90 bar does not move)
-- ☐ Results matrix (`make eval-all` → `results/matrix.md`), `docs/validation_methodology.md`, pre-release audit on TrueNAS Linux
+### Validated (v1.1 additions)
+
+- ✓ Reproducible conda-forge environment (numpy<2, tophu, rio-cogeo shim, _mp.py fork bundle, subprocess watchdog, per-platform lockfiles) — v1.1
+- ✓ Shared validation harness (harness.py, stable_terrain.py, selfconsistency.py, criteria.py CALIBRATING/BINDING, split dataclasses) — v1.1
+- ✓ RTC-S1 EU burst-level validation: 3/5 PASS across Alpine/Iberian/Portuguese regimes; same criteria as N.Am. — v1.1
+- ✓ CSLC-S1 self-consistency framework: SoCal/Mojave/Iberian CALIBRATING PASS; cross-version phase impossibility documented — v1.1
+- ✓ DISP-S1 comparison adapter + honest FAIL: prepare_for_reference (explicit method=); ramp-attribution diagnostic; Unwrapper Selection brief — v1.1
+- ✓ DIST-S1 CMR auto-supersede probe + EFFIS 3-event EU infrastructure; DIST-01/02/03 deferred-with-evidence to v1.2 — v1.1
+- ✓ DSWx-S2 N.Am. F1=0.9252 PASS (Lake Tahoe); typed threshold constants; EU honest FAIL F1=0.8165 with named upgrade path — v1.1
+- ✓ 10-cell manifest-driven results matrix + 808-line validation_methodology.md; 554 unit tests; Dockerfile + Apptainer — v1.1
 
 ## Current Milestone: v1.1 N.Am./EU Validation Parity & Scientific PASS
 
@@ -65,11 +68,19 @@ v1.1 — N.Am./EU Validation Parity & Scientific PASS:
 
 ## Current State
 
-Shipped v1.0 with 4,914 LOC Python (source) + 4,209 LOC Python (tests) across 88 files. 87 commits over 4 days.
+Shipped v1.1 with ~22,600 LOC Python (source + tests) across 184+ files. 308 v1.1 commits over 21 days (2026-04-08 → 2026-04-29).
 
-All five product pipelines functional with lazy imports for conda-forge deps. Full CLI with 7 subcommands. Validation framework covers RTC (OPERA N.Am.), CSLC (OPERA N.Am.), DISP (EGMS EU), and DSWx (JRC GSW).
+**v1.1 Results Matrix:**
 
-**v1.1 progress**: Phases 1, 2, 3, 4, 5 of 7 complete. Phase 5 (DIST-S1 OPERA v0.1 + EFFIS EU) shipped 2026-04-26 — DIST-04 CMR auto-supersede probe + DEFERRED N.Am. cell; DIST-05 EFFIS REST cross-validation (WFS endpoints both unreachable; pivoted to REST per Probe 3); DIST-06 EU 3-event aggregate (aveiro + evros EMSR686 + spain_culebra) with per-event try/except isolation; DIST-07 chained_retry differentiator wired (Sept 28 → Oct 10 → Nov 15). Live `make eval-dist-eu` produced **honest FAIL 0/3 PASS** with three distinct attributable causes (dist_s1 silent failure × 2 + speculative track number wrong × 1); infrastructure deliverables verified (7/7 must-haves, 13/13 unit tests). DIST-01/02/03 deferred-with-evidence to v1.2 (RESEARCH Probes 1 + 6: no canonical CloudFront URL; CMR empty); `docs/validation_methodology.md` §4 appended (4 sub-sections; §4.5 deferred to v1.2).
+| Product | N.Am. | EU |
+|---------|-------|-----|
+| RTC | DEFERRED (v1.2 re-run) | 3/5 PASS ⚠ |
+| CSLC | *CALIBRATING* | *CALIBRATING* |
+| DISP | FAIL r=0.049 (inconclusive ramp) | FAIL r=0.336 (inconclusive ramp) |
+| DIST | DEFERRED (CMR: operational_not_found) | 0/3 PASS |
+| DSWX | F1=0.9252 PASS | F1=0.8165 FAIL |
+
+All 10 cells filled — PASS, FAIL-with-named-upgrade-path, or DEFERRED-with-dated-unblock. No n/a, no empty cells. CALIBRATING gates bind at v1.2 (≥3 data points required for promotion).
 
 ## Context
 
@@ -128,4 +139,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-26 — Phase 5 (DIST-S1 OPERA v0.1 + EFFIS EU) shipped honest FAIL infrastructure*
+*Last updated: 2026-04-30 after v1.1 milestone — 8 requirements moved to Validated; Current State reflects shipped matrix; v1.2 requirements to be defined via /gsd-new-milestone*
