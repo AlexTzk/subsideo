@@ -20,8 +20,8 @@
   "cell_status": "CALIBRATING",
   "any_blocker": false,
   "product_quality_aggregate": {
-    "worst_coherence_median_of_persistent": 0.8677730177130017,
-    "worst_residual_mm_yr": 0.0,
+    "worst_coherence_median_of_persistent": 0.8575451970100403,
+    "worst_residual_mm_yr": 0.4040731191635132,
     "worst_aoi": "Iberian"
   },
   "reference_agreement_aggregate": {
@@ -58,13 +58,13 @@
       "stable_mask_pixels": 115655,
       "product_quality": {
         "measurements": {
-          "coherence_median_of_persistent": 0.8677730177130017,
+          "coherence_median_of_persistent": 0.8575451970100403,
           "residual_mm_yr": 0.4040731191635132,
-          "coherence_mean": 0.8529168246315736,
-          "coherence_median": 0.8646866423743111,
-          "coherence_p25": 0.8391512972967965,
-          "coherence_p75": 0.8910134711435862,
-          "persistently_coherent_fraction": 0.9296615951830881
+          "coherence_mean": 0.591419572606744,
+          "coherence_median": 0.5940977111458778,
+          "coherence_p25": 0.4992342671113355,
+          "coherence_p75": 0.6869703877185072,
+          "persistently_coherent_fraction": 0.06380253534277404
         },
         "criterion_ids": [
           "cslc.selfconsistency.coherence_min",
@@ -79,19 +79,12 @@
           "residual_mm_yr_abs_max": 2.0
         },
         "blocker": {
-          "reason_code": "egms_l2a_upstream_access_or_tooling_failure",
+          "reason_code": "opera_frame_unavailable",
           "evidence": {
-            "request_bounds": "(-3.744459, 40.111674, -1.6854149999999999, 41.453727)",
-            "egms_toolkit_version": "unknown",
-            "retry_attempts": 1,
-            "retry_evidence": "single existing _fetch_egms_l2a invocation failed before CSV diagnostics",
-            "n_ps_total": null,
-            "n_stable_ps": null,
-            "n_in_raster": null,
-            "n_valid": null,
-            "stable_std_max": 2.0,
-            "min_valid_points": 100,
-            "error": "AttributeError(\"module 'EGMStoolkit' has no attribute 'download'\")"
+            "aoi_name": "Iberian",
+            "burst_id": "t103_219329_iw1",
+            "reference_h5_count": 0,
+            "reference_dir": "eval-cslc-selfconsist-eu/opera_reference/Iberian"
           }
         }
       },

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "git_sha": "94970d80800e607e8c8782b335cf586c51202f6d",
+  "git_sha": "5288647a83de3346522f0a0ff064228d1c0b85c8",
   "git_dirty": true,
-  "run_started_iso": "2026-04-30T23:16:58Z",
-  "run_duration_s": 183.65726900100708,
+  "run_started_iso": "2026-05-01T07:55:08Z",
+  "run_duration_s": 298.78442001342773,
   "python_version": "3.12.13 | packaged by conda-forge | (main, Mar  5 2026, 17:06:14) [Clang 19.1.7 ]",
   "platform": "macOS-26.3.1-arm64-arm-64bit",
   "input_hashes": {

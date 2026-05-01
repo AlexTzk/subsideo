@@ -360,9 +360,9 @@ The EU handoff also inherits the CRS-aware stable-terrain buffer fix and stable-
 
 Phase 9 records candidate BINDING evidence without changing the legacy CALIBRATING registry until rerun sidecars support promotion. Product-quality self-consistency, EGMS L2a stable-PS residual evidence, reference-agreement amplitude sanity, and blocker evidence remain separate categories.
 
-Phase 9 promotion deferred. The regenerated EU sidecar reports cell-level `BINDING BLOCKER` because the required Iberian AOI cannot complete the EGMS L2a stable-PS residual evidence path.
+Phase 9 promotion deferred. The regenerated EU sidecar reports cell-level `BINDING BLOCKER` because the required Iberian AOI cannot complete the OPERA amplitude-sanity reference-agreement path.
 
-- Iberian candidate product-quality measurements satisfy the proposed self-consistency thresholds `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0` (`coherence_median_of_persistent=0.867773`, `residual_mm_yr=+0.404073`).
-- EGMS L2a stable-PS residual is blocked with `egms_l2a_upstream_access_or_tooling_failure`; the installed `EGMStoolkit` module does not expose the expected `download` attribute.
-- Blocker evidence records `stable_std_max=2.0`, `min_valid_points=100`, `retry_attempts=1`, `egms_toolkit_version=unknown`, and null stable-PS count fields because CSV diagnostics could not run before the tooling failure.
-- OPERA amplitude sanity is not promoted into the product-quality verdict. The EU promotion decision remains blocked on the EGMS residual path, not on amplitude evidence.
+- Iberian candidate product-quality measurements satisfy the proposed self-consistency thresholds `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0` (`coherence_median_of_persistent=0.857545`, `residual_mm_yr=+0.404073`).
+- OPERA amplitude sanity is blocked with `opera_frame_unavailable`: no reference HDF5 was found under `eval-cslc-selfconsist-eu/opera_reference/Iberian` for burst `t103_219329_iw1`.
+- The EGMS L2a residual path also remains unresolved in the rerun logs because the installed `EGMStoolkit` module does not expose the expected `download` attribute; however, the committed candidate blocker is the earlier missing-amplitude-sanity prerequisite.
+- EU promotion remains blocked on reference-agreement evidence. Product-quality self-consistency alone is not enough to promote the registry.

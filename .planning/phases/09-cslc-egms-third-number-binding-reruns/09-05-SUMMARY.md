@@ -30,7 +30,7 @@ key-files:
 key-decisions:
   - "criteria.py remains CALIBRATING because regenerated N.Am. and EU sidecars report BINDING BLOCKER."
   - "N.Am. promotion is blocked by SoCal stable-mask/burst-footprint intersection producing zero valid pixels."
-  - "EU promotion is blocked by EGMStoolkit API mismatch before EGMS L2a CSV diagnostics can run."
+  - "EU promotion is blocked by missing OPERA amplitude-sanity reference HDF5; EGMS toolkit API mismatch remains a follow-up blocker in rerun logs."
 patterns-established:
   - "A candidate BINDING BLOCKER is a valid Phase 9 outcome when sidecars contain named evidence and conclusions document deferment."
 requirements-completed: [CSLC-07, CSLC-10, CSLC-11, VAL-01, VAL-03]
@@ -51,7 +51,7 @@ completed: 2026-05-01
 
 ## Accomplishments
 
-- Ran `make eval-cslc-eu`, which regenerated the EU sidecar with Iberian self-consistency measurements and an EGMS blocker.
+- Ran `make eval-cslc-eu`, which regenerated the EU sidecar with Iberian self-consistency measurements and an OPERA amplitude-sanity blocker.
 - Ran `make eval-cslc-nam`, which regenerated the N.Am. sidecar with a SoCal blocker and Mojave/Coso-Searles candidate PASS plus OPERA amplitude sanity.
 - Ran `make results-matrix`, which now renders both CSLC rows as `BINDING BLOCKER`.
 - Preserved the ignored eval sidecars in git with forced staging so Phase 9 evidence is reviewable.
@@ -67,7 +67,7 @@ completed: 2026-05-01
 
 - `eval-cslc-selfconsist-nam/metrics.json` - N.Am. candidate BINDING sidecar: cell-level `BINDING BLOCKER`, SoCal `aoi_processing_failed`, Mojave `BINDING PASS`.
 - `eval-cslc-selfconsist-nam/meta.json` - N.Am. rerun provenance.
-- `eval-cslc-selfconsist-eu/metrics.json` - EU candidate BINDING sidecar: cell-level `BINDING BLOCKER`, Iberian EGMS tooling blocker.
+- `eval-cslc-selfconsist-eu/metrics.json` - EU candidate BINDING sidecar: cell-level `BINDING BLOCKER`, Iberian `opera_frame_unavailable` blocker.
 - `eval-cslc-selfconsist-eu/meta.json` - EU rerun provenance.
 - `results/matrix.md` - CSLC N.Am. and EU rows render explicit `BINDING BLOCKER` text.
 - `CONCLUSIONS_CSLC_SELFCONSIST_NAM.md` - Phase 9 N.Am. deferment evidence replaces rerun TODOs.
@@ -100,7 +100,7 @@ completed: 2026-05-01
 
 ## Issues Encountered
 
-- EU rerun blocker: `EGMStoolkit` lacks the expected `download` attribute, recorded as `egms_l2a_upstream_access_or_tooling_failure`.
+- EU rerun blocker: no OPERA reference HDF5 exists under `eval-cslc-selfconsist-eu/opera_reference/Iberian`, recorded as `opera_frame_unavailable`. The rerun logs also show `EGMStoolkit` lacks the expected `download` attribute before EGMS CSV diagnostics can run.
 - N.Am. rerun blocker: SoCal stable-mask intersection dropped from 2,286 pixels to 0 valid pixels after burst-footprint intersection, recorded as `aoi_processing_failed`.
 - `make eval-cslc-nam` exited 2 because the cell has a required blocked AOI, but it wrote the evidence sidecars used by matrix/deferment.
 
@@ -126,7 +126,7 @@ No credentials or environment variables were committed. Blocker evidence records
 
 ## User Setup Required
 
-None for the completed phase result. Future promotion work needs separate fixes for SoCal stable-mask intersection and the EGMS toolkit adapter/API mismatch.
+None for the completed phase result. Future promotion work needs separate fixes for SoCal stable-mask intersection, EU OPERA reference availability, and the EGMS toolkit adapter/API mismatch.
 
 ## Next Phase Readiness
 

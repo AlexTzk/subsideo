@@ -108,6 +108,7 @@ def test_candidate_binding_constants_are_module_level(script_ast: ast.Module) ->
 
     assert constants["CANDIDATE_COHERENCE_MIN"] == 0.75
     assert constants["CANDIDATE_RESIDUAL_ABS_MAX_MM_YR"] == 2.0
+    assert constants["CANDIDATE_EGMS_RESIDUAL_ABS_MAX_MM_YR"] == 5.0
 
 
 def test_candidate_binding_wiring_present(script_src: str) -> None:
@@ -273,6 +274,34 @@ def test_missing_egms_residual_blocks_candidate_pass(script_src: str) -> None:
     assert "egms_l2a_blocker is not None" in script_src
     assert '"egms_l2a_stable_ps_residual_mm_yr" not in measurements' in script_src
     assert "blocker=egms_l2a_blocker" in script_src
+
+
+def test_finite_egms_residual_is_thresholded_for_candidate_pass(script_src: str) -> None:
+    """Finite EGMS third number must be checked, not merely present."""
+    assert 'measurements.get("egms_l2a_stable_ps_residual_mm_yr", float("nan"))' in script_src
+    assert "egms <= CANDIDATE_EGMS_RESIDUAL_ABS_MAX_MM_YR" in script_src
+
+
+def test_missing_required_amplitude_sanity_blocks_candidate_pass(script_src: str) -> None:
+    """Required EU amplitude sanity absence must become candidate blocker evidence."""
+    assert "amplitude_blocker: CSLCBlockerEvidence | None = None" in script_src
+    assert 'reason_code="opera_frame_unavailable"' in script_src
+    assert "blocker=amplitude_blocker" in script_src
+    assert "amplitude_blocker=amplitude_blocker" in script_src
+
+
+def test_eu_coherence_uses_complex_mean_numerator(script_src: str) -> None:
+    """Coherence numerator must be |E[complex IFG]|, not E[|IFG|]."""
+    assert "uniform_filter(ifg.real" in script_src
+    assert "uniform_filter(ifg.imag" in script_src
+    assert "uniform_filter(np.abs(ifg)" not in script_src
+
+
+def test_worst_residual_aggregate_tracks_abs_value(script_src: str) -> None:
+    """Worst residual aggregate must not initialize to -inf and compare abs(-inf)."""
+    assert "worst_resid_abs = float(\"-inf\")" in script_src
+    assert "resid_abs = abs(float(resid))" in script_src
+    assert "if resid_abs > worst_resid_abs:" in script_src
 
 
 # ---------------------------------------------------------------------------

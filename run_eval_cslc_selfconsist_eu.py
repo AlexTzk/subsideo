@@ -31,6 +31,7 @@ import warnings; warnings.filterwarnings("ignore")  # noqa: E702, I001
 EXPECTED_WALL_S = 60 * 60 * 14   # 50400s (CONTEXT D-Claude's-Discretion EU budget)
 CANDIDATE_COHERENCE_MIN = 0.75
 CANDIDATE_RESIDUAL_ABS_MAX_MM_YR = 2.0
+CANDIDATE_EGMS_RESIDUAL_ABS_MAX_MM_YR = 5.0
 
 
 if __name__ == "__main__":
@@ -349,7 +350,10 @@ if __name__ == "__main__":
         for i in range(len(stacks) - 1):
             ifg = stacks[i] * np.conj(stacks[i + 1])
             # Coherence estimate: |E[ifg]| / sqrt(E[|a|^2] * E[|b|^2])
-            num = uniform_filter(np.abs(ifg), size=boxcar_px).astype("float32")
+            num = np.abs(
+                uniform_filter(ifg.real, size=boxcar_px)
+                + 1j * uniform_filter(ifg.imag, size=boxcar_px)
+            ).astype("float32")
             denom_a = uniform_filter(np.abs(stacks[i]) ** 2, size=boxcar_px)
             denom_b = uniform_filter(np.abs(stacks[i + 1]) ** 2, size=boxcar_px)
             denom = np.sqrt(denom_a * denom_b + 1e-12).astype("float32")
@@ -572,6 +576,7 @@ if __name__ == "__main__":
         pq: ProductQualityResultJson | None,
         *,
         egms_l2a_blocker: CSLCBlockerEvidence | None = None,
+        amplitude_blocker: CSLCBlockerEvidence | None = None,
     ) -> CSLCCandidateBindingResult:
         thresholds = CSLCCandidateThresholds(
             coherence_median_of_persistent_min=CANDIDATE_COHERENCE_MIN,
@@ -579,6 +584,12 @@ if __name__ == "__main__":
         )
         if pq is None:
             return CSLCCandidateBindingResult(verdict="BINDING BLOCKER", thresholds=thresholds)
+        if amplitude_blocker is not None:
+            return CSLCCandidateBindingResult(
+                verdict="BINDING BLOCKER",
+                thresholds=thresholds,
+                blocker=amplitude_blocker,
+            )
         measurements = pq.measurements
         if (
             egms_l2a_blocker is not None
@@ -591,13 +602,16 @@ if __name__ == "__main__":
             )
         coh = float(measurements.get("coherence_median_of_persistent", float("nan")))
         resid = abs(float(measurements.get("residual_mm_yr", float("nan"))))
+        egms = abs(float(measurements.get("egms_l2a_stable_ps_residual_mm_yr", float("nan"))))
         verdict = (
             "BINDING PASS"
             if (
                 np.isfinite(coh)
                 and np.isfinite(resid)
+                and np.isfinite(egms)
                 and coh >= CANDIDATE_COHERENCE_MIN
                 and resid <= CANDIDATE_RESIDUAL_ABS_MAX_MM_YR
+                and egms <= CANDIDATE_EGMS_RESIDUAL_ABS_MAX_MM_YR
             )
             else "BINDING FAIL"
         )
@@ -628,7 +642,8 @@ if __name__ == "__main__":
     def _worst_pq(rows: list[AOIResult]) -> dict[str, float | str]:
         """Worst-case product-quality aggregate across all AOIs."""
         best_coh = float("inf")
-        worst_resid = float("-inf")
+        worst_resid_abs = float("-inf")
+        worst_resid = 0.0
         worst_aoi = ""
         for row in rows:
             if row.product_quality is None:
@@ -639,11 +654,13 @@ if __name__ == "__main__":
             if coh < best_coh:
                 best_coh = coh
                 worst_aoi = row.aoi_name
-            if abs(resid) > abs(worst_resid):
-                worst_resid = resid
+            resid_abs = abs(float(resid))
+            if resid_abs > worst_resid_abs:
+                worst_resid_abs = resid_abs
+                worst_resid = float(resid)
         return {
             "worst_coherence_median_of_persistent": best_coh if best_coh != float("inf") else 0.0,
-            "worst_residual_mm_yr": worst_resid if worst_resid != float("-inf") else 0.0,
+            "worst_residual_mm_yr": worst_resid if worst_resid_abs != float("-inf") else 0.0,
             "worst_aoi": worst_aoi,
         }
 
@@ -976,6 +993,7 @@ if __name__ == "__main__":
 
         # 8. Amplitude sanity -- gated on per-AOI run_amplitude_sanity flag (D-07)
         ra_result: ReferenceAgreementResultJson | None = None
+        amplitude_blocker: CSLCBlockerEvidence | None = None
         if cfg.run_amplitude_sanity:
             ref_dir = CACHE / "opera_reference" / cfg.aoi_name
             ref_h5_candidates = sorted(ref_dir.glob("*.h5"))
@@ -1001,6 +1019,15 @@ if __name__ == "__main__":
                     "Amplitude sanity skipped for {} -- no OPERA reference HDF5 found "
                     "(OPERA CSLC-S1 V1 is N.Am. only; EU AOI amplitude sanity is best-effort)",
                     cfg.aoi_name,
+                )
+                amplitude_blocker = CSLCBlockerEvidence(
+                    reason_code="opera_frame_unavailable",
+                    evidence={
+                        "aoi_name": cfg.aoi_name,
+                        "burst_id": cfg.burst_id,
+                        "reference_h5_count": 0,
+                        "reference_dir": str(ref_dir),
+                    },
                 )
 
         # 9. Stable-mask sanity artifacts (P2.1 mitigation) — use the CSLC-grid
@@ -1136,6 +1163,7 @@ if __name__ == "__main__":
             candidate_binding=_candidate_binding_for_pq(
                 pq,
                 egms_l2a_blocker=egms_l2a_blocker,
+                amplitude_blocker=amplitude_blocker,
             ),
         )
 
