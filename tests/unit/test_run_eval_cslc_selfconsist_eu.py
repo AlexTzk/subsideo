@@ -117,7 +117,7 @@ def test_candidate_binding_wiring_present(script_src: str) -> None:
     assert "_candidate_binding_for_pq" in script_src
     assert "_candidate_binding_for_rows" in script_src
     assert 'verdict="BINDING BLOCKER"' in script_src
-    assert "candidate_binding=_candidate_binding_for_pq(pq)" in script_src
+    assert "candidate_binding=_candidate_binding_for_pq(" in script_src
     assert "candidate_binding=_candidate_binding_for_rows(per_aoi)" in script_src
 
 
@@ -250,6 +250,31 @@ def test_egms_output_path_under_cache_egms(script_src: str) -> None:
     )
 
 
+def test_egms_l2a_diagnostics_and_blocker_wiring(script_src: str) -> None:
+    """Missing EGMS residual must become named blocker evidence, not silent pass."""
+    assert "compare_cslc_egms_l2a_residual_diagnostics" in script_src
+    assert "egms_l2a_diagnostics" in script_src
+    assert "egms_l2a_blocker" in script_src
+    assert "egms_l2a_upstream_access_or_tooling_failure" in script_src
+    assert "egms_l2a_stable_ps_residual_mm_yr" in script_src
+    assert "request_bounds" in script_src
+    assert "egms_toolkit_version" in script_src
+    assert "retry_attempts" in script_src
+    assert "retry_evidence" in script_src
+    assert "n_ps_total" in script_src
+    assert "n_stable_ps" in script_src
+    assert "n_in_raster" in script_src
+    assert "n_valid" in script_src
+    assert "min_valid_points=100" in script_src
+
+
+def test_missing_egms_residual_blocks_candidate_pass(script_src: str) -> None:
+    """Candidate binding cannot PASS when the EGMS third number is blocked."""
+    assert "egms_l2a_blocker is not None" in script_src
+    assert '"egms_l2a_stable_ps_residual_mm_yr" not in measurements' in script_src
+    assert "blocker=egms_l2a_blocker" in script_src
+
+
 # ---------------------------------------------------------------------------
 # Test 7: ENV-07 diff discipline
 # ---------------------------------------------------------------------------
@@ -281,7 +306,10 @@ _ENV07_ALLOWED_HUNK_CLASSES: dict[str, re.Pattern] = {
     # (4) EGMS L2a download + residual block (EU-only addition).
     "EGMS_block": re.compile(
         r"(EGMStoolkit|_fetch_egms_l2a|egms_csvs|egms_residual|"
-        r"compare_cslc_egms_l2a_residual|egms_l2a_stable_ps_residual|"
+        r"compare_cslc_egms_l2a_residual|egms_l2a_diagnostics|egms_l2a_blocker|"
+        r"egms_l2a_stable_ps_residual|egms_l2a_upstream_access_or_tooling_failure|"
+        r"egms_toolkit_version|retry_attempts|retry_evidence|request_bounds|"
+        r"n_ps_total|n_stable_ps|n_in_raster|n_valid|min_valid_points|"
         r"_write_velocity_geotiff|CACHE\s*/\s*\"egms\"|product_level\s*=|"
         r"release\s*=\s*\"2019_2023\"|stable_std_max\s*=\s*2\.0|"
         r"velocity_tif)"

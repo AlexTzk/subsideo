@@ -57,7 +57,10 @@ if __name__ == "__main__":
     from subsideo.data.orbits import fetch_orbit
     from subsideo.data.worldcover import fetch_worldcover_class60, load_worldcover_for_bbox
     from subsideo.products.cslc import run_cslc
-    from subsideo.validation.compare_cslc import compare_cslc, compare_cslc_egms_l2a_residual
+    from subsideo.validation.compare_cslc import (
+        compare_cslc,
+        compare_cslc_egms_l2a_residual_diagnostics,
+    )
     from subsideo.validation.criteria import CRITERIA  # noqa: F401
     from subsideo.validation.harness import (
         bounds_for_burst,
@@ -567,6 +570,8 @@ if __name__ == "__main__":
 
     def _candidate_binding_for_pq(
         pq: ProductQualityResultJson | None,
+        *,
+        egms_l2a_blocker: CSLCBlockerEvidence | None = None,
     ) -> CSLCCandidateBindingResult:
         thresholds = CSLCCandidateThresholds(
             coherence_median_of_persistent_min=CANDIDATE_COHERENCE_MIN,
@@ -575,6 +580,15 @@ if __name__ == "__main__":
         if pq is None:
             return CSLCCandidateBindingResult(verdict="BINDING BLOCKER", thresholds=thresholds)
         measurements = pq.measurements
+        if (
+            egms_l2a_blocker is not None
+            and "egms_l2a_stable_ps_residual_mm_yr" not in measurements
+        ):
+            return CSLCCandidateBindingResult(
+                verdict="BINDING BLOCKER",
+                thresholds=thresholds,
+                blocker=egms_l2a_blocker,
+            )
         coh = float(measurements.get("coherence_median_of_persistent", float("nan")))
         resid = abs(float(measurements.get("residual_mm_yr", float("nan"))))
         verdict = (
@@ -1004,6 +1018,15 @@ if __name__ == "__main__":
         # --- EU-ONLY: EGMS L2a stable-PS residual step (CSLC-05 third number; D-12) ---
         egms_csvs: list[Path] = []
         egms_residual: float | None = None
+        egms_l2a_diagnostics: dict[str, object] = {}
+        egms_l2a_blocker: CSLCBlockerEvidence | None = None
+        egms_toolkit_version = "unknown"
+        try:
+            import EGMStoolkit  # noqa: PLC0415
+
+            egms_toolkit_version = getattr(EGMStoolkit, "__version__", "unknown")
+        except ImportError:
+            egms_toolkit_version = "import_failed"
         try:
             egms_csvs = _fetch_egms_l2a(bounds, out_dir=CACHE / "egms" / cfg.aoi_name)
             if egms_csvs:
@@ -1017,16 +1040,37 @@ if __name__ == "__main__":
                     cslc_crs,
                     out_path=CACHE / "output" / cfg.aoi_name / "velocity.tif",
                 )
-                egms_residual = compare_cslc_egms_l2a_residual(
+                egms_l2a_diagnostics = compare_cslc_egms_l2a_residual_diagnostics(
                     velocity_tif,
                     egms_csvs,
                     stable_std_max=2.0,
+                    min_valid_points=100,
                 )
-                logger.info(
-                    "EGMS L2a residual on {} stable PS: {:.3f} mm/yr",
-                    cfg.aoi_name,
-                    egms_residual,
-                )
+                if egms_l2a_diagnostics["blocker_reason"] is None:
+                    egms_residual = float(egms_l2a_diagnostics["residual_mm_yr"])
+                    logger.info(
+                        "EGMS L2a residual on {} stable PS: {:.3f} mm/yr",
+                        cfg.aoi_name,
+                        egms_residual,
+                    )
+                else:
+                    egms_blocker_evidence = {
+                        **{
+                            k: v
+                            for k, v in egms_l2a_diagnostics.items()
+                            if k != "blocker_reason"
+                        },
+                        "request_bounds": repr(bounds),
+                        "egms_toolkit_version": egms_toolkit_version,
+                        "retry_attempts": 0,
+                        "retry_evidence": "not_applicable_fetch_succeeded",
+                        "error": None,
+                    }
+                    egms_l2a_blocker = CSLCBlockerEvidence(
+                        reason_code="egms_l2a_"
+                        + str(egms_l2a_diagnostics["blocker_reason"]),
+                        evidence=egms_blocker_evidence,
+                    )
             else:
                 logger.warning(
                     "EGMS L2a: no CSVs downloaded for {} -- skipping third-number",
@@ -1035,6 +1079,25 @@ if __name__ == "__main__":
         except Exception as e:  # noqa: BLE001
             logger.error("EGMS L2a residual step FAILED for {}: {}", cfg.aoi_name, e)
             egms_residual = None
+            egms_l2a_blocker = CSLCBlockerEvidence(
+                reason_code="egms_l2a_upstream_access_or_tooling_failure",
+                evidence={
+                    "request_bounds": repr(bounds),
+                    "egms_toolkit_version": egms_toolkit_version,
+                    "retry_attempts": 1,
+                    "retry_evidence": (
+                        "single existing _fetch_egms_l2a invocation failed before "
+                        "CSV diagnostics"
+                    ),
+                    "n_ps_total": None,
+                    "n_stable_ps": None,
+                    "n_in_raster": None,
+                    "n_valid": None,
+                    "stable_std_max": 2.0,
+                    "min_valid_points": 100,
+                    "error": repr(e),
+                },
+            )
 
         # --- Build AOIResult with THREE-number product_quality (CSLC-05) ---
         pq_measurements: dict[str, float] = {
@@ -1070,7 +1133,10 @@ if __name__ == "__main__":
             stable_mask_pixels=n_stable,
             product_quality=pq,
             reference_agreement=ra_result,
-            candidate_binding=_candidate_binding_for_pq(pq),
+            candidate_binding=_candidate_binding_for_pq(
+                pq,
+                egms_l2a_blocker=egms_l2a_blocker,
+            ),
         )
 
     # -- Main loop --------------------------------------------------------
