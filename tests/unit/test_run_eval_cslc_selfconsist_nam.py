@@ -119,6 +119,29 @@ def test_expected_wall_s_is_module_level_binop(script_ast: ast.Module) -> None:
     )
 
 
+def test_candidate_binding_constants_are_module_level(script_ast: ast.Module) -> None:
+    constants: dict[str, float] = {}
+    for node in script_ast.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id.startswith("CANDIDATE_"):
+                    constants[target.id] = ast.literal_eval(node.value)
+
+    assert constants["CANDIDATE_COHERENCE_MIN"] == 0.75
+    assert constants["CANDIDATE_RESIDUAL_ABS_MAX_MM_YR"] == 2.0
+
+
+def test_candidate_binding_wiring_present(script_src: str) -> None:
+    assert "CSLCCandidateBindingResult" in script_src
+    assert "CSLCCandidateThresholds" in script_src
+    assert "CSLCBlockerEvidence" in script_src
+    assert "_candidate_binding_for_pq" in script_src
+    assert "_candidate_binding_for_rows" in script_src
+    assert 'verdict="BINDING BLOCKER"' in script_src
+    assert "candidate_binding=_candidate_binding_for_pq(pq)" in script_src
+    assert "candidate_binding=_candidate_binding_for_rows(per_aoi)" in script_src
+
+
 def test_supervisor_can_parse_expected_wall_s() -> None:
     """Supervisor._parse_expected_wall_s must succeed on the script."""
     from subsideo.validation.supervisor import _parse_expected_wall_s

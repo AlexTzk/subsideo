@@ -29,6 +29,8 @@ import warnings; warnings.filterwarnings("ignore")  # noqa: E702, I001
 # Iberian 15-epoch SoCal-style stack + EGMStoolkit L2a download + per-stage
 # ensure_resume_safe + supervisor margin. Warm re-run <= 5 min.
 EXPECTED_WALL_S = 60 * 60 * 14   # 50400s (CONTEXT D-Claude's-Discretion EU budget)
+CANDIDATE_COHERENCE_MIN = 0.75
+CANDIDATE_RESIDUAL_ABS_MAX_MM_YR = 2.0
 
 
 if __name__ == "__main__":
@@ -66,6 +68,9 @@ if __name__ == "__main__":
     )
     from subsideo.validation.matrix_schema import (
         AOIResult,
+        CSLCBlockerEvidence,
+        CSLCCandidateBindingResult,
+        CSLCCandidateThresholds,
         CSLCSelfConsistEUCellMetrics,
         MetaJson,
         ProductQualityResultJson,
@@ -560,6 +565,52 @@ if __name__ == "__main__":
             return "PASS" if statuses == {"PASS"} else "MIXED"
         return "FAIL"
 
+    def _candidate_binding_for_pq(
+        pq: ProductQualityResultJson | None,
+    ) -> CSLCCandidateBindingResult:
+        thresholds = CSLCCandidateThresholds(
+            coherence_median_of_persistent_min=CANDIDATE_COHERENCE_MIN,
+            residual_mm_yr_abs_max=CANDIDATE_RESIDUAL_ABS_MAX_MM_YR,
+        )
+        if pq is None:
+            return CSLCCandidateBindingResult(verdict="BINDING BLOCKER", thresholds=thresholds)
+        measurements = pq.measurements
+        coh = float(measurements.get("coherence_median_of_persistent", float("nan")))
+        resid = abs(float(measurements.get("residual_mm_yr", float("nan"))))
+        verdict = (
+            "BINDING PASS"
+            if (
+                np.isfinite(coh)
+                and np.isfinite(resid)
+                and coh >= CANDIDATE_COHERENCE_MIN
+                and resid <= CANDIDATE_RESIDUAL_ABS_MAX_MM_YR
+            )
+            else "BINDING FAIL"
+        )
+        return CSLCCandidateBindingResult(verdict=verdict, thresholds=thresholds)
+
+    def _candidate_binding_for_rows(rows: list[AOIResult]) -> CSLCCandidateBindingResult:
+        thresholds = CSLCCandidateThresholds(
+            coherence_median_of_persistent_min=CANDIDATE_COHERENCE_MIN,
+            residual_mm_yr_abs_max=CANDIDATE_RESIDUAL_ABS_MAX_MM_YR,
+        )
+        verdicts = [r.candidate_binding.verdict for r in rows if r.candidate_binding is not None]
+        if len(verdicts) != len(rows) or any(v == "BINDING BLOCKER" for v in verdicts):
+            return CSLCCandidateBindingResult(
+                verdict="BINDING BLOCKER",
+                thresholds=thresholds,
+                blocker=CSLCBlockerEvidence(
+                    reason_code="required_aoi_binding_blocker",
+                    evidence={
+                        "blocked_aoi_count": sum(1 for v in verdicts if v == "BINDING BLOCKER"),
+                        "missing_candidate_binding_count": len(rows) - len(verdicts),
+                        "total_required_aoi": len(rows),
+                    },
+                ),
+            )
+        verdict = "BINDING FAIL" if any(v == "BINDING FAIL" for v in verdicts) else "BINDING PASS"
+        return CSLCCandidateBindingResult(verdict=verdict, thresholds=thresholds)
+
     def _worst_pq(rows: list[AOIResult]) -> dict[str, float | str]:
         """Worst-case product-quality aggregate across all AOIs."""
         best_coh = float("inf")
@@ -635,6 +686,14 @@ if __name__ == "__main__":
                         status="FAIL",
                         attempt_index=idx,
                         reason=f"{type(e).__name__}: {e}",
+                        candidate_binding=CSLCCandidateBindingResult(
+                            verdict="BINDING BLOCKER",
+                            thresholds=CSLCCandidateThresholds(),
+                            blocker=CSLCBlockerEvidence(
+                                reason_code="aoi_processing_failed",
+                                evidence={"error": repr(e)},
+                            ),
+                        ),
                         error=repr(e),
                         traceback=tb,
                     ))
@@ -657,6 +716,18 @@ if __name__ == "__main__":
                 attempts=attempts,
                 product_quality=parent_pq,
                 reference_agreement=parent_ra,
+                candidate_binding=(
+                    first_success.candidate_binding
+                    if first_success is not None
+                    else CSLCCandidateBindingResult(
+                        verdict="BINDING BLOCKER",
+                        thresholds=CSLCCandidateThresholds(),
+                        blocker=CSLCBlockerEvidence(
+                            reason_code="aoi_processing_failed",
+                            evidence={"error": f"All {len(cfg.fallback_chain)} fallbacks FAILed"},
+                        ),
+                    )
+                ),
                 reason=None if first_success else (
                     f"All {len(cfg.fallback_chain)} fallbacks FAILed"
                 ),
@@ -999,6 +1070,7 @@ if __name__ == "__main__":
             stable_mask_pixels=n_stable,
             product_quality=pq,
             reference_agreement=ra_result,
+            candidate_binding=_candidate_binding_for_pq(pq),
         )
 
     # -- Main loop --------------------------------------------------------
@@ -1020,6 +1092,14 @@ if __name__ == "__main__":
                 regime=cfg.regime,
                 burst_id=cfg.burst_id or None,
                 status="FAIL",
+                candidate_binding=CSLCCandidateBindingResult(
+                    verdict="BINDING BLOCKER",
+                    thresholds=CSLCCandidateThresholds(),
+                    blocker=CSLCBlockerEvidence(
+                        reason_code="aoi_processing_failed",
+                        evidence={"error": repr(e)},
+                    ),
+                ),
                 error=repr(e),
                 traceback=tb,
             ))
@@ -1049,6 +1129,7 @@ if __name__ == "__main__":
         product_quality_aggregate=pq_agg,
         reference_agreement_aggregate=ra_agg,
         per_aoi=per_aoi,
+        candidate_binding=_candidate_binding_for_rows(per_aoi),
     )
     (CACHE / "metrics.json").write_text(metrics.model_dump_json(indent=2))
 
