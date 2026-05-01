@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: CSLC Binding & DISP Science Pass
-status: Phase 9 context gathered; ready for $gsd-plan-phase 9
+status: executing
 stopped_at: Phase 9 context gathered
-last_updated: "2026-04-30T23:57:47.726Z"
-last_activity: 2026-04-30 -- Phase 9 context gathered; ready for $gsd-plan-phase 9
+last_updated: "2026-05-01T03:01:34.970Z"
+last_activity: 2026-05-01 -- Phase 09 planning complete
 progress:
   total_phases: 5
   completed_phases: 1
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 Phase: 09 (cslc-egms-third-number-and-binding-reruns) — READY TO PLAN
 Plan: Phase 8 complete; next plan is Phase 9
-Status: Phase 9 context gathered; ready for $gsd-plan-phase 9
-Last activity: 2026-04-30 -- Phase 9 context gathered; ready for $gsd-plan-phase 9
+Status: Ready to execute
+Last activity: 2026-05-01 -- Phase 09 planning complete
 
 **v1.2 scope:** Focus on CSLC and DISP. CSLC enters with strong v1.1 self-consistency baselines (SoCal coh=0.887 / residual=-0.109 mm/yr; Mojave coh=0.804 / residual=+1.127 mm/yr; Iberian coh=0.868 / residual=+0.347 mm/yr) and needs BINDING gate promotion plus deferred EGMS/AOI hardening. DISP enters with structurally complete N.Am./EU validation but reference-agreement FAILs (SoCal r=0.049, Bologna r=0.336), while stable-terrain residuals remain near zero; v1.2 starts with ERA5/ramp diagnostics before choosing an unwrapper/resolution candidate.
 
