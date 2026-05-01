@@ -358,9 +358,11 @@ The EU handoff also inherits the CRS-aware stable-terrain buffer fix and stable-
 
 ## Phase 9 BINDING rerun evidence
 
-Phase 9 records candidate BINDING evidence without changing the legacy CALIBRATING registry until rerun sidecars exist. Product-quality self-consistency, EGMS L2a stable-PS residual evidence, reference-agreement amplitude sanity, and blocker evidence remain separate categories.
+Phase 9 records candidate BINDING evidence without changing the legacy CALIBRATING registry until rerun sidecars support promotion. Product-quality self-consistency, EGMS L2a stable-PS residual evidence, reference-agreement amplitude sanity, and blocker evidence remain separate categories.
 
-- TODO(Phase 9 rerun): Replace with Iberian candidate product-quality verdict using `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0`.
-- TODO(Phase 9 rerun): Replace with EGMS L2a stable-PS residual evidence, using `stable_std_max=2.0` and `min_valid_points=100`, or name the EGMS blocker reason.
-- TODO(Phase 9 rerun): If EGMS L2a is blocked, replace with blocker evidence that distinguishes upstream/tooling failure from scientifically insufficient stable PS support.
-- TODO(Phase 9 rerun): Preserve OPERA amplitude-sanity as reference-agreement evidence when available; do not collapse it into the product-quality BINDING verdict.
+Phase 9 promotion deferred. The regenerated EU sidecar reports cell-level `BINDING BLOCKER` because the required Iberian AOI cannot complete the EGMS L2a stable-PS residual evidence path.
+
+- Iberian candidate product-quality measurements satisfy the proposed self-consistency thresholds `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0` (`coherence_median_of_persistent=0.867773`, `residual_mm_yr=+0.404073`).
+- EGMS L2a stable-PS residual is blocked with `egms_l2a_upstream_access_or_tooling_failure`; the installed `EGMStoolkit` module does not expose the expected `download` attribute.
+- Blocker evidence records `stable_std_max=2.0`, `min_valid_points=100`, `retry_attempts=1`, `egms_toolkit_version=unknown`, and null stable-PS count fields because CSV diagnostics could not run before the tooling failure.
+- OPERA amplitude sanity is not promoted into the product-quality verdict. The EU promotion decision remains blocked on the EGMS residual path, not on amplitude evidence.

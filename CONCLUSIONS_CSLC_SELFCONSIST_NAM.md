@@ -348,9 +348,11 @@ Canonical AOI windows now come from `.planning/milestones/v1.2-research/cslc_gat
 
 ## Phase 9 BINDING rerun evidence
 
-Phase 9 records candidate BINDING evidence without changing the legacy CALIBRATING registry until rerun sidecars exist. Product-quality self-consistency, OPERA amplitude sanity reference-agreement, and blocker evidence remain separate categories.
+Phase 9 records candidate BINDING evidence without changing the legacy CALIBRATING registry until rerun sidecars support promotion. Product-quality self-consistency, OPERA amplitude sanity reference-agreement, and blocker evidence remain separate categories.
 
-- TODO(Phase 9 rerun): Replace with SoCal candidate product-quality verdict using `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0`.
-- TODO(Phase 9 rerun): Replace with Mojave/Coso-Searles candidate product-quality verdict using `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0`, or name the product-quality blocker.
-- TODO(Phase 9 rerun): Replace with Mojave OPERA amplitude-sanity disposition as reference-agreement evidence, separate from the product-quality verdict.
-- TODO(Phase 9 rerun): If OPERA amplitude sanity is unavailable, replace with the named blocker evidence and frame-search reason without treating the blocker as a product-quality measurement.
+Phase 9 promotion deferred. The regenerated N.Am. sidecar reports cell-level `BINDING BLOCKER` because one required AOI is blocked.
+
+- SoCal candidate product-quality verdict: `BINDING BLOCKER`. The rerun found `stable_mask_cslc` had 0 valid pixels after burst-footprint intersection, with 2,286 pixels present before the valid-data intersection; this is recorded as `aoi_processing_failed`.
+- Mojave/Coso-Searles candidate product-quality verdict: `BINDING PASS` against `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0` (`coherence_median_of_persistent=0.804491`, `residual_mm_yr=+1.127405`).
+- Mojave OPERA amplitude sanity remains reference-agreement evidence, not product-quality evidence: `amp_r=0.955419`, `amp_rmse_db=2.248974`.
+- Registry promotion remains deferred because the N.Am. cell is blocked by the required SoCal AOI, even though Mojave/Coso-Searles itself passed the candidate product-quality and amplitude sanity checks.
