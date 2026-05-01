@@ -355,3 +355,12 @@ Phase 3 plans 03-01 through 03-05 are now all in a closed-loop state on disk:
 Phase 8 keeps Iberian Meseta-North as the primary EU calibration AOI and regenerates fallback candidates from `.planning/milestones/v1.2-research/cslc_gate_promotion_aoi_candidates.md`. The artifact accepts Ebro Basin and La Mancha as EU fallback AOIs with real acquisition-backed sensing windows, while old Alentejo and Massif Central rows are rejected in the artifact's `Rejected Candidates` section because the v1.1 burst bindings were stale.
 
 The EU handoff also inherits the CRS-aware stable-terrain buffer fix and stable-mask retention diagnostics used by the N.Am. path. The proposed Phase 9 binding candidate is `median_of_persistent >= 0.75` and residual <= 2.0 mm/yr, with final promotion blocked until Phase 9 reruns confirm the regenerated AOI and stable-mask diagnostics.
+
+## Phase 9 BINDING rerun evidence
+
+Phase 9 records candidate BINDING evidence without changing the legacy CALIBRATING registry until rerun sidecars exist. Product-quality self-consistency, EGMS L2a stable-PS residual evidence, reference-agreement amplitude sanity, and blocker evidence remain separate categories.
+
+- TODO(Phase 9 rerun): Replace with Iberian candidate product-quality verdict using `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0`.
+- TODO(Phase 9 rerun): Replace with EGMS L2a stable-PS residual evidence, using `stable_std_max=2.0` and `min_valid_points=100`, or name the EGMS blocker reason.
+- TODO(Phase 9 rerun): If EGMS L2a is blocked, replace with blocker evidence that distinguishes upstream/tooling failure from scientifically insufficient stable PS support.
+- TODO(Phase 9 rerun): Preserve OPERA amplitude-sanity as reference-agreement evidence when available; do not collapse it into the product-quality BINDING verdict.

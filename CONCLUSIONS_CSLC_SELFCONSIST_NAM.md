@@ -345,3 +345,12 @@ Phase 3 plans 03-01 through 03-05 are now all in a closed-loop state on disk:
 Phase 8 replaces the old degree-space stable-terrain buffer behavior with CRS-aware metre buffering: coast and water geometries that carry a CRS are reprojected before buffering, then returned to the AOI CRS for raster masking. SoCal and Mojave/Coso-Searles rerun inputs now emit stable-mask retention diagnostics in `mask_metadata.json`, including class-60, slope-ok, coast-excluded, water-excluded, final-count, retention percent, and buffer CRS fields.
 
 Canonical AOI windows now come from `.planning/milestones/v1.2-research/cslc_gate_promotion_aoi_candidates.md`; candidates without at least 15 real acquisition-backed dates are rejected rather than filled with fabricated sensing windows. The proposed Phase 9 binding candidate is `median_of_persistent >= 0.75` and residual <= 2.0 mm/yr, pending final Phase 9 reruns/promotion.
+
+## Phase 9 BINDING rerun evidence
+
+Phase 9 records candidate BINDING evidence without changing the legacy CALIBRATING registry until rerun sidecars exist. Product-quality self-consistency, OPERA amplitude sanity reference-agreement, and blocker evidence remain separate categories.
+
+- TODO(Phase 9 rerun): Replace with SoCal candidate product-quality verdict using `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0`.
+- TODO(Phase 9 rerun): Replace with Mojave/Coso-Searles candidate product-quality verdict using `median_of_persistent >= 0.75` and `residual_mm_yr <= 2.0`, or name the product-quality blocker.
+- TODO(Phase 9 rerun): Replace with Mojave OPERA amplitude-sanity disposition as reference-agreement evidence, separate from the product-quality verdict.
+- TODO(Phase 9 rerun): If OPERA amplitude sanity is unavailable, replace with the named blocker evidence and frame-search reason without treating the blocker as a product-quality measurement.
