@@ -289,6 +289,67 @@ def _render_cslc_selfconsist_cell(
         )
         return None
 
+    if metrics.candidate_binding is not None:
+        verdict = metrics.candidate_binding.verdict
+        candidate_verdicts = ("BINDING PASS", "BINDING FAIL", "BINDING BLOCKER")
+        if verdict not in candidate_verdicts:
+            logger.warning("Unexpected CSLC candidate BINDING verdict: {}", verdict)
+            return None
+        pq_agg = metrics.product_quality_aggregate
+        worst_coh = pq_agg.get("worst_coherence_median_of_persistent")
+        worst_resid = pq_agg.get("worst_residual_mm_yr")
+        pq_parts: list[str] = [
+            verdict,
+            f"coh={float(worst_coh):.2f}" if worst_coh is not None else "coh=—",
+            (
+                f"resid={float(worst_resid):.1f} mm/yr"
+                if worst_resid is not None
+                else "resid=—"
+            ),
+        ]
+
+        if region == "eu":
+            egms_vals = [
+                r.product_quality.measurements.get("egms_l2a_stable_ps_residual_mm_yr")
+                for r in metrics.per_aoi
+                if r.product_quality is not None
+            ]
+            egms_finite = [v for v in egms_vals if v is not None]
+            if egms_finite:
+                worst_egms = max(abs(float(v)) for v in egms_finite)
+                pq_parts.append(f"egms_resid={worst_egms:.1f} mm/yr")
+
+        blocker_reason = None
+        if metrics.candidate_binding.blocker is not None:
+            blocker_reason = metrics.candidate_binding.blocker.reason_code
+            pq_parts.append(f"blocker={blocker_reason}")
+
+        worst_aoi = str(pq_agg.get("worst_aoi") or "")
+        pq_body = " / ".join(pq_parts)
+        if worst_aoi:
+            pq_body = f"{pq_body} ({worst_aoi})"
+
+        ra_agg = metrics.reference_agreement_aggregate
+        worst_r = ra_agg.get("worst_amp_r")
+        worst_rmse = ra_agg.get("worst_amp_rmse_db")
+        if worst_r is not None or worst_rmse is not None:
+            ra_parts: list[str] = []
+            if worst_r is not None:
+                ra_parts.append(f"amp_r={float(worst_r):.2f}")
+            if worst_rmse is not None:
+                ra_parts.append(f"amp_rmse={float(worst_rmse):.1f} dB")
+            ra_body = " / ".join(ra_parts)
+        elif blocker_reason is not None and (
+            "mojave" in blocker_reason.lower()
+            or "opera" in blocker_reason.lower()
+        ):
+            ra_body = f"unavailable={blocker_reason}"
+        else:
+            ra_body = "—"
+
+        warn = " ⚠" if metrics.any_blocker or verdict == "BINDING BLOCKER" else ""
+        return pq_body + warn, ra_body
+
     # Status tally
     cal_count = sum(1 for r in metrics.per_aoi if r.status == "CALIBRATING")
     blocker_count = sum(1 for r in metrics.per_aoi if r.status == "BLOCKER")

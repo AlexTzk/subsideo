@@ -493,6 +493,7 @@ def _make_cslc_selfconsist_metrics(
     worst_amp_rmse_db: float | None = 3.8,
     per_aoi: list[dict] | None = None,
     egms_resid: float | None = None,
+    candidate_binding: dict | None = None,
 ) -> Path:
     """Write a synthetic CSLCSelfConsist metrics.json to tmp_path."""
     d = tmp_path / eval_dir_name
@@ -543,6 +544,7 @@ def _make_cslc_selfconsist_metrics(
                 "worst_aoi": worst_aoi} if worst_amp_r is not None else {}),
         },
         "per_aoi": per_aoi,
+        **({"candidate_binding": candidate_binding} if candidate_binding else {}),
     }
     p = d / "metrics.json"
     p.write_text(json.dumps(body))
@@ -703,6 +705,98 @@ class TestCSLCSelfConsistRendering:
         assert result is not None
         pq_col, ra_col = result
         assert "egms_resid=1.9" in pq_col
+
+    def test_candidate_binding_pass_not_italicised(self, tmp_path: Path) -> None:
+        """Candidate BINDING PASS rows render as binding evidence, not CALIBRATING."""
+        from subsideo.validation.matrix_writer import _render_cslc_selfconsist_cell
+
+        metrics_path = _make_cslc_selfconsist_metrics(
+            tmp_path, "eval-cslc-selfconsist-nam",
+            worst_coh=0.88, worst_resid=0.1, worst_aoi="SoCal",
+            candidate_binding={"verdict": "BINDING PASS"},
+        )
+        result = _render_cslc_selfconsist_cell(metrics_path, region="nam")
+        assert result is not None
+        pq_col, ra_col = result
+        assert "BINDING PASS" in pq_col
+        assert "coh=0.88" in pq_col
+        assert "resid=0.1 mm/yr" in pq_col
+        assert "*" not in pq_col
+        assert "*" not in ra_col
+
+    def test_candidate_binding_fail_renders_verdict(self, tmp_path: Path) -> None:
+        """Candidate BINDING FAIL rows expose the fail verdict explicitly."""
+        from subsideo.validation.matrix_writer import _render_cslc_selfconsist_cell
+
+        metrics_path = _make_cslc_selfconsist_metrics(
+            tmp_path, "eval-cslc-selfconsist-nam",
+            worst_coh=0.70, worst_resid=2.4, worst_aoi="Mojave",
+            candidate_binding={"verdict": "BINDING FAIL"},
+        )
+        result = _render_cslc_selfconsist_cell(metrics_path, region="nam")
+        assert result is not None
+        pq_col, _ra_col = result
+        assert "BINDING FAIL" in pq_col
+        assert "*" not in pq_col
+
+    def test_candidate_binding_blocker_renders_reason(self, tmp_path: Path) -> None:
+        """Candidate BINDING BLOCKER rows include the named blocker reason."""
+        from subsideo.validation.matrix_writer import _render_cslc_selfconsist_cell
+
+        metrics_path = _make_cslc_selfconsist_metrics(
+            tmp_path, "eval-cslc-selfconsist-nam",
+            any_blocker=True, worst_coh=0.80, worst_resid=1.3,
+            worst_aoi="Mojave/Coso-Searles", worst_amp_r=None,
+            candidate_binding={
+                "verdict": "BINDING BLOCKER",
+                "blocker": {
+                    "reason_code": "mojave_opera_frame_unavailable",
+                    "evidence": {"candidate_count": 0},
+                },
+            },
+        )
+        result = _render_cslc_selfconsist_cell(metrics_path, region="nam")
+        assert result is not None
+        pq_col, ra_col = result
+        assert "BINDING BLOCKER" in pq_col
+        assert "blocker=mojave_opera_frame_unavailable" in pq_col
+        assert "unavailable=mojave_opera_frame_unavailable" in ra_col
+        assert "*" not in pq_col
+        assert "*" not in ra_col
+
+    def test_candidate_binding_eu_row_renders_egms_residual(
+        self, tmp_path: Path
+    ) -> None:
+        """EU candidate rows include the EGMS residual when sidecar evidence exists."""
+        from subsideo.validation.matrix_writer import _render_cslc_selfconsist_cell
+
+        metrics_path = _make_cslc_selfconsist_metrics(
+            tmp_path, "eval-cslc-selfconsist-eu",
+            worst_coh=0.86, worst_resid=0.3, worst_aoi="Iberian",
+            egms_resid=1.4,
+            candidate_binding={"verdict": "BINDING PASS"},
+        )
+        result = _render_cslc_selfconsist_cell(metrics_path, region="eu")
+        assert result is not None
+        pq_col, _ra_col = result
+        assert "BINDING PASS" in pq_col
+        assert "egms_resid=1.4 mm/yr" in pq_col
+
+    def test_legacy_no_candidate_binding_still_calibrating(
+        self, tmp_path: Path
+    ) -> None:
+        """Legacy CSLC sidecars without candidate_binding keep old CALIBRATING style."""
+        from subsideo.validation.matrix_writer import _render_cslc_selfconsist_cell
+
+        metrics_path = _make_cslc_selfconsist_metrics(
+            tmp_path, "eval-cslc-selfconsist-nam",
+            worst_coh=0.78, worst_resid=2.1, worst_aoi="SoCal",
+        )
+        result = _render_cslc_selfconsist_cell(metrics_path, region="nam")
+        assert result is not None
+        pq_col, _ra_col = result
+        assert "CALIBRATING" in pq_col
+        assert pq_col.startswith("*")
 
     def test_rtc_eu_rendering_unaffected_by_phase3(self, tmp_path: Path) -> None:
         """Regression: RTC-EU cell still renders X/N PASS correctly."""
