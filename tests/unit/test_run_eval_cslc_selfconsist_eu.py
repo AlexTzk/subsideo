@@ -279,6 +279,7 @@ def test_missing_egms_residual_blocks_candidate_pass(script_src: str) -> None:
 
 def test_finite_egms_residual_is_thresholded_for_candidate_pass(script_src: str) -> None:
     """Finite EGMS third number must be checked, not merely present."""
+    assert "egms_l2a_stable_ps_residual_mm_yr_abs_max" in script_src
     assert 'measurements.get("egms_l2a_stable_ps_residual_mm_yr", float("nan"))' in script_src
     assert "egms <= CANDIDATE_EGMS_RESIDUAL_ABS_MAX_MM_YR" in script_src
 

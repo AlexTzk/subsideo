@@ -617,6 +617,9 @@ if __name__ == "__main__":
         thresholds = CSLCCandidateThresholds(
             coherence_median_of_persistent_min=CANDIDATE_COHERENCE_MIN,
             residual_mm_yr_abs_max=CANDIDATE_RESIDUAL_ABS_MAX_MM_YR,
+            egms_l2a_stable_ps_residual_mm_yr_abs_max=(
+                CANDIDATE_EGMS_RESIDUAL_ABS_MAX_MM_YR
+            ),
         )
         if pq is None:
             return CSLCCandidateBindingResult(verdict="BINDING BLOCKER", thresholds=thresholds)

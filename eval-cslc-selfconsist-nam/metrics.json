@@ -46,7 +46,8 @@
         "verdict": "BINDING BLOCKER",
         "thresholds": {
           "coherence_median_of_persistent_min": 0.75,
-          "residual_mm_yr_abs_max": 2.0
+          "residual_mm_yr_abs_max": 2.0,
+          "egms_l2a_stable_ps_residual_mm_yr_abs_max": null
         },
         "blocker": {
           "reason_code": "aoi_processing_failed",
@@ -57,7 +58,7 @@
       },
       "opera_frame_search": null,
       "error": "RuntimeError('SoCal: stable_mask_cslc has only 0 valid pixels after burst-footprint intersection (was 2286 before); AOI too sparse or stable-terrain criteria too strict for this burst')",
-      "traceback": "Traceback (most recent call last):\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_cslc_selfconsist_nam.py\", line 1227, in <module>\n    row = process_aoi(cfg)\n          ^^^^^^^^^^^^^^^^\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_cslc_selfconsist_nam.py\", line 1103, in process_aoi\n    raise RuntimeError(\nRuntimeError: SoCal: stable_mask_cslc has only 0 valid pixels after burst-footprint intersection (was 2286 before); AOI too sparse or stable-terrain criteria too strict for this burst\n"
+      "traceback": "Traceback (most recent call last):\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_cslc_selfconsist_nam.py\", line 1241, in <module>\n    row = process_aoi(cfg)\n          ^^^^^^^^^^^^^^^^\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_cslc_selfconsist_nam.py\", line 1115, in process_aoi\n    raise RuntimeError(\nRuntimeError: SoCal: stable_mask_cslc has only 0 valid pixels after burst-footprint intersection (was 2286 before); AOI too sparse or stable-terrain criteria too strict for this burst\n"
     },
     {
       "aoi_name": "Mojave",
@@ -111,8 +112,8 @@
           },
           "reference_agreement": {
             "measurements": {
-              "amp_r": 0.9554190250734962,
-              "amp_rmse_db": 2.2489743373443267
+              "amplitude_r": 0.9554190250734962,
+              "amplitude_rmse_db": 2.2489743373443267
             },
             "criterion_ids": [
               "cslc.amplitude_r_min",
@@ -123,7 +124,8 @@
             "verdict": "BINDING PASS",
             "thresholds": {
               "coherence_median_of_persistent_min": 0.75,
-              "residual_mm_yr_abs_max": 2.0
+              "residual_mm_yr_abs_max": 2.0,
+              "egms_l2a_stable_ps_residual_mm_yr_abs_max": null
             },
             "blocker": null
           },
@@ -158,8 +160,8 @@
       },
       "reference_agreement": {
         "measurements": {
-          "amp_r": 0.9554190250734962,
-          "amp_rmse_db": 2.2489743373443267
+          "amplitude_r": 0.9554190250734962,
+          "amplitude_rmse_db": 2.2489743373443267
         },
         "criterion_ids": [
           "cslc.amplitude_r_min",
@@ -170,7 +172,8 @@
         "verdict": "BINDING PASS",
         "thresholds": {
           "coherence_median_of_persistent_min": 0.75,
-          "residual_mm_yr_abs_max": 2.0
+          "residual_mm_yr_abs_max": 2.0,
+          "egms_l2a_stable_ps_residual_mm_yr_abs_max": null
         },
         "blocker": null
       },
@@ -183,7 +186,8 @@
     "verdict": "BINDING BLOCKER",
     "thresholds": {
       "coherence_median_of_persistent_min": 0.75,
-      "residual_mm_yr_abs_max": 2.0
+      "residual_mm_yr_abs_max": 2.0,
+      "egms_l2a_stable_ps_residual_mm_yr_abs_max": null
     },
     "blocker": {
       "reason_code": "required_aoi_binding_blocker",

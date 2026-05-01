@@ -798,18 +798,30 @@ if __name__ == "__main__":
             }
         worst_r_row = min(
             ra_rows,
-            key=lambda r: r.reference_agreement.measurements.get("amp_r", 1.0),  # type: ignore[union-attr]
+            key=lambda r: r.reference_agreement.measurements.get(  # type: ignore[union-attr]
+                "amplitude_r",
+                r.reference_agreement.measurements.get("amp_r", 1.0),  # type: ignore[union-attr]
+            ),
         )
         worst_rmse_row = max(
             ra_rows,
-            key=lambda r: r.reference_agreement.measurements.get("amp_rmse_db", 0.0),  # type: ignore[union-attr]
+            key=lambda r: r.reference_agreement.measurements.get(  # type: ignore[union-attr]
+                "amplitude_rmse_db",
+                r.reference_agreement.measurements.get("amp_rmse_db", 0.0),  # type: ignore[union-attr]
+            ),
         )
         return {
             "worst_amp_r": float(
-                worst_r_row.reference_agreement.measurements.get("amp_r", -1.0)  # type: ignore[union-attr]
+                worst_r_row.reference_agreement.measurements.get(  # type: ignore[union-attr]
+                    "amplitude_r",
+                    worst_r_row.reference_agreement.measurements.get("amp_r", -1.0),  # type: ignore[union-attr]
+                )
             ),
             "worst_amp_rmse_db": float(
-                worst_rmse_row.reference_agreement.measurements.get("amp_rmse_db", -1.0)  # type: ignore[union-attr]
+                worst_rmse_row.reference_agreement.measurements.get(  # type: ignore[union-attr]
+                    "amplitude_rmse_db",
+                    worst_rmse_row.reference_agreement.measurements.get("amp_rmse_db", -1.0),  # type: ignore[union-attr]
+                )
             ),
             "worst_aoi": worst_r_row.aoi_name,
         }
@@ -1145,8 +1157,10 @@ if __name__ == "__main__":
                 # lookup always fell through to the default.
                 ra_result = ReferenceAgreementResultJson(
                     measurements={
-                        "amp_r": float(ra.measurements.get("amplitude_r", -1.0)),
-                        "amp_rmse_db": float(ra.measurements.get("amplitude_rmse_db", -1.0)),
+                        "amplitude_r": float(ra.measurements.get("amplitude_r", -1.0)),
+                        "amplitude_rmse_db": float(
+                            ra.measurements.get("amplitude_rmse_db", -1.0)
+                        ),
                     },
                     criterion_ids=["cslc.amplitude_r_min", "cslc.amplitude_rmse_db_max"],
                 )

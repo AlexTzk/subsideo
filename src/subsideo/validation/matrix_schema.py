@@ -322,6 +322,7 @@ class CSLCCandidateThresholds(BaseModel):
 
     coherence_median_of_persistent_min: float = Field(default=0.75)
     residual_mm_yr_abs_max: float = Field(default=2.0)
+    egms_l2a_stable_ps_residual_mm_yr_abs_max: float | None = Field(default=None)
 
 
 class CSLCBlockerEvidence(BaseModel):

@@ -333,6 +333,17 @@ class TestAOIResult:
         assert result.candidate_binding is not None
         assert result.candidate_binding.verdict == "BINDING PASS"
 
+    def test_candidate_binding_thresholds_can_record_egms_threshold(self) -> None:
+        from subsideo.validation.matrix_schema import CSLCCandidateThresholds
+
+        thresholds = CSLCCandidateThresholds(
+            coherence_median_of_persistent_min=0.75,
+            residual_mm_yr_abs_max=2.0,
+            egms_l2a_stable_ps_residual_mm_yr_abs_max=5.0,
+        )
+
+        assert thresholds.egms_l2a_stable_ps_residual_mm_yr_abs_max == 5.0
+
     def test_aoi_result_opera_frame_search_validates(self) -> None:
         from subsideo.validation.matrix_schema import AOIResult
 

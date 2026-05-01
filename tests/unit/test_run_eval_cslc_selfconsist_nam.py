@@ -19,6 +19,7 @@ import h5py
 import numpy as np
 import pytest
 from datetime import datetime
+from subsideo.validation.results import ReferenceAgreementResult, evaluate
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "run_eval_cslc_selfconsist_nam.py"
 PROBE_PATH = (
@@ -399,7 +400,7 @@ def test_socal_success_path_smoke(
         ],
     )
     ra = ReferenceAgreementResultJson(
-        measurements={"amp_r": 0.79, "amp_rmse_db": 3.77},
+        measurements={"amplitude_r": 0.79, "amplitude_rmse_db": 3.77},
         criterion_ids=["cslc.amplitude_r_min", "cslc.amplitude_rmse_db_max"],
     )
     result = AOIResult(
@@ -417,6 +418,10 @@ def test_socal_success_path_smoke(
     assert result.product_quality is not None
     assert "coherence_median_of_persistent" in result.product_quality.measurements
     assert result.reference_agreement is not None
+    assert evaluate(ReferenceAgreementResult(**result.reference_agreement.model_dump())) == {
+        "cslc.amplitude_r_min": True,
+        "cslc.amplitude_rmse_db_max": True,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +451,7 @@ def test_mojave_all_fallbacks_fail_surfaces_blocker(script_src: str) -> None:
         stable_mask_pixels=5000,
         product_quality=socal_pq,
         reference_agreement=ReferenceAgreementResultJson(
-            measurements={"amp_r": 0.79, "amp_rmse_db": 3.77},
+            measurements={"amplitude_r": 0.79, "amplitude_rmse_db": 3.77},
             criterion_ids=[],
         ),
     )

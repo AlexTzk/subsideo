@@ -76,7 +76,8 @@
         "verdict": "BINDING BLOCKER",
         "thresholds": {
           "coherence_median_of_persistent_min": 0.75,
-          "residual_mm_yr_abs_max": 2.0
+          "residual_mm_yr_abs_max": 2.0,
+          "egms_l2a_stable_ps_residual_mm_yr_abs_max": 5.0
         },
         "blocker": {
           "reason_code": "opera_frame_unavailable",
@@ -97,7 +98,8 @@
     "verdict": "BINDING BLOCKER",
     "thresholds": {
       "coherence_median_of_persistent_min": 0.75,
-      "residual_mm_yr_abs_max": 2.0
+      "residual_mm_yr_abs_max": 2.0,
+      "egms_l2a_stable_ps_residual_mm_yr_abs_max": null
     },
     "blocker": {
       "reason_code": "required_aoi_binding_blocker",
