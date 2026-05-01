@@ -138,7 +138,7 @@ def test_candidate_binding_wiring_present(script_src: str) -> None:
     assert "_candidate_binding_for_pq" in script_src
     assert "_candidate_binding_for_rows" in script_src
     assert 'verdict="BINDING BLOCKER"' in script_src
-    assert "candidate_binding=_candidate_binding_for_pq(pq)" in script_src
+    assert "candidate_binding = _candidate_binding_for_pq(pq)" in script_src
     assert "candidate_binding=_candidate_binding_for_rows(per_aoi)" in script_src
 
 
@@ -265,6 +265,33 @@ def test_mojave_fallback_chain_order(script_src: str) -> None:
     assert "Mojave/Hualapai" not in script_src
     assert "Mojave/Hualapai" in artifact_src
     assert "insufficient acquisition-backed sensing window" in artifact_src
+
+
+def test_mojave_bounded_amplitude_sanity_evidence_policy(script_src: str) -> None:
+    """Plan 09-03: bounded Mojave fallbacks attempt amplitude sanity with evidence."""
+    import re
+
+    assert "opera_frame_search" in script_src
+    assert "reference_h5_count" in script_src
+    assert "mojave_opera_frame_unavailable" in script_src
+
+    names = [
+        "Mojave/Coso-Searles",
+        "Mojave/Pahranagat",
+        "Mojave/Amargosa",
+    ]
+    positions = [script_src.index(f'aoi_name="{name}"') for name in names]
+    assert positions == sorted(positions)
+
+    fallback_match = re.search(
+        r"_MOJAVE_FALLBACKS: tuple\[AOIConfig, \.\.\.\] = \((?P<body>.*?)\n    \)",
+        script_src,
+        re.DOTALL,
+    )
+    assert fallback_match is not None
+    fallback_body = fallback_match.group("body")
+    assert "Mojave/Hualapai" not in fallback_body
+    assert fallback_body.count("run_amplitude_sanity=True") == 3
 
 
 # ---------------------------------------------------------------------------
@@ -748,11 +775,12 @@ def test_all_mojave_epochs_have_15_entries(script_src: str) -> None:
 
 
 def test_run_amplitude_sanity_field_and_flag(script_src: str) -> None:
-    """BLOCKER 4: run_amplitude_sanity field exists + SoCal sets True + conditional uses cfg.run_amplitude_sanity."""
+    """run_amplitude_sanity gates SoCal and the bounded Mojave fallback leaves."""
     assert "run_amplitude_sanity: bool" in script_src, (
         "run_amplitude_sanity: bool field not in AOIConfig"
     )
-    # Only SoCal sets True (Mojave + parent default False).
+    # SoCal plus the three accepted Mojave fallbacks set True; the Mojave
+    # parent remains the default False.
     # Count only keyword-argument assignments (lines that have the pattern as code,
     # not inside logger strings). We exclude lines containing '(' + '"' or "'" before
     # the pattern (which indicates a string literal context).
@@ -763,8 +791,8 @@ def test_run_amplitude_sanity_field_and_flag(script_src: str) -> None:
         script_src,
         _re.MULTILINE,
     )
-    assert len(code_assignments) == 1, (
-        f"Exactly 1 run_amplitude_sanity=True code assignment expected (SoCal only); "
+    assert len(code_assignments) == 4, (
+        f"Exactly 4 run_amplitude_sanity=True code assignments expected; "
         f"found {len(code_assignments)}: {code_assignments}"
     )
     # Conditional must use cfg.run_amplitude_sanity not cfg.aoi_name == "SoCal"
