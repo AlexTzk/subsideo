@@ -230,6 +230,7 @@ def test_reference_agreement_wired(script_src: str) -> None:
     assert "run_amplitude_sanity" in script_src, (
         "run_amplitude_sanity field/check not found in EU script"
     )
+    assert "_ensure_opera_reference_for_first_epoch(cfg)" in script_src
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +289,15 @@ def test_missing_required_amplitude_sanity_blocks_candidate_pass(script_src: str
     assert 'reason_code="opera_frame_unavailable"' in script_src
     assert "blocker=amplitude_blocker" in script_src
     assert "amplitude_blocker=amplitude_blocker" in script_src
+
+
+def test_opera_reference_lookup_runs_on_warm_cache_path(script_src: str) -> None:
+    """Amplitude sanity reference lookup must not depend on missing CSLC epochs."""
+    eager_call = "if epoch_idx == 0 and cfg.run_amplitude_sanity:"
+    warm_call = "ref_h5_candidates = _ensure_opera_reference_for_first_epoch(cfg)"
+    assert "def _ensure_opera_reference_for_first_epoch" in script_src
+    assert eager_call in script_src
+    assert warm_call in script_src
 
 
 def test_eu_coherence_uses_complex_mean_numerator(script_src: str) -> None:
@@ -397,8 +407,8 @@ def test_env07_diff_discipline() -> None:
             unclassified.append(line)
 
     if len(unclassified) > 50:
-        pytest.skip(
-            f"ENV-07 skipped — {len(unclassified)} unclassified hunks indicates "
+        pytest.xfail(
+            f"ENV-07 divergence debt — {len(unclassified)} unclassified hunks indicates "
             "scripts have legitimately diverged beyond original diff discipline scope. "
             "Re-scope allowed hunk classes when convergence is desired."
         )

@@ -553,6 +553,42 @@ if __name__ == "__main__":
             hashes[f"egms/{csv_file.name}"] = sha256_of_file(csv_file)
         return hashes
 
+    def _opera_burst_upper(burst_id: str) -> str:
+        """Convert JPL lowercase burst ID to OPERA granule burst token."""
+        parts = burst_id.split("_")
+        return f"T{parts[0][1:]}-{parts[1]}-{parts[2].upper()}"
+
+    def _ensure_opera_reference_for_first_epoch(cfg: AOIConfig) -> list[Path]:
+        """Ensure first-epoch OPERA reference search runs even on warm CSLC caches."""
+        epoch = cfg.sensing_window[0]
+        ref_aoi_dir = CACHE / "opera_reference" / cfg.aoi_name
+        ref_aoi_dir.mkdir(parents=True, exist_ok=True)
+        ref_h5_candidates = sorted(ref_aoi_dir.glob("*.h5"))
+        if ref_h5_candidates:
+            return ref_h5_candidates
+
+        ref_results = earthaccess.search_data(
+            short_name="OPERA_L2_CSLC-S1_V1",
+            temporal=(epoch - timedelta(hours=1), epoch + timedelta(hours=1)),
+            granule_name=f"OPERA_L2_CSLC-S1_{_opera_burst_upper(cfg.burst_id)}*",
+        )
+        if ref_results:
+            ref_metadata = [
+                {
+                    "sensing_datetime": (
+                        g["umm"]["TemporalExtent"]["RangeDateTime"]["BeginningDateTime"]
+                    ),
+                    "_granule": g,
+                }
+                for g in ref_results
+            ]
+            chosen_meta = select_opera_frame_by_utc_hour(
+                epoch, ref_metadata, tolerance_hours=1.0
+            )
+            earthaccess.download([chosen_meta["_granule"]], str(ref_aoi_dir))
+            ref_h5_candidates = sorted(ref_aoi_dir.glob("*.h5"))
+        return ref_h5_candidates
+
     def _resolve_cell_status(rows: list[AOIResult]) -> str:
         """Aggregate per-AOI statuses into a single cell-level status.
 
@@ -873,41 +909,10 @@ if __name__ == "__main__":
                     output_dir=CACHE / "orbits",
                 )
                 if epoch_idx == 0 and cfg.run_amplitude_sanity:
-                    # D-07 amplitude sanity -- gated on per-AOI AOIConfig flag.
-                    # BLOCKER 4 fix: flag drives whether compare_cslc runs;
-                    # the leaf-path conditional consults cfg.run_amplitude_sanity
-                    # (not cfg.aoi_name == 'Iberian') so the EU script works
-                    # identically for all three EU AOIs without further edits.
-                    ref_results = earthaccess.search_data(
-                        short_name="OPERA_L2_CSLC-S1_V1",
-                        temporal=(epoch - timedelta(hours=1), epoch + timedelta(hours=1)),
-                        granule_name=(
-                            f"OPERA_L2_CSLC-S1_"
-                            f"{cfg.burst_id.replace('_', '-').upper()}*"
-                        ),
-                    )
-                    if ref_results:
-                        # earthaccess DataGranule keeps sensing time at
-                        # umm['TemporalExtent']['RangeDateTime']['BeginningDateTime'];
-                        # select_opera_frame_by_utc_hour wants a flat
-                        # {'sensing_datetime': iso_str} dict per candidate.
-                        ref_metadata = [
-                            {
-                                "sensing_datetime": (
-                                    g["umm"]["TemporalExtent"]
-                                    ["RangeDateTime"]["BeginningDateTime"]
-                                ),
-                                "_granule": g,
-                            }
-                            for g in ref_results
-                        ]
-                        chosen_meta = select_opera_frame_by_utc_hour(
-                            epoch, ref_metadata
-                        )
-                        earthaccess.download(
-                            [chosen_meta["_granule"]],
-                            str(CACHE / "opera_reference" / cfg.aoi_name),
-                        )
+                    # D-07 amplitude sanity reference lookup is also repeated
+                    # later on warm CSLC-cache paths, so this is just an eager
+                    # fetch while first-epoch inputs are already being prepared.
+                    _ensure_opera_reference_for_first_epoch(cfg)
                 # run_cslc calls subsideo._mp.configure_multiprocessing() at
                 # its top (Phase 1 D-14), so no explicit call needed here.
                 run_cslc(
@@ -996,7 +1001,7 @@ if __name__ == "__main__":
         amplitude_blocker: CSLCBlockerEvidence | None = None
         if cfg.run_amplitude_sanity:
             ref_dir = CACHE / "opera_reference" / cfg.aoi_name
-            ref_h5_candidates = sorted(ref_dir.glob("*.h5"))
+            ref_h5_candidates = _ensure_opera_reference_for_first_epoch(cfg)
             if ref_h5_candidates:
                 opera_ref_h5 = ref_h5_candidates[0]
                 cmp_result = compare_cslc(
