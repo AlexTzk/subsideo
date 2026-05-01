@@ -122,8 +122,8 @@ if __name__ == "__main__":
         cached_safe_search_dirs: tuple[Path, ...]
         fallback_chain: tuple["AOIConfig", ...] = ()  # empty for leaves
         # BLOCKER 4 fix: per-AOI attribute that drives amplitude-sanity gating.
-        # SoCal + Iberian = True (D-07 runs compare_cslc on first-epoch OPERA ref).
-        # Mojave leaves = False (D-07 explicitly skips amplitude sanity for Mojave).
+        # SoCal + bounded Mojave fallback leaves = True (D-07/D-09 runs
+        # compare_cslc or records OPERA frame-search evidence on first epoch).
         # Mojave parent = False (inherited default; parent status folds from attempts[]).
         # Replaces a prior aoi_name-based literal conditional so the EU fork
         # (Plan 03-04) can set True on IberianAOI without editing the leaf-path
@@ -287,6 +287,7 @@ if __name__ == "__main__":
             output_epsg=32611,    # UTM 11N
             centroid_lat=35.85,
             cached_safe_search_dirs=(Path("eval-cslc-selfconsist-nam/input"),),
+            run_amplitude_sanity=True,
         ),
         AOIConfig(
             aoi_name="Mojave/Pahranagat",
@@ -296,6 +297,7 @@ if __name__ == "__main__":
             output_epsg=32611,    # UTM 11N
             centroid_lat=37.27,
             cached_safe_search_dirs=(Path("eval-cslc-selfconsist-nam/input"),),
+            run_amplitude_sanity=True,
         ),
         AOIConfig(
             aoi_name="Mojave/Amargosa",
@@ -305,6 +307,7 @@ if __name__ == "__main__":
             output_epsg=32611,    # UTM 11N
             centroid_lat=36.47,
             cached_safe_search_dirs=(Path("eval-cslc-selfconsist-nam/input"),),
+            run_amplitude_sanity=True,
         ),
     )
 
@@ -608,6 +611,71 @@ if __name__ == "__main__":
             for p in sorted(ref_dir.glob("*.h5"))[:1]:
                 hashes[f"{cfg.aoi_name}_opera_ref_sha256"] = sha256_of_file(p)
         return hashes
+
+    def _opera_burst_upper(burst_id: str) -> str:
+        """Convert JPL lowercase burst ID to OPERA granule burst token."""
+        parts = burst_id.split("_")
+        return f"T{parts[0][1:]}-{parts[1]}-{parts[2].upper()}"
+
+    def _build_opera_frame_search(
+        cfg: AOIConfig,
+        epoch: datetime,
+        ref_h5_candidates: list[Path],
+    ) -> dict[str, str | int | float | bool | None]:
+        """Build schema-valid OPERA frame-search evidence for amplitude sanity."""
+        opera_burst_upper = _opera_burst_upper(cfg.burst_id)
+        opera_ref_h5 = ref_h5_candidates[0] if ref_h5_candidates else None
+        return {
+            "aoi_name": cfg.aoi_name,
+            "burst_id": cfg.burst_id,
+            "epoch_iso": epoch.isoformat(),
+            "opera_burst_upper": opera_burst_upper,
+            "granule_pattern": f"OPERA_L2_CSLC-S1_{opera_burst_upper}*",
+            "reference_h5_count": len(ref_h5_candidates),
+            "selected_reference_h5": str(opera_ref_h5) if ref_h5_candidates else None,
+        }
+
+    def _ensure_opera_reference_for_first_epoch(
+        cfg: AOIConfig,
+    ) -> tuple[list[Path], dict[str, str | int | float | bool | None]]:
+        """Ensure first-epoch OPERA reference if available and return search evidence."""
+        epoch = cfg.sensing_window[0]
+        ref_aoi_dir = CACHE / "opera_reference" / cfg.aoi_name
+        ref_aoi_dir.mkdir(parents=True, exist_ok=True)
+        ref_h5_candidates = sorted(ref_aoi_dir.glob("*.h5"))
+        if not ref_h5_candidates:
+            opera_burst_upper = _opera_burst_upper(cfg.burst_id)
+            ref_results = earthaccess.search_data(
+                short_name="OPERA_L2_CSLC-S1_V1",
+                temporal=(
+                    (epoch - timedelta(hours=1)).strftime("%Y-%m-%d"),
+                    (epoch + timedelta(hours=1)).strftime("%Y-%m-%d"),
+                ),
+                granule_name=f"OPERA_L2_CSLC-S1_{opera_burst_upper}*",
+            )
+            if ref_results:
+                # earthaccess DataGranule carries sensing time deep inside
+                # umm['TemporalExtent']['RangeDateTime']['BeginningDateTime'];
+                # select_opera_frame_by_utc_hour wants a flat
+                # {'sensing_datetime': iso_str} dict per candidate, so map.
+                ref_metadata = [
+                    {
+                        "sensing_datetime": (
+                            g["umm"]["TemporalExtent"]
+                            ["RangeDateTime"]["BeginningDateTime"]
+                        ),
+                        "_granule": g,
+                    }
+                    for g in ref_results
+                ]
+                chosen_meta = select_opera_frame_by_utc_hour(
+                    epoch, ref_metadata, tolerance_hours=1.0
+                )
+                earthaccess.download([chosen_meta["_granule"]], str(ref_aoi_dir))
+                ref_h5_candidates = sorted(ref_aoi_dir.glob("*.h5"))
+        return ref_h5_candidates, _build_opera_frame_search(
+            cfg, epoch, ref_h5_candidates
+        )
 
     # -- Cell-status resolver ------------------------------------------------
 
@@ -937,6 +1005,7 @@ if __name__ == "__main__":
         # 5. Per-epoch: download SAFE, orbit, run CSLC
         burst_out = CACHE / "output" / cfg.aoi_name
         burst_out.mkdir(parents=True, exist_ok=True)
+        opera_frame_search: dict[str, str | int | float | bool | None] | None = None
         # compass writes nested <burst_id>/<YYYYMMDD>/<burst_id>_<YYYYMMDD>.h5,
         # so ensure_resume_safe's top-level iterdir check can't see them.
         # Count recursively instead; skip the loop only when every epoch wrote.
@@ -958,44 +1027,11 @@ if __name__ == "__main__":
                     output_dir=CACHE / "orbits",
                 )
 
-                # D-07 amplitude sanity: download OPERA reference for first epoch only,
-                # gated on cfg.run_amplitude_sanity (NOT a hard-coded aoi_name check).
+                # D-07/D-09 amplitude sanity: download OPERA reference for first
+                # epoch only, gated on cfg.run_amplitude_sanity (NOT a hard-coded
+                # aoi_name check), and preserve OPERA frame-search evidence.
                 if epoch_idx == 0 and cfg.run_amplitude_sanity:
-                    ref_aoi_dir = CACHE / "opera_reference" / cfg.aoi_name
-                    ref_aoi_dir.mkdir(parents=True, exist_ok=True)
-                    existing_refs = sorted(ref_aoi_dir.glob("*.h5"))
-                    if not existing_refs:
-                        parts = cfg.burst_id.split("_")
-                        opera_burst_upper = f"T{parts[0][1:]}-{parts[1]}-{parts[2].upper()}"
-                        ref_results = earthaccess.search_data(
-                            short_name="OPERA_L2_CSLC-S1_V1",
-                            temporal=(
-                                (epoch - timedelta(hours=1)).strftime("%Y-%m-%d"),
-                                (epoch + timedelta(hours=1)).strftime("%Y-%m-%d"),
-                            ),
-                            granule_name=f"OPERA_L2_CSLC-S1_{opera_burst_upper}*",
-                        )
-                        if ref_results:
-                            # earthaccess DataGranule carries sensing time deep inside
-                            # umm['TemporalExtent']['RangeDateTime']['BeginningDateTime'];
-                            # select_opera_frame_by_utc_hour wants a flat
-                            # {'sensing_datetime': iso_str} dict per candidate, so map.
-                            ref_metadata = [
-                                {
-                                    "sensing_datetime": (
-                                        g["umm"]["TemporalExtent"]
-                                        ["RangeDateTime"]["BeginningDateTime"]
-                                    ),
-                                    "_granule": g,
-                                }
-                                for g in ref_results
-                            ]
-                            chosen_meta = select_opera_frame_by_utc_hour(
-                                epoch, ref_metadata, tolerance_hours=1.0
-                            )
-                            earthaccess.download(
-                                [chosen_meta["_granule"]], str(ref_aoi_dir)
-                            )
+                    _, opera_frame_search = _ensure_opera_reference_for_first_epoch(cfg)
 
                 # run_cslc calls _mp.configure_multiprocessing() at its top (Phase 1 D-14)
                 run_cslc(
@@ -1089,7 +1125,10 @@ if __name__ == "__main__":
         # (Plan 03-04) flips this to True on IberianAOI without editing the
         # conditional text.
         ra_result: ReferenceAgreementResultJson | None = None
+        amplitude_blocker: CSLCBlockerEvidence | None = None
         if cfg.run_amplitude_sanity:
+            if opera_frame_search is None:
+                _, opera_frame_search = _ensure_opera_reference_for_first_epoch(cfg)
             ref_aoi_dir = CACHE / "opera_reference" / cfg.aoi_name
             ref_h5_list = sorted(ref_aoi_dir.glob("*.h5"))
             if ref_h5_list:
@@ -1112,9 +1151,14 @@ if __name__ == "__main__":
                     criterion_ids=["cslc.amplitude_r_min", "cslc.amplitude_rmse_db_max"],
                 )
             else:
+                if cfg.aoi_name.startswith("Mojave/"):
+                    amplitude_blocker = CSLCBlockerEvidence(
+                        reason_code="mojave_opera_frame_unavailable",
+                        evidence={"opera_frame_search": opera_frame_search or {}},
+                    )
                 logger.warning(
                     "{}: run_amplitude_sanity=True but no OPERA ref h5 in {}; "
-                    "skipping amplitude sanity",
+                    "recording candidate BINDING blocker if this is a Mojave fallback",
                     cfg.aoi_name, ref_aoi_dir,
                 )
 
@@ -1149,6 +1193,17 @@ if __name__ == "__main__":
                 "cslc.selfconsistency.residual_mm_yr_max",
             ],
         )
+        candidate_binding = _candidate_binding_for_pq(pq)
+        if amplitude_blocker is not None and cfg.aoi_name.startswith("Mojave/"):
+            candidate_binding = CSLCCandidateBindingResult(
+                verdict="BINDING BLOCKER",
+                thresholds=CSLCCandidateThresholds(
+                    coherence_median_of_persistent_min=CANDIDATE_COHERENCE_MIN,
+                    residual_mm_yr_abs_max=CANDIDATE_RESIDUAL_ABS_MAX_MM_YR,
+                ),
+                blocker=amplitude_blocker,
+            )
+
         return AOIResult(
             aoi_name=cfg.aoi_name,
             regime=cfg.regime,
@@ -1158,7 +1213,8 @@ if __name__ == "__main__":
             stable_mask_pixels=n_stable,
             product_quality=pq,
             reference_agreement=ra_result,
-            candidate_binding=_candidate_binding_for_pq(pq),
+            candidate_binding=candidate_binding,
+            opera_frame_search=opera_frame_search,
         )
 
     # -- Main loop -----------------------------------------------------------
