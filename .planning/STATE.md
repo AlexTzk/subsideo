@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: CSLC Binding & DISP Science Pass
-status: planning
-stopped_at: ~
-last_updated: "2026-04-30T23:59:00.000Z"
-last_activity: 2026-04-30 -- Phase 8 completed; CSLC gate-promotion inputs hardened and Phase 9 ready
+status: Phase 9 context gathered; ready for $gsd-plan-phase 9
+stopped_at: Phase 9 context gathered
+last_updated: "2026-04-30T23:57:47.726Z"
+last_activity: 2026-04-30 -- Phase 9 context gathered; ready for $gsd-plan-phase 9
 progress:
   total_phases: 5
   completed_phases: 1
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 Phase: 09 (cslc-egms-third-number-and-binding-reruns) — READY TO PLAN
 Plan: Phase 8 complete; next plan is Phase 9
-Status: Phase 8 completed all 4 plans; ready for `$gsd-plan-phase 9`
-Last activity: 2026-04-30 -- Phase 8 executed and closed with focused + broad unit suites passing
+Status: Phase 9 context gathered; ready for $gsd-plan-phase 9
+Last activity: 2026-04-30 -- Phase 9 context gathered; ready for $gsd-plan-phase 9
 
 **v1.2 scope:** Focus on CSLC and DISP. CSLC enters with strong v1.1 self-consistency baselines (SoCal coh=0.887 / residual=-0.109 mm/yr; Mojave coh=0.804 / residual=+1.127 mm/yr; Iberian coh=0.868 / residual=+0.347 mm/yr) and needs BINDING gate promotion plus deferred EGMS/AOI hardening. DISP enters with structurally complete N.Am./EU validation but reference-agreement FAILs (SoCal r=0.049, Bologna r=0.336), while stable-terrain residuals remain near zero; v1.2 starts with ERA5/ramp diagnostics before choosing an unwrapper/resolution candidate.
 
@@ -177,8 +177,8 @@ Recent decisions affecting current work (v1.1):
 ## Session Continuity
 
 Last activity: 2026-04-30 — Phase 8 execution complete. Delivered projected-metre stable-terrain buffers and retention diagnostics (08-01), acquisition-backed AOI probe regeneration and stale fallback repair (08-02), SAFE cache self-healing plus CR-01/CR-02/HI-01 regression tests (08-03), and CSLC BINDING threshold proposal/conclusions/methodology closure with focused + broad unit suites passing (08-04). Requirements covered: CSLC-07, CSLC-08, CSLC-09, CSLC-12, RTCSUP-01, RTCSUP-03. Next step: `$gsd-plan-phase 9`.
-Last session: 2026-04-30T23:59:00.000Z
-Stopped at: ~
-Resume file: None
+Last session: 2026-04-30T23:57:15.198Z
+Stopped at: Phase 9 context gathered
+Resume file: .planning/phases/09-cslc-egms-third-number-binding-reruns/09-CONTEXT.md
 
 **Completed Phase:** 08 (cslc-gate-promotion-and-aoi-hardening) — 4 plans — 2026-04-30T23:59:00.000Z
