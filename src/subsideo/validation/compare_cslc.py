@@ -247,6 +247,31 @@ def compare_cslc_egms_l2a_residual(
     velocity_col: str = "mean_velocity",
     min_valid_points: int = 100,
 ) -> float:
+    """Return mean |our_velocity - EGMS L2a stable_ps_velocity| after alignment.
+
+    Backward-compatible float API over
+    :func:`compare_cslc_egms_l2a_residual_diagnostics`. Returns ``NaN`` for
+    insufficient stable PS or schema blockers, matching the historical helper
+    behavior.
+    """
+    diagnostics = compare_cslc_egms_l2a_residual_diagnostics(
+        our_velocity_raster,
+        egms_csv_paths,
+        stable_std_max=stable_std_max,
+        velocity_col=velocity_col,
+        min_valid_points=min_valid_points,
+    )
+    return float(diagnostics["residual_mm_yr"])
+
+
+def compare_cslc_egms_l2a_residual_diagnostics(
+    our_velocity_raster: Path,
+    egms_csv_paths: list[Path],
+    *,
+    stable_std_max: float = 2.0,
+    velocity_col: str = "mean_velocity",
+    min_valid_points: int = 100,
+) -> dict[str, int | float | str | bool | None]:
     """Return mean |our_velocity - EGMS L2a stable_ps_velocity| after reference-frame alignment.
 
     Per CONTEXT 03-CONTEXT.md D-12 + PITFALLS P2.3:
@@ -279,22 +304,94 @@ def compare_cslc_egms_l2a_residual(
             if fewer are available (matches compare_disp_egms_l2a line 339 pattern).
 
     Returns:
-        Mean absolute residual in mm/yr, or NaN if too few valid samples.
+        Diagnostic dict with residual/count evidence. ``residual_mm_yr`` is NaN
+        if a named blocker prevents a finite residual.
     """
     # Function-body-local cross-module import — marks load-bearing-here-only (D-12 + PATTERNS)
     import geopandas as gpd  # noqa: PLC0415
+    import pandas as pd  # noqa: PLC0415
     import rasterio  # noqa: PLC0415
     from shapely.geometry import Point  # noqa: PLC0415
 
-    from subsideo.validation.compare_disp import _load_egms_l2a_points  # noqa: PLC0415
+    std_aliases = (
+        "mean_velocity_std",
+        "velocity_std",
+        "std_velocity",
+        "mean_velocity_stdev",
+    )
 
-    df = _load_egms_l2a_points([Path(p) for p in egms_csv_paths], velocity_col=velocity_col)
-    if "mean_velocity_std" not in df.columns:
-        raise ValueError(
-            "EGMS L2a CSV(s) missing 'mean_velocity_std' column -- required for "
-            "stable-PS filter per Phase 3 D-12. Ensure CSV is EGMS L2a product "
-            "(not Ortho) and was produced by EGMStoolkit >= 0.2.15."
+    def _diagnostics(
+        *,
+        residual_mm_yr: float = float("nan"),
+        n_ps_total: int,
+        n_stable_ps: int = 0,
+        n_in_raster: int = 0,
+        n_valid: int = 0,
+        std_column_used: str | None = None,
+        available_columns: str,
+        blocker_reason: str | None,
+    ) -> dict[str, int | float | str | bool | None]:
+        return {
+            "residual_mm_yr": residual_mm_yr,
+            "n_ps_total": n_ps_total,
+            "n_stable_ps": n_stable_ps,
+            "n_in_raster": n_in_raster,
+            "n_valid": n_valid,
+            "stable_std_max": stable_std_max,
+            "min_valid_points": min_valid_points,
+            "velocity_col": velocity_col,
+            "std_column_used": std_column_used,
+            "available_columns": available_columns,
+            "blocker_reason": blocker_reason,
+        }
+
+    frames: list[pd.DataFrame] = []
+    for p in [Path(p) for p in egms_csv_paths]:
+        raw = pd.read_csv(p)
+        cols_lower = {c.lower(): c for c in raw.columns}
+        if "longitude" in cols_lower and "latitude" in cols_lower:
+            raw = raw.rename(
+                columns={
+                    cols_lower["longitude"]: "lon",
+                    cols_lower["latitude"]: "lat",
+                }
+            )
+        elif "easting" in cols_lower and "northing" in cols_lower:
+            from pyproj import Transformer  # noqa: PLC0415
+
+            t = Transformer.from_crs(3035, 4326, always_xy=True)
+            lon, lat = t.transform(
+                raw[cols_lower["easting"]].values,
+                raw[cols_lower["northing"]].values,
+            )
+            raw["lon"] = lon
+            raw["lat"] = lat
+        else:
+            raise ValueError(
+                f"EGMS L2a file {p.name} has no lon/lat or easting/northing columns: "
+                f"{list(raw.columns)[:10]}"
+            )
+        if velocity_col not in raw.columns:
+            raise ValueError(
+                f"EGMS L2a file {p.name} is missing velocity column "
+                f"'{velocity_col}'. Available: {list(raw.columns)[:15]}"
+            )
+        keep_cols = ["lon", "lat", velocity_col]
+        keep_cols.extend(alias for alias in std_aliases if alias in raw.columns)
+        frames.append(raw[keep_cols])
+
+    df = pd.concat(frames, ignore_index=True)
+    available_columns = ",".join(str(c) for c in df.columns)
+    std_column_used = next((alias for alias in std_aliases if alias in df.columns), None)
+    if std_column_used is None:
+        return _diagnostics(
+            n_ps_total=len(df),
+            available_columns=available_columns,
+            blocker_reason="egms_l2a_schema_upstream_breakage",
         )
+    if std_column_used != "mean_velocity_std":
+        df["mean_velocity_std"] = df[std_column_used]
+
     stable_df = df[df["mean_velocity_std"] < stable_std_max].copy()
 
     points = gpd.GeoDataFrame(
@@ -326,7 +423,15 @@ def compare_cslc_egms_l2a_residual(
                 our_velocity_raster.name,
                 len(stable_df),
             )
-            return float("nan")
+            return _diagnostics(
+                n_ps_total=len(df),
+                n_stable_ps=len(stable_df),
+                n_in_raster=0,
+                n_valid=0,
+                std_column_used=std_column_used,
+                available_columns=available_columns,
+                blocker_reason="insufficient_stable_ps",
+            )
 
         xy = list(zip(points_in.geometry.x, points_in.geometry.y, strict=True))
         our_sampled = np.array([v[0] for v in src.sample(xy)], dtype=np.float64)
@@ -353,7 +458,15 @@ def compare_cslc_egms_l2a_residual(
             n_valid,
             min_valid_points,
         )
-        return float("nan")
+        return _diagnostics(
+            n_ps_total=len(df),
+            n_stable_ps=n_stable_ps,
+            n_in_raster=len(points_in),
+            n_valid=n_valid,
+            std_column_used=std_column_used,
+            available_columns=available_columns,
+            blocker_reason="insufficient_stable_ps",
+        )
 
     our_valid = our_sampled[valid]
     egms_valid = egms_vals[valid]
@@ -368,4 +481,13 @@ def compare_cslc_egms_l2a_residual(
         residual,
         n_valid,
     )
-    return residual
+    return _diagnostics(
+        residual_mm_yr=residual,
+        n_ps_total=len(df),
+        n_stable_ps=n_stable_ps,
+        n_in_raster=len(points_in),
+        n_valid=n_valid,
+        std_column_used=std_column_used,
+        available_columns=available_columns,
+        blocker_reason=None if np.isfinite(residual) else "insufficient_stable_ps",
+    )

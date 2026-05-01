@@ -148,6 +148,110 @@ def test_returns_nan_when_too_few_valid_points(tmp_path: Path) -> None:
     assert not np.isfinite(result)  # NaN expected
 
 
+def test_diagnostics_returns_counts_for_happy_path(tmp_path: Path) -> None:
+    """Diagnostics helper returns EGMS support counts and no blocker on finite residual."""
+    from subsideo.validation.compare_cslc import (
+        compare_cslc_egms_l2a_residual_diagnostics,
+    )
+
+    vel_tif = _make_velocity_geotiff(tmp_path, value=1.5)
+    csv_path = _make_egms_csv(
+        tmp_path,
+        n_points=200,
+        mean_velocity=0.0,
+        mean_velocity_std=0.5,
+    )
+    diagnostics = compare_cslc_egms_l2a_residual_diagnostics(vel_tif, [csv_path])
+
+    assert np.isfinite(diagnostics["residual_mm_yr"])
+    assert diagnostics["n_ps_total"] == 200
+    assert diagnostics["n_stable_ps"] == 200
+    assert diagnostics["n_in_raster"] == 200
+    assert diagnostics["n_valid"] == 200
+    assert diagnostics["stable_std_max"] == 2.0
+    assert diagnostics["min_valid_points"] == 100
+    assert diagnostics["velocity_col"] == "mean_velocity"
+    assert diagnostics["std_column_used"] == "mean_velocity_std"
+    assert "mean_velocity_std" in str(diagnostics["available_columns"])
+    assert diagnostics["blocker_reason"] is None
+
+
+def test_diagnostics_normalizes_velocity_std_alias(tmp_path: Path) -> None:
+    """Maintained EGMS std aliases are adapter-normalized before blocker handling."""
+    from subsideo.validation.compare_cslc import (
+        compare_cslc_egms_l2a_residual_diagnostics,
+    )
+
+    vel_tif = _make_velocity_geotiff(tmp_path, value=1.5)
+    csv_path = _make_egms_csv(
+        tmp_path,
+        n_points=200,
+        mean_velocity=0.0,
+        mean_velocity_std=0.5,
+    )
+    df = pd.read_csv(csv_path)
+    df = df.rename(columns={"mean_velocity_std": "velocity_std"})
+    df.to_csv(csv_path, index=False)
+
+    diagnostics = compare_cslc_egms_l2a_residual_diagnostics(vel_tif, [csv_path])
+
+    assert np.isfinite(diagnostics["residual_mm_yr"])
+    assert diagnostics["std_column_used"] == "velocity_std"
+    assert diagnostics["blocker_reason"] is None
+
+
+def test_diagnostics_schema_blocker_only_after_alias_check(tmp_path: Path) -> None:
+    """Missing all known std columns becomes a named schema blocker with columns."""
+    from subsideo.validation.compare_cslc import (
+        compare_cslc_egms_l2a_residual_diagnostics,
+    )
+
+    vel_tif = _make_velocity_geotiff(tmp_path, value=1.5)
+    csv_path = _make_egms_csv(
+        tmp_path,
+        n_points=200,
+        mean_velocity=0.0,
+        include_std=False,
+    )
+
+    diagnostics = compare_cslc_egms_l2a_residual_diagnostics(vel_tif, [csv_path])
+
+    assert not np.isfinite(diagnostics["residual_mm_yr"])
+    assert diagnostics["n_ps_total"] == 200
+    assert diagnostics["n_valid"] == 0
+    assert diagnostics["std_column_used"] is None
+    assert "mean_velocity" in str(diagnostics["available_columns"])
+    assert diagnostics["blocker_reason"] == "egms_l2a_schema_upstream_breakage"
+
+
+def test_diagnostics_insufficient_stable_ps_blocker(tmp_path: Path) -> None:
+    """Too few valid paired PS returns a scientific support blocker with counts."""
+    from subsideo.validation.compare_cslc import (
+        compare_cslc_egms_l2a_residual_diagnostics,
+    )
+
+    vel_tif = _make_velocity_geotiff(tmp_path, value=1.5)
+    csv_path = _make_egms_csv(
+        tmp_path,
+        n_points=30,
+        mean_velocity=0.0,
+        mean_velocity_std=0.5,
+    )
+
+    diagnostics = compare_cslc_egms_l2a_residual_diagnostics(
+        vel_tif,
+        [csv_path],
+        min_valid_points=100,
+    )
+
+    assert not np.isfinite(diagnostics["residual_mm_yr"])
+    assert diagnostics["n_ps_total"] == 30
+    assert diagnostics["n_stable_ps"] == 30
+    assert diagnostics["n_in_raster"] == 30
+    assert diagnostics["n_valid"] == 30
+    assert diagnostics["blocker_reason"] == "insufficient_stable_ps"
+
+
 # ---------------------------------------------------------------------------
 # Test 4: _load_egms_l2a_points — extended column backward compatibility
 # ---------------------------------------------------------------------------
