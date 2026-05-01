@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "product_quality": {
+    "measurements": {},
+    "criterion_ids": []
+  },
+  "reference_agreement": {
+    "measurements": {},
+    "criterion_ids": []
+  },
+  "criterion_ids_applied": [
+    "cslc.selfconsistency.coherence_min",
+    "cslc.selfconsistency.residual_mm_yr_max",
+    "cslc.amplitude_r_min",
+    "cslc.amplitude_rmse_db_max"
+  ],
+  "runtime_conda_list_hash": null,
+  "pass_count": 1,
+  "total": 2,
+  "cell_status": "FAIL",
+  "any_blocker": false,
+  "product_quality_aggregate": {
+    "worst_coherence_median_of_persistent": 0.8044910175459725,
+    "worst_residual_mm_yr": 1.1274054050445557,
+    "worst_aoi": "Mojave"
+  },
+  "reference_agreement_aggregate": {
+    "worst_amp_r": 0.9554190250734962,
+    "worst_amp_rmse_db": 2.2489743373443267,
+    "worst_aoi": "Mojave"
+  },
+  "per_aoi": [
+    {
+      "aoi_name": "SoCal",
+      "regime": "SoCal-Mediterranean",
+      "burst_id": "t144_308029_iw1",
+      "sensing_window": [],
+      "status": "FAIL",
+      "attempt_index": 0,
+      "reason": null,
+      "attempts": [],
+      "stable_mask_pixels": null,
+      "product_quality": null,
+      "reference_agreement": null,
+      "candidate_binding": {
+        "verdict": "BINDING BLOCKER",
+        "thresholds": {
+          "coherence_median_of_persistent_min": 0.75,
+          "residual_mm_yr_abs_max": 2.0
+        },
+        "blocker": {
+          "reason_code": "aoi_processing_failed",
+          "evidence": {
+            "error": "RuntimeError('SoCal: stable_mask_cslc has only 0 valid pixels after burst-footprint intersection (was 2286 before); AOI too sparse or stable-terrain criteria too strict for this burst')"
+          }
+        }
+      },
+      "opera_frame_search": null,
+      "error": "RuntimeError('SoCal: stable_mask_cslc has only 0 valid pixels after burst-footprint intersection (was 2286 before); AOI too sparse or stable-terrain criteria too strict for this burst')",
+      "traceback": "Traceback (most recent call last):\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_cslc_selfconsist_nam.py\", line 1227, in <module>\n    row = process_aoi(cfg)\n          ^^^^^^^^^^^^^^^^\n  File \"/Volumes/Geospatial/Geospatial/subsideo/run_eval_cslc_selfconsist_nam.py\", line 1103, in process_aoi\n    raise RuntimeError(\nRuntimeError: SoCal: stable_mask_cslc has only 0 valid pixels after burst-footprint intersection (was 2286 before); AOI too sparse or stable-terrain criteria too strict for this burst\n"
+    },
+    {
+      "aoi_name": "Mojave",
+      "regime": "desert-fallback-chain",
+      "burst_id": null,
+      "sensing_window": [],
+      "status": "CALIBRATING",
+      "attempt_index": 0,
+      "reason": null,
+      "attempts": [
+        {
+          "aoi_name": "Mojave/Coso-Searles",
+          "regime": "desert-bedrock-playa-adjacent",
+          "burst_id": "t064_135527_iw2",
+          "sensing_window": [
+            "2023-12-22T01:51:11",
+            "2024-01-03T01:51:11",
+            "2024-01-15T01:51:10",
+            "2024-01-27T01:51:10",
+            "2024-02-08T01:51:10",
+            "2024-02-20T01:51:10",
+            "2024-03-03T01:51:10",
+            "2024-03-15T01:51:10",
+            "2024-03-27T01:51:10",
+            "2024-04-08T01:51:11",
+            "2024-04-20T01:51:11",
+            "2024-05-02T01:51:11",
+            "2024-05-14T01:51:11",
+            "2024-05-26T01:51:11",
+            "2024-06-19T01:51:10"
+          ],
+          "status": "CALIBRATING",
+          "attempt_index": 1,
+          "reason": null,
+          "attempts": [],
+          "stable_mask_pixels": 10148330,
+          "product_quality": {
+            "measurements": {
+              "coherence_median_of_persistent": 0.8044910175459725,
+              "residual_mm_yr": 1.1274054050445557,
+              "coherence_mean": 0.5939344778396723,
+              "coherence_median": 0.5877841542075788,
+              "coherence_p25": 0.503702236605542,
+              "coherence_p75": 0.6902208929615361,
+              "persistently_coherent_fraction": 0.11091365505022457
+            },
+            "criterion_ids": [
+              "cslc.selfconsistency.coherence_min",
+              "cslc.selfconsistency.residual_mm_yr_max"
+            ]
+          },
+          "reference_agreement": {
+            "measurements": {
+              "amp_r": 0.9554190250734962,
+              "amp_rmse_db": 2.2489743373443267
+            },
+            "criterion_ids": [
+              "cslc.amplitude_r_min",
+              "cslc.amplitude_rmse_db_max"
+            ]
+          },
+          "candidate_binding": {
+            "verdict": "BINDING PASS",
+            "thresholds": {
+              "coherence_median_of_persistent_min": 0.75,
+              "residual_mm_yr_abs_max": 2.0
+            },
+            "blocker": null
+          },
+          "opera_frame_search": {
+            "aoi_name": "Mojave/Coso-Searles",
+            "burst_id": "t064_135527_iw2",
+            "epoch_iso": "2023-12-22T01:51:11",
+            "opera_burst_upper": "T064-135527-IW2",
+            "granule_pattern": "OPERA_L2_CSLC-S1_T064-135527-IW2*",
+            "reference_h5_count": 1,
+            "selected_reference_h5": "eval-cslc-selfconsist-nam/opera_reference/Mojave/Coso-Searles/OPERA_L2_CSLC-S1_T064-135527-IW2_20231222T015111Z_20240505T211033Z_S1A_VV_v1.1.h5"
+          },
+          "error": null,
+          "traceback": null
+        }
+      ],
+      "stable_mask_pixels": null,
+      "product_quality": {
+        "measurements": {
+          "coherence_median_of_persistent": 0.8044910175459725,
+          "residual_mm_yr": 1.1274054050445557,
+          "coherence_mean": 0.5939344778396723,
+          "coherence_median": 0.5877841542075788,
+          "coherence_p25": 0.503702236605542,
+          "coherence_p75": 0.6902208929615361,
+          "persistently_coherent_fraction": 0.11091365505022457
+        },
+        "criterion_ids": [
+          "cslc.selfconsistency.coherence_min",
+          "cslc.selfconsistency.residual_mm_yr_max"
+        ]
+      },
+      "reference_agreement": {
+        "measurements": {
+          "amp_r": 0.9554190250734962,
+          "amp_rmse_db": 2.2489743373443267
+        },
+        "criterion_ids": [
+          "cslc.amplitude_r_min",
+          "cslc.amplitude_rmse_db_max"
+        ]
+      },
+      "candidate_binding": {
+        "verdict": "BINDING PASS",
+        "thresholds": {
+          "coherence_median_of_persistent_min": 0.75,
+          "residual_mm_yr_abs_max": 2.0
+        },
+        "blocker": null
+      },
+      "opera_frame_search": null,
+      "error": null,
+      "traceback": null
+    }
+  ],
+  "candidate_binding": {
+    "verdict": "BINDING BLOCKER",
+    "thresholds": {
+      "coherence_median_of_persistent_min": 0.75,
+      "residual_mm_yr_abs_max": 2.0
+    },
+    "blocker": {
+      "reason_code": "required_aoi_binding_blocker",
+      "evidence": {
+        "blocked_aoi_count": 1,
+        "missing_candidate_binding_count": 0,
+        "total_required_aoi": 2
+      }
+    }
+  }
+}
