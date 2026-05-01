@@ -315,6 +315,41 @@ class TestAOIResult:
         loaded = AOIResult.model_validate_json(js)
         assert loaded.attempts[0].attempt_index == 1
 
+    def test_aoi_result_candidate_binding_validates(self) -> None:
+        from subsideo.validation.matrix_schema import AOIResult
+
+        result = AOIResult(
+            aoi_name="SoCal",
+            status="CALIBRATING",
+            candidate_binding={
+                "verdict": "BINDING PASS",
+                "thresholds": {
+                    "coherence_median_of_persistent_min": 0.75,
+                    "residual_mm_yr_abs_max": 2.0,
+                },
+            },
+        )
+
+        assert result.candidate_binding is not None
+        assert result.candidate_binding.verdict == "BINDING PASS"
+
+    def test_aoi_result_opera_frame_search_validates(self) -> None:
+        from subsideo.validation.matrix_schema import AOIResult
+
+        result = AOIResult(
+            aoi_name="Mojave/Coso-Searles",
+            status="CALIBRATING",
+            opera_frame_search={
+                "reference_h5_count": 0,
+                "granule_pattern": "OPERA_L2_CSLC-S1_T064_135527_IW2*",
+            },
+        )
+
+        assert result.opera_frame_search == {
+            "reference_h5_count": 0,
+            "granule_pattern": "OPERA_L2_CSLC-S1_T064_135527_IW2*",
+        }
+
 
 class TestCSLCSelfConsistNAMCellMetrics:
     def test_construction_with_per_aoi(self) -> None:
@@ -344,6 +379,70 @@ class TestCSLCSelfConsistNAMCellMetrics:
         assert "per_aoi" in js
         loaded = CSLCSelfConsistNAMCellMetrics.model_validate_json(js)
         assert loaded.per_aoi[1].aoi_name == "Mojave"
+
+    def test_candidate_binding_blocker_evidence_validates(self) -> None:
+        from subsideo.validation.matrix_schema import CSLCSelfConsistNAMCellMetrics
+
+        metrics = CSLCSelfConsistNAMCellMetrics(
+            pass_count=1,
+            total=1,
+            cell_status="CALIBRATING",
+            any_blocker=False,
+            candidate_binding={
+                "verdict": "BINDING BLOCKER",
+                "blocker": {
+                    "reason_code": "egms_upstream_access_failure",
+                    "evidence": {"stable_std_max": 2.0, "min_valid_points": 100},
+                },
+            },
+        )
+
+        assert metrics.candidate_binding is not None
+        assert metrics.candidate_binding.verdict == "BINDING BLOCKER"
+        assert metrics.candidate_binding.blocker is not None
+        assert metrics.candidate_binding.blocker.evidence["min_valid_points"] == 100
+
+    def test_legacy_cslc_metrics_without_candidate_binding_validate(self) -> None:
+        from subsideo.validation.matrix_schema import AOIResult, CSLCSelfConsistNAMCellMetrics
+
+        metrics = CSLCSelfConsistNAMCellMetrics(
+            pass_count=1,
+            total=1,
+            cell_status="CALIBRATING",
+            any_blocker=False,
+            per_aoi=[AOIResult(aoi_name="SoCal", status="CALIBRATING")],
+        )
+
+        assert metrics.candidate_binding is None
+
+    def test_nested_blocker_evidence_validates(self) -> None:
+        from subsideo.validation.matrix_schema import CSLCSelfConsistNAMCellMetrics
+
+        metrics = CSLCSelfConsistNAMCellMetrics(
+            pass_count=0,
+            total=1,
+            cell_status="BLOCKER",
+            any_blocker=True,
+            candidate_binding={
+                "verdict": "BINDING BLOCKER",
+                "blocker": {
+                    "reason_code": "opera_reference_unavailable",
+                    "evidence": {
+                        "opera_frame_search": {
+                            "reference_h5_count": 0,
+                            "granule_pattern": "OPERA_L2_CSLC-S1_T064_135527_IW2*",
+                        }
+                    },
+                },
+            },
+        )
+
+        assert metrics.candidate_binding is not None
+        assert metrics.candidate_binding.blocker is not None
+        assert metrics.candidate_binding.blocker.evidence["opera_frame_search"] == {
+            "reference_h5_count": 0,
+            "granule_pattern": "OPERA_L2_CSLC-S1_T064_135527_IW2*",
+        }
 
 
 class TestCSLCSelfConsistEUCellMetrics:

@@ -310,6 +310,40 @@ class RTCEUCellMetrics(MetricsJson):
 
 AOIStatus = Literal["PASS", "FAIL", "CALIBRATING", "BLOCKER", "SKIPPED"]
 CSLCCellStatus = Literal["PASS", "FAIL", "CALIBRATING", "MIXED", "BLOCKER"]
+CSLCCandidateBindingVerdict = Literal["BINDING PASS", "BINDING FAIL", "BINDING BLOCKER"]
+
+CSLCBlockerEvidenceScalar = str | int | float | bool | None
+
+
+class CSLCCandidateThresholds(BaseModel):
+    """Candidate v1.2 BINDING thresholds carried with verdict sidecars."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    coherence_median_of_persistent_min: float = Field(default=0.75)
+    residual_mm_yr_abs_max: float = Field(default=2.0)
+
+
+class CSLCBlockerEvidence(BaseModel):
+    """Structured blocker evidence for candidate BINDING outcomes."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason_code: str
+    evidence: dict[
+        str,
+        CSLCBlockerEvidenceScalar | dict[str, CSLCBlockerEvidenceScalar],
+    ]
+
+
+class CSLCCandidateBindingResult(BaseModel):
+    """Candidate BINDING verdict without mutating CALIBRATING registry rows."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    verdict: CSLCCandidateBindingVerdict
+    thresholds: CSLCCandidateThresholds = Field(default_factory=CSLCCandidateThresholds)
+    blocker: CSLCBlockerEvidence | None = None
 
 
 class AOIResult(BaseModel):
@@ -376,6 +410,20 @@ class AOIResult(BaseModel):
             "OPERA CSLC amplitude sanity. Null for Mojave per CONTEXT D-07."
         ),
     )
+    candidate_binding: CSLCCandidateBindingResult | None = Field(
+        default=None,
+        description=(
+            "Candidate v1.2 BINDING verdict computed from product-quality "
+            "thresholds while criteria.py remains CALIBRATING."
+        ),
+    )
+    opera_frame_search: dict[str, str | int | float | bool | None] | None = Field(
+        default=None,
+        description=(
+            "OPERA CSLC reference frame-search evidence for amplitude-sanity "
+            "availability or blocker explanations."
+        ),
+    )
     error: str | None = Field(
         default=None, description="repr(exception) on FAIL; null otherwise."
     )
@@ -432,6 +480,13 @@ class CSLCSelfConsistNAMCellMetrics(MetricsJson):
         description=(
             "Per-AOI drilldown; order matches AOIS declaration in "
             "run_eval_cslc_selfconsist_nam.py."
+        ),
+    )
+    candidate_binding: CSLCCandidateBindingResult | None = Field(
+        default=None,
+        description=(
+            "Cell-level candidate v1.2 BINDING verdict aggregated from "
+            "required per-AOI candidate verdicts."
         ),
     )
 
