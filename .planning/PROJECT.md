@@ -30,7 +30,7 @@ Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial produ
 
 ### Active
 
-- **CSLC-S1 v1.2**: promote self-consistency gates from CALIBRATING to BINDING; fix stable-terrain buffer geometry; regenerate real acquisition-backed AOI probes; populate EU EGMS L2a stable-PS residual; restore Mojave amplitude sanity where possible.
+- **CSLC-S1 v1.2**: Phase 09 completed an evidence-backed BINDING deferment. CSLC matrix rows now render `BINDING BLOCKER` with regenerated sidecars; promotion remains blocked by SoCal stable-mask/burst-footprint intersection, EU OPERA reference availability, and EGMS toolkit adapter/API mismatch.
 - **DISP-S1 v1.2**: run ERA5 and deramping diagnostics from cached SoCal/Bologna stacks; evaluate unwrapper/resolution candidates from the v1.1 brief; preserve native 5 x 10 m production output while improving reference agreement.
 - **RTC-S1 support only**: fix shared cache/provenance diagnostics only when they directly support CSLC/DISP validation or explain shared orbit/DEM/terrain failure modes.
 
@@ -71,6 +71,8 @@ Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial produ
 ## Current State
 
 Shipped v1.1 with ~22,600 LOC Python (source + tests) across 184+ files. 308 v1.1 commits over 21 days (2026-04-08 → 2026-04-29). v1.2 now focuses on CSLC and DISP because those are the two products with immediate calibration/promotion work and clear science-pass blockers.
+
+Phase 09 completed CSLC BINDING reruns as an audit-ready deferment rather than registry promotion. Regenerated CSLC N.Am. and EU sidecars are committed, `results/matrix.md` shows both CSLC rows as `BINDING BLOCKER`, Mojave/Coso-Searles amplitude sanity is populated (`amplitude_r=0.955419`, `amplitude_rmse_db=2.248974`), and `criteria.py` correctly remains CALIBRATING until the named blockers are resolved.
 
 **v1.1 Results Matrix:**
 
@@ -141,4 +143,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-30 for v1.2 milestone planning — Active requirements focus on CSLC/DISP, with RTC support limited to shared validation dependencies*
+*Last updated: 2026-05-03 after Phase 09 execution — CSLC BINDING promotion deferred with committed blocker evidence; Active requirements focus on DISP plus CSLC blocker closure, with RTC support limited to shared validation dependencies*
