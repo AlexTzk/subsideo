@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: CSLC Binding & DISP Science Pass
-status: milestone_complete
-stopped_at: Phase 9 context gathered
-last_updated: "2026-05-01T03:20:47.259Z"
-last_activity: 2026-05-01 -- Phase 09 execution started
+status: Ready for discussion
+stopped_at: Phase 10 context gathered
+last_updated: "2026-05-03T23:56:25.619Z"
+last_activity: 2026-05-03
 progress:
-  total_phases: 5
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
-  percent: 40
+  total_phases: 4
+  completed_phases: 1
+  total_plans: 5
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 09 — cslc-egms-third-number-binding-reruns
+**Current focus:** Phase 10 — disp-era5-ramp-diagnostics
 
 ## Current Position
 
-Phase: 09
+Phase: 10
 Plan: Not started
-Status: Milestone complete
+Status: Ready for discussion
 Last activity: 2026-05-03
 
 **v1.2 scope:** Focus on CSLC and DISP. CSLC enters with strong v1.1 self-consistency baselines (SoCal coh=0.887 / residual=-0.109 mm/yr; Mojave coh=0.804 / residual=+1.127 mm/yr; Iberian coh=0.868 / residual=+0.347 mm/yr) and needs BINDING gate promotion plus deferred EGMS/AOI hardening. DISP enters with structurally complete N.Am./EU validation but reference-agreement FAILs (SoCal r=0.049, Bologna r=0.336), while stable-terrain residuals remain near zero; v1.2 starts with ERA5/ramp diagnostics before choosing an unwrapper/resolution candidate.
@@ -157,7 +157,7 @@ Recent decisions affecting current work (v1.1):
 
 ### Pending Todos
 
-- Plan Phase 9 with `$gsd-plan-phase 9`.
+- Gather Phase 10 context with `$gsd-discuss-phase 10`.
 
 ### Blockers/Concerns
 
@@ -177,9 +177,9 @@ Recent decisions affecting current work (v1.1):
 
 ## Session Continuity
 
-Last activity: 2026-04-30 — Phase 8 execution complete. Delivered projected-metre stable-terrain buffers and retention diagnostics (08-01), acquisition-backed AOI probe regeneration and stale fallback repair (08-02), SAFE cache self-healing plus CR-01/CR-02/HI-01 regression tests (08-03), and CSLC BINDING threshold proposal/conclusions/methodology closure with focused + broad unit suites passing (08-04). Requirements covered: CSLC-07, CSLC-08, CSLC-09, CSLC-12, RTCSUP-01, RTCSUP-03. Next step: `$gsd-plan-phase 9`.
-Last session: 2026-04-30T23:57:15.198Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-cslc-egms-third-number-binding-reruns/09-CONTEXT.md
+Last activity: 2026-05-03 — ROADMAP.md restored for the remaining active v1.2 work. Phase 09 remains complete, and Phases 10-12 are available again for DISP ERA5/ramp diagnostics, unwrapper/deramping candidate evaluation, and release-readiness closure.
+Last session: 2026-05-03T23:56:25.580Z
+Stopped at: Phase 10 context gathered
+Resume file: .planning/phases/10-disp-era5-ramp-diagnostics/10-CONTEXT.md
 
 **Completed Phase:** 08 (cslc-gate-promotion-and-aoi-hardening) — 4 plans — 2026-04-30T23:59:00.000Z
