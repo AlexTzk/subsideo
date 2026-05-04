@@ -31,6 +31,8 @@ from typing import Literal  # noqa: E402
 # supervisor AST-parser whitelists nested BinOp of literal Constants (Plan 01-07 T-07-06).
 EXPECTED_WALL_S = 60 * 60 * 6   # 21600 -- Plan 01-07 supervisor AST-parses this
 REFERENCE_MULTILOOK_METHOD: Literal["block_mean"] = "block_mean"  # Phase 4 D-04
+ERA5_MODE: Literal["on", "off"] = "on"
+BASELINE_ERA5_MODE: Literal["off"] = "off"
 
 
 def _reproject_mask_to_grid(
@@ -149,8 +151,13 @@ if __name__ == "__main__":
     # Credentials already validated above via harness.credential_preflight.
     cdsapirc = Path.home() / ".cdsapirc"
     if not cdsapirc.exists():
-        print("  WARN: ~/.cdsapirc not found -- ERA5 correction paths in MintPy will fail.")
-        print("        Dolphin-native velocity path does not require ERA5, continuing.")
+        if ERA5_MODE == "on":
+            raise SystemExit(
+                "~/.cdsapirc not found. ERA5 tropospheric correction requires "
+                "CDS API credentials.\nRegister at https://cds.climate.copernicus.eu/"
+            )
+        print("  WARN: ~/.cdsapirc not found -- ERA5 correction is disabled.")
+    print(f"  ERA5 mode  : {ERA5_MODE} (baseline: {BASELINE_ERA5_MODE})")
     print(f"  CDS API    : {cdsapirc if cdsapirc.exists() else '(missing)'}")
     print()
 
@@ -537,8 +544,11 @@ if __name__ == "__main__":
 
     # ── Stage 7: DISP pipeline ───────────────────────────────────────────────
     print("\n-- Stage 7: DISP Pipeline (dolphin native) --")
-    disp_dir = OUT / "disp"
+    baseline_disp_dir = OUT / "disp"
+    disp_dir = OUT / ("disp-era5-on" if ERA5_MODE == "on" else "disp")
     velocity_path = disp_dir / "dolphin" / "timeseries" / "velocity.tif"
+    if ERA5_MODE == "on":
+        print(f"  Warm baseline preserved: {baseline_disp_dir}")
 
     if velocity_path.exists():
         print(f"  Velocity already exists: {velocity_path}")
@@ -556,6 +566,7 @@ if __name__ == "__main__":
             n_parallel_bursts=2,
             block_shape=(512, 512),
             n_parallel_unwrap=8,
+            era5_mode=ERA5_MODE,
         )
         elapsed_min = (time.time() - t0) / 60
 
@@ -769,6 +780,7 @@ if __name__ == "__main__":
     from subsideo.validation.matrix_schema import (
         DISPCellMetrics,
         DISPProductQualityResultJson,
+        Era5Diagnostic,
         MetaJson,
         PerIFGRamp,
         RampAggregate,
@@ -781,7 +793,7 @@ if __name__ == "__main__":
         fit_planar_ramp,
     )
 
-    unwrapped_dir = _PhasePath("eval-disp-egms/disp/dolphin/unwrapped")
+    unwrapped_dir = disp_dir / "dolphin" / "unwrapped"
     unw_files = sorted(unwrapped_dir.glob("*.unw.tif"))
     date_pat = _re_phase4.compile(r"^(\d{8})_(\d{8})\.unw\.tif$")
 
@@ -817,7 +829,7 @@ if __name__ == "__main__":
     )
 
     ifg_coh_means: list[float] = []
-    cor_dir = _PhasePath("eval-disp-egms/disp/dolphin/interferograms")
+    cor_dir = disp_dir / "dolphin" / "interferograms"
     for f, _, _ in sequential_unw:
         cor_file = cor_dir / f.name.replace(".unw.tif", ".int.cor.tif")
         if not cor_file.exists():
@@ -939,6 +951,7 @@ if __name__ == "__main__":
         product_quality=pq,
         reference_agreement=ra,
         ramp_attribution=ramp_attribution_obj,
+        era5_diagnostic=Era5Diagnostic(mode=ERA5_MODE),
         cell_status=cell_status,
         criterion_ids_applied=[
             "disp.selfconsistency.coherence_min",
