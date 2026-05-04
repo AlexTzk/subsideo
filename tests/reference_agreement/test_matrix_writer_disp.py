@@ -5,8 +5,10 @@ import json
 from pathlib import Path
 
 from subsideo.validation.matrix_schema import (
+    CauseAssessment,
     DISPCellMetrics,
     DISPProductQualityResultJson,
+    Era5Diagnostic,
     PerIFGRamp,
     RampAggregate,
     RampAttribution,
@@ -28,6 +30,8 @@ def _make_disp_metrics(
     resid: float = -0.11,
     correlation: float = 0.04,
     bias_mm_yr: float = 23.6,
+    include_era5_diagnostic: bool = False,
+    include_cause_assessment: bool = False,
 ) -> DISPCellMetrics:
     pq = DISPProductQualityResultJson(
         measurements={
@@ -71,6 +75,24 @@ def _make_disp_metrics(
         attributed_source=attributed_source,
         attribution_note="test fixture",
     )
+    era5_diagnostic = None
+    if include_era5_diagnostic:
+        era5_diagnostic = Era5Diagnostic(
+            mode="on",
+            improvement_signals=[
+                "correlation_improved",
+                "rmse_improved",
+            ],
+            meaningful_improvement=True,
+        )
+    cause_assessment = None
+    if include_cause_assessment:
+        cause_assessment = CauseAssessment(
+            human_verdict="inconclusive_narrowed",
+            eliminated_causes=["tropospheric"],
+            remaining_causes=["orbit", "terrain", "unwrapper"],
+            next_test="Run SPURT native candidate.",
+        )
     return DISPCellMetrics(
         schema_version=1,
         product_quality=pq,
@@ -84,6 +106,8 @@ def _make_disp_metrics(
             "disp.bias_mm_yr_max",
         ],
         runtime_conda_list_hash=None,
+        era5_diagnostic=era5_diagnostic,
+        cause_assessment=cause_assessment,
     )
 
 
@@ -193,6 +217,23 @@ def test_render_disp_cell_shows_attr_inconclusive(tmp_path: Path) -> None:
     assert cols is not None
     pq_col, _ = cols
     assert "attr=inconclusive" in pq_col
+
+
+def test_render_disp_cell_shows_phase10_era5_flags(tmp_path: Path) -> None:
+    p = tmp_path / "metrics.json"
+    _write(
+        p,
+        _make_disp_metrics(
+            include_era5_diagnostic=True,
+            include_cause_assessment=True,
+        ),
+    )
+    cols = _render_disp_cell(p, region="nam")
+    assert cols is not None
+    pq_col, _ = cols
+    assert "era5=on" in pq_col
+    assert "signals=2" in pq_col
+    assert "narrowed=tropospheric" in pq_col
 
 
 def test_render_disp_cell_returns_none_on_malformed_disp_metrics(tmp_path: Path) -> None:

@@ -484,6 +484,14 @@ def _render_disp_cell(
     else:
         parts.append("resid=—")
     parts.append(f"attr={attr}")
+    if m.era5_diagnostic is not None:
+        parts.append(f"era5={m.era5_diagnostic.mode}")
+        parts.append(f"signals={len(m.era5_diagnostic.improvement_signals)}")
+    if (
+        m.cause_assessment is not None
+        and m.cause_assessment.eliminated_causes == ["tropospheric"]
+    ):
+        parts.append("narrowed=tropospheric")
     pq_body = " / ".join(parts)
 
     # CALIBRATING italics; warning glyph if cell_status == BLOCKER (mirrors
