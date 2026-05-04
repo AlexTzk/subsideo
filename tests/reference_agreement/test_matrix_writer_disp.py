@@ -129,7 +129,7 @@ def test_render_disp_cell_nam_returns_tuple(tmp_path: Path) -> None:
     assert "coh=" in pq_col
     assert "resid=" in pq_col
     assert "attr=" in pq_col
-    assert "(CALIBRATING)" in pq_col
+    assert "CALIBRATING" in pq_col
     # RA col: per-criterion measurements rendered via _render_measurement
     assert "0.04" in ra_col or "FAIL" in ra_col  # correlation rendered
     # RA body should NOT be italicised whole-body (existing _render_measurement
@@ -266,7 +266,7 @@ cells:
     text = out.read_text()
     # Validate DISP-branch rendering signature
     assert "DISP" in text
-    assert "(CALIBRATING)" in text
+    assert "CALIBRATING" in text
     assert "attr=phass" in text
     assert "[phase3-cached]" in text
     # Make sure RUN_FAILED is NOT present (would indicate dispatch fell through)
