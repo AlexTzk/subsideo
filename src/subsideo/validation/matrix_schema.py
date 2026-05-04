@@ -730,6 +730,163 @@ class CauseAssessment(BaseModel):
     next_test: str = ""
 
 
+# --- Phase 11 DISP candidate evidence models (D-09 through D-12) ---
+
+DISPCandidateName = Literal["spurt_native", "phass_post_deramp"]
+DISPCandidateCell = Literal["socal", "bologna"]
+DISPCandidateStatus = Literal["PASS", "FAIL", "BLOCKER"]
+
+
+class DISPDeformationSanityCheck(BaseModel):
+    """Lightweight deformation-signal sanity check for Phase 11 PHASS deramping (D-07).
+
+    A flagged check (``flagged=True``) blocks a Phase 12 production recommendation
+    for PHASS deramping but does NOT block Phase 11 from reporting candidate metrics
+    (D-08). The flag_reason is used by Phase 12 to assess production safety.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    cell: DISPCandidateCell
+    trend_delta_mm_yr: float | None = Field(
+        default=None,
+        description=(
+            "Velocity trend change (deramped minus baseline) in mm/yr. "
+            "Large values indicate real deformation may have been erased."
+        ),
+    )
+    direction_change_deg: float | None = Field(
+        default=None,
+        description=(
+            "Mean velocity direction change in degrees from baseline. "
+            "High values (> 60 deg) indicate possible deformation-signal erasure."
+        ),
+    )
+    stable_residual_delta_mm_yr: float | None = Field(
+        default=None,
+        description=(
+            "Stable-terrain residual change (deramped minus baseline) in mm/yr. "
+            "Used to distinguish ramp removal from signal removal."
+        ),
+    )
+    flagged: bool = Field(
+        default=False,
+        description=(
+            "True when sanity-check heuristics indicate deformation signal "
+            "was likely erased. Blocks Phase 12 production recommendation (D-08)."
+        ),
+    )
+    flag_reason: str = Field(
+        default="",
+        description="Human-readable reason for the flag (populated when flagged=True).",
+    )
+
+
+class DISPCandidateOutcome(BaseModel):
+    """Phase 11 candidate-cell evidence record (D-09 / D-10 / D-11).
+
+    Represents exactly one candidate run on one cell. Status is PASS, FAIL, or
+    BLOCKER per D-09. BLOCKER records must carry failed_stage, error_summary,
+    evidence_paths, cached_input_valid, and partial_metrics per D-10.
+
+    This model is additive sidecar evidence that MUST NOT collapse product_quality,
+    reference_agreement, or ramp_attribution evidence into a single verdict (D-12).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate: DISPCandidateName = Field(
+        ...,
+        description="Candidate identifier: 'spurt_native' or 'phass_post_deramp'.",
+    )
+    cell: DISPCandidateCell = Field(
+        ...,
+        description="Validation cell: 'socal' or 'bologna'.",
+    )
+    status: DISPCandidateStatus = Field(
+        ...,
+        description="Candidate-cell verdict: PASS, FAIL, or BLOCKER.",
+    )
+    failed_stage: str | None = Field(
+        default=None,
+        description=(
+            "Pipeline stage where a BLOCKER was triggered (e.g. 'unwrap', "
+            "'phase_linking', 'timeseries'). None for PASS/FAIL."
+        ),
+    )
+    error_summary: str | None = Field(
+        default=None,
+        description=(
+            "repr(exception) or human summary of blocking error. "
+            "None for PASS/FAIL. Required for BLOCKER per D-10."
+        ),
+    )
+    evidence_paths: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Paths to log or artifact files produced before the block occurred. "
+            "Empty list for PASS/FAIL. Populated for BLOCKER per D-10."
+        ),
+    )
+    cached_input_valid: bool = Field(
+        ...,
+        description=(
+            "True when the cached stack inputs were verified valid at run start. "
+            "Preserved in BLOCKER records per D-10 so replanning can assess "
+            "whether a cache-refresh is needed."
+        ),
+    )
+    partial_metrics: bool = Field(
+        default=False,
+        description=(
+            "True when the candidate produced some outputs before blocking. "
+            "Marks the remaining metric fields as partial and not fully comparable "
+            "with PASS/FAIL evidence (D-11)."
+        ),
+    )
+    product_quality_status: str | None = Field(
+        default=None,
+        description=(
+            "Candidate product-quality verdict string (e.g. 'CALIBRATING'). "
+            "Separate from reference-agreement per D-12."
+        ),
+    )
+    reference_correlation: float | None = Field(
+        default=None,
+        description="Pearson r against OPERA DISP-S1 or EGMS L2a reference.",
+    )
+    reference_bias_mm_yr: float | None = Field(
+        default=None,
+        description="Bias in mm/yr against reference.",
+    )
+    reference_rmse_mm_yr: float | None = Field(
+        default=None,
+        description="RMSE in mm/yr against reference.",
+    )
+    ramp_mean_magnitude_rad: float | None = Field(
+        default=None,
+        description="Mean planar-ramp magnitude in radians across the IFG stack.",
+    )
+    ramp_direction_sigma_deg: float | None = Field(
+        default=None,
+        description="Circular standard deviation of ramp direction in degrees.",
+    )
+    attributed_source: AttributedSource | None = Field(
+        default=None,
+        description=(
+            "Ramp attribution label from auto_attribute_ramp. None if ramp "
+            "diagnostics could not be computed (e.g. partial BLOCKER)."
+        ),
+    )
+    deformation_sanity: DISPDeformationSanityCheck | None = Field(
+        default=None,
+        description=(
+            "Optional deformation-signal sanity check for PHASS deramping (D-07). "
+            "None for SPURT native or when check could not be computed."
+        ),
+    )
+
+
 class DISPCellMetrics(MetricsJson):
     """Phase 4 DISP comparison-adapter cell aggregate (CONTEXT D-11).
 
@@ -803,6 +960,14 @@ class DISPCellMetrics(MetricsJson):
     cache_provenance: list[CacheProvenance] = Field(
         default_factory=list,
         description="Optional Phase 10 cache mode and input/output hash provenance.",
+    )
+    candidate_outcomes: list[DISPCandidateOutcome] = Field(
+        default_factory=list,
+        description=(
+            "Phase 11 SPURT/native and PHASS post-deramping candidate-cell evidence. "
+            "Additive sidecar — does not replace product_quality, reference_agreement, "
+            "or ramp_attribution (D-12). Empty list for legacy sidecars."
+        ),
     )
 
 
