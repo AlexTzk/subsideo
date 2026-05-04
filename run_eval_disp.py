@@ -282,6 +282,7 @@ if __name__ == "__main__":
 
     if existing_dem:
         dem_path = existing_dem[0]
+        dem_cache_mode = "reused"
         print(f"  Already present: {dem_path.name}")
     else:
         dem_path, _ = fetch_dem(
@@ -289,6 +290,7 @@ if __name__ == "__main__":
             output_epsg=EPSG,
             output_dir=dem_dir,
         )
+        dem_cache_mode = "redownloaded"
         print(f"  DEM: {dem_path.name}")
 
     # ── Stage 5: Burst database ──────────────────────────────────────────────
@@ -333,6 +335,10 @@ if __name__ == "__main__":
 
     cslc_paths: list[Path] = []
     failed_scenes: list[str] = []
+    slc_cache_inputs: list[tuple[str, Path, str]] = []
+    cslc_cache_inputs: list[tuple[str, Path, str]] = []
+    tracked_orbits: list[tuple[Path, datetime, str]] = []
+    successful_sensing_times: list[datetime] = []
 
     for i, scene in enumerate(slc_results):
         scene_id = scene.properties["fileID"].removesuffix("-SLC")
@@ -353,17 +359,21 @@ if __name__ == "__main__":
             cslc_h5 = existing_cslc[0]
             print(f"  {label}: exists ({cslc_h5.name})")
             cslc_paths.append(cslc_h5)
+            cslc_cache_inputs.append((f"cslc_{date_tag}", cslc_h5, "reused"))
+            successful_sensing_times.append(sensing_dt)
             continue
 
         print(f"  {label}: ", end="", flush=True)
 
         # -- Download SLC --
         safe_path = input_dir / f"{scene_id}.zip"
+        slc_cache_mode = "reused"
         if not safe_path.exists():
             # Check for any zip matching this date
             date_zips = sorted(input_dir.glob(f"*{date_tag}*.zip"))
             if date_zips:
                 safe_path = date_zips[0]
+                slc_cache_mode = "reused"
             else:
                 print("downloading SLC... ", end="", flush=True)
                 try:
@@ -378,6 +388,7 @@ if __name__ == "__main__":
                     candidates = sorted(input_dir.glob("*.zip"), key=lambda p: p.stat().st_mtime)
                 if candidates:
                     safe_path = candidates[-1]
+                    slc_cache_mode = "redownloaded"
 
         if not safe_path.exists():
             print("SKIP (no SAFE file)")
@@ -387,15 +398,21 @@ if __name__ == "__main__":
             print("SKIP (invalid SAFE cache/download)")
             failed_scenes.append(date_tag)
             continue
+        slc_cache_inputs.append((f"slc_{date_tag}", safe_path, slc_cache_mode))
 
         # -- Fetch orbit --
         print("orbit... ", end="", flush=True)
         try:
+            existing_orbit_paths = {p.resolve() for p in orbit_dir.glob("*.EOF")}
             orbit_path = fetch_orbit(
                 sensing_time=sensing_dt,
                 satellite=sat_tag,
                 output_dir=orbit_dir,
             )
+            orbit_cache_mode = (
+                "reused" if orbit_path.resolve() in existing_orbit_paths else "redownloaded"
+            )
+            tracked_orbits.append((orbit_path, sensing_dt, orbit_cache_mode))
         except Exception as e:
             print(f"SKIP (orbit: {e})")
             failed_scenes.append(date_tag)
@@ -423,6 +440,8 @@ if __name__ == "__main__":
         if result.valid and result.output_paths:
             cslc_h5 = result.output_paths[0]
             cslc_paths.append(cslc_h5)
+            cslc_cache_inputs.append((f"cslc_{date_tag}", cslc_h5, "regenerated"))
+            successful_sensing_times.append(sensing_dt)
             print(f"OK ({elapsed:.0f}s, {cslc_h5.name})")
         else:
             print(f"FAIL ({elapsed:.0f}s: {result.validation_errors})")
@@ -466,6 +485,7 @@ if __name__ == "__main__":
     if velocity_path.exists():
         print(f"  Velocity already exists: {velocity_path}")
         print(f"  Size: {velocity_path.stat().st_size / 1e6:.1f} MB")
+        velocity_cache_mode = "reused"
     else:
         print(f"  Input  : {len(cslc_paths)} CSLCs")
         print(f"  Output : {disp_dir}")
@@ -499,6 +519,7 @@ if __name__ == "__main__":
             raise SystemExit("DISP pipeline failed -- see errors above.")
 
         velocity_path = disp_result.velocity_path
+        velocity_cache_mode = "regenerated"
 
     if velocity_path is None or not velocity_path.exists():
         raise SystemExit("No velocity.h5 produced. DISP pipeline may have failed silently.")
@@ -901,6 +922,12 @@ if __name__ == "__main__":
         RampAttribution,
         ReferenceAgreementResultJson,
     )
+    from subsideo.validation.disp_diagnostics import (
+        cache_provenance,
+        summarize_dem,
+        summarize_orbit_coverage,
+        summarize_terrain,
+    )
     from subsideo.validation.selfconsistency import (
         auto_attribute_ramp,
         compute_ramp_aggregate,
@@ -1047,12 +1074,59 @@ if __name__ == "__main__":
         },
         criterion_ids=["disp.correlation_min", "disp.bias_mm_yr_max"],
     )
+
+    dem_diagnostics = summarize_dem(dem_path)
+    terrain_diagnostics = summarize_terrain(dem_path, stable_mask, None)
+
+    orbit_by_sensing: dict[str, tuple[Path, datetime, str]] = {
+        sensing.isoformat(): (path, sensing, mode)
+        for path, sensing, mode in tracked_orbits
+    }
+    cached_orbit_paths = sorted(orbit_dir.glob("*.EOF"))
+    for sensing in successful_sensing_times:
+        key = sensing.isoformat()
+        if key in orbit_by_sensing:
+            continue
+        for candidate in cached_orbit_paths:
+            coverage = summarize_orbit_coverage(candidate, sensing)
+            if coverage.covers_sensing_time is True:
+                orbit_by_sensing[key] = (candidate, sensing, "reused")
+                break
+        if key not in orbit_by_sensing:
+            orbit_by_sensing[key] = (Path(""), sensing, "reused")
+    orbit_provenance = [
+        summarize_orbit_coverage(path, sensing)
+        for path, sensing, _mode in orbit_by_sensing.values()
+    ]
+
+    cache_provenance_records = [
+        cache_provenance("dem", dem_path, dem_cache_mode),
+        *[
+            cache_provenance(name, path, mode)
+            for name, path, mode in slc_cache_inputs
+        ],
+        *[
+            cache_provenance(name, path, mode)
+            for name, path, mode in cslc_cache_inputs
+        ],
+        *[
+            cache_provenance(f"orbit_{sensing:%Y%m%d}", path, mode)
+            for path, sensing, mode in orbit_by_sensing.values()
+            if path.name
+        ],
+        cache_provenance("velocity_tif", velocity_path, velocity_cache_mode),
+    ]
+
     metrics = DISPCellMetrics(
         schema_version=1,
         product_quality=pq,
         reference_agreement=ra,
         ramp_attribution=ramp_attribution_obj,
         era5_diagnostic=Era5Diagnostic(mode=ERA5_MODE),
+        terrain_diagnostics=terrain_diagnostics,
+        orbit_provenance=orbit_provenance,
+        dem_diagnostics=dem_diagnostics,
+        cache_provenance=cache_provenance_records,
         cell_status=cell_status,
         criterion_ids_applied=[
             "disp.selfconsistency.coherence_min",
