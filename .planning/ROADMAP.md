@@ -63,13 +63,14 @@ Plans:
   3. Candidate failures are captured as structured metrics or blocker evidence, not terminal-only logs.
   4. N.Am. OPERA and EU EGMS comparisons continue using explicit `prepare_for_reference(method=...)`.
   5. Product-quality, reference-agreement, and ramp-attribution outcomes remain separated in sidecars, matrix output, and conclusions.
-**Plans**: 4
+**Plans**: 5
 
 Plans:
 - [ ] 11-01-PLAN.md - Candidate evidence schema and helper contract
 - [ ] 11-02-PLAN.md - SPURT native candidate execution
 - [ ] 11-03-PLAN.md - PHASS pre-inversion deramping candidate
-- [ ] 11-04-PLAN.md - Candidate sidecars, matrix hints, and conclusions
+- [ ] 11-04-PLAN.md - Candidate sidecars and matrix hints
+- [ ] 11-05-PLAN.md - Candidate conclusion sections
 
 ### Phase 12: DISP Conclusions & Release Readiness
 **Goal**: Close v1.2 by choosing the DISP production posture and updating all release-facing artifacts so CSLC/DISP outcomes, requirements, matrix cells, and methodology are traceable and audit-ready.
@@ -95,5 +96,5 @@ Phases execute in numeric order: 09 -> 10 -> 11 -> 12
 |-------|----------------|--------|-----------|
 | 09. CSLC EGMS Third Number & Binding Reruns | 5/5 | Complete | 2026-05-02 |
 | 10. DISP ERA5 & Ramp Diagnostics | 4/4 | Complete   | 2026-05-04 |
-| 11. DISP Unwrapper & Deramping Candidates | 0/TBD | Not started | - |
+| 11. DISP Unwrapper & Deramping Candidates | 0/5 | Not started | - |
 | 12. DISP Conclusions & Release Readiness | 0/TBD | Not started | - |

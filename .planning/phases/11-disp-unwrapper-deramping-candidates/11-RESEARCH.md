@@ -328,22 +328,22 @@ candidate_at_reference = prepare_for_reference(
 | A3 | Plane removal can erase geophysical long-wavelength signal. | Common Pitfalls | If too conservative, PHASS-deramp may be blocked from production recommendation even when metrics improve. |
 | A4 | ERA5 candidate multiplication is a likely planning failure mode. | Common Pitfalls | If future user decision changes ERA5 posture, planner would need to revise candidate matrix. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact time-series re-entry point for deramped IFGs**
    - What we know: Locked semantics require deramped unwrapped IFGs before time-series inversion. [VERIFIED: .planning/phases/11-disp-unwrapper-deramping-candidates/11-CONTEXT.md]
    - What's unclear: Existing `run_disp` currently relies on dolphin output directories and does not expose a public "rerun inversion from modified unwrapped IFGs" entry point. [VERIFIED: src/subsideo/products/disp.py]
-   - Recommendation: Planner should allocate a discovery task to identify the minimum dolphin/MintPy re-entry point, with BLOCKER sidecar if the toolchain cannot consume deramped IFGs without deeper product changes. [ASSUMED]
+   - Resolution: Plan 11-03 resolves this by adding an explicit validation-only `deramped_unwrapped_paths: list[Path] | None = None` product-helper hook if a supported local/public re-entry path exists, and otherwise preserving the PHASS post-deramp candidate as a schema-valid partial `BLOCKER` with `failed_stage="deramped_ifg_timeseries_reentry"`, deramped-IFG evidence paths, cached-input validity, and `partial_metrics=True`. This satisfies D-05, D-10, and D-11 without requiring private dolphin APIs or changing production defaults. [RESOLVED: 11-03-PLAN.md]
 
 2. **PHASS deramp sanity-check metric**
    - What we know: SoCal requires a lightweight deformation-signal sanity check. [VERIFIED: .planning/phases/11-disp-unwrapper-deramping-candidates/11-CONTEXT.md]
    - What's unclear: No specific GPS/NGL data integration is in scope or currently available as a dependency. [VERIFIED: .planning/phases/11-disp-unwrapper-deramping-candidates/11-CONTEXT.md]
-   - Recommendation: Use a simple recorded check such as pre/post velocity low-order trend magnitude, sign/direction comparison, and stable-mask residual preservation; mark it as a production-recommendation blocker if suspicious. [ASSUMED]
+   - Resolution: Plan 11-01 defines `DISPDeformationSanityCheck`; Plan 11-03 records `trend_delta_mm_yr`, `direction_change_deg`, and `stable_residual_delta_mm_yr`, with `flagged=True` when `abs(trend_delta_mm_yr) > 3.0` or `abs(stable_residual_delta_mm_yr) > 2.0`. The flag blocks Phase 12 production recommendation for PHASS deramping per D-08 but does not block Phase 11 candidate measurement per D-07. [RESOLVED: 11-01-PLAN.md, 11-03-PLAN.md]
 
 3. **tophu/SNAPHU fallback trigger**
    - What we know: Phase 11 requires SPURT and PHASS deramping; tophu/SNAPHU and 20 x 20 m are later ladder steps unless needed for success criteria. [VERIFIED: .planning/phases/11-disp-unwrapper-deramping-candidates/11-CONTEXT.md]
    - What's unclear: Planner may decide whether a fallback task is needed to satisfy the "at least one alternative candidate" success criterion if SPURT blocks. [VERIFIED: .planning/REQUIREMENTS.md]
-   - Recommendation: Include a conditional fallback task that runs tophu/SNAPHU only if SPURT produces `BLOCKER` before comparable metrics. [ASSUMED]
+   - Resolution: No tophu/SNAPHU fallback task is planned in Phase 11. DISP-08 requires running at least one alternative candidate with failures captured as structured metrics; Plan 11-02 runs SPURT native on both cells and records `BLOCKER` outcomes if SPURT fails before comparable metrics. That structured SPURT outcome satisfies the Phase 11 alternative-candidate requirement, while D-14 keeps tophu/SNAPHU and 20 x 20 m as later ladder steps for Phase 12 or a follow-on gap plan if Phase 11 evidence proves they are needed. [RESOLVED: 11-02-PLAN.md]
 
 ## Environment Availability
 
