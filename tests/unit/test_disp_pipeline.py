@@ -172,6 +172,19 @@ def test_generate_mintpy_template(tmp_path: Path) -> None:
     assert "mintpy.timeFunc.polynomial = 1" in contents
 
 
+def test_generate_mintpy_template_era5_off(tmp_path: Path) -> None:
+    """ERA5-off template disables tropospheric correction."""
+    cfg_path = _generate_mintpy_template(
+        tmp_path,
+        Path.home() / ".cdsapirc",
+        era5_mode="off",
+    )
+
+    contents = cfg_path.read_text()
+    assert "mintpy.troposphericDelay.method = no" in contents
+    assert "mintpy.troposphericDelay.weatherModel = auto" in contents
+
+
 # ---------------------------------------------------------------------------
 # Test 7: run_disp with mocked deps returns valid result
 # ---------------------------------------------------------------------------
@@ -299,6 +312,48 @@ def test_run_disp_import_error(tmp_path: Path, mocker: MockerFixture) -> None:
     assert len(result.validation_errors) > 0
     err_lower = result.validation_errors[0].lower()
     assert "not installed" in err_lower or "dolphin" in err_lower
+
+
+def test_run_disp_era5_off_does_not_require_cdsapirc(
+    tmp_path: Path,
+    mocker: MockerFixture,
+) -> None:
+    """ERA5-off local diagnostic path skips CDS credential validation."""
+    dolphin_dir = tmp_path / "out" / "dolphin"
+    ifg_path = _make_test_ifg_tif(dolphin_dir / "ifg_001.tif")
+    cor_path = _make_test_cor_tif(dolphin_dir / "cor_001.tif", high_coherence=True)
+
+    ts_dir = dolphin_dir / "timeseries"
+    ts_dir.mkdir(parents=True, exist_ok=True)
+    (ts_dir / "velocity.tif").touch()
+
+    validate = mocker.patch("subsideo.products.disp._validate_cds_credentials")
+    mocker.patch(
+        "subsideo.products.disp._run_dolphin_phase_linking",
+        return_value=([ifg_path], [cor_path]),
+    )
+
+    result = run_disp(
+        cslc_paths=[tmp_path / "cslc.h5"],
+        output_dir=tmp_path / "out",
+        cdsapirc_path=tmp_path / "missing.cdsapirc",
+        era5_mode="off",
+    )
+
+    assert result.valid is True
+    validate.assert_not_called()
+
+
+def test_run_disp_invalid_era5_mode_raises(tmp_path: Path) -> None:
+    """Invalid ERA5 mode is rejected before pipeline work starts."""
+    import pytest
+
+    with pytest.raises(ValueError, match="era5_mode must be 'on' or 'off'"):
+        run_disp(
+            cslc_paths=[tmp_path / "cslc.h5"],
+            output_dir=tmp_path / "out",
+            era5_mode="invalid",  # type: ignore[arg-type]
+        )
 
 
 # ---------------------------------------------------------------------------
