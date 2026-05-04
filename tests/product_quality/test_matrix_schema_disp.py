@@ -5,8 +5,10 @@ import pytest
 from pydantic import ValidationError
 
 from subsideo.validation.matrix_schema import (
+    CauseAssessment,
     DISPCellMetrics,
     DISPProductQualityResultJson,
+    Era5Diagnostic,
     PerIFGRamp,
     RampAggregate,
     RampAttribution,
@@ -89,6 +91,70 @@ def test_disp_cell_metrics_round_trip() -> None:
     assert len(parsed.ramp_attribution.per_ifg) == 1
     assert parsed.ramp_attribution.per_ifg[0].ifg_idx == 0
     assert parsed.cell_status == "MIXED"
+    assert parsed.era5_diagnostic is None
+    assert parsed.cause_assessment is None
+
+
+def test_phase10_diagnostics_are_additive_optional_fields() -> None:
+    base = _make_valid_disp_metrics()
+    payload = base.model_dump()
+    payload["era5_diagnostic"] = {
+        "mode": "on",
+        "baseline_correlation": 0.049,
+        "era5_correlation": 0.11,
+        "correlation_delta": 0.061,
+        "baseline_bias_mm_yr": 23.6,
+        "era5_bias_mm_yr": 20.0,
+        "bias_abs_delta_mm_yr": 3.6,
+        "baseline_rmse_mm_yr": 59.6,
+        "era5_rmse_mm_yr": 56.5,
+        "rmse_delta_mm_yr": 3.1,
+        "baseline_ramp_mean_magnitude_rad": 35.6,
+        "era5_ramp_mean_magnitude_rad": 28.0,
+        "ramp_magnitude_delta_rad": 7.6,
+        "improvement_signals": [
+            "reference_correlation_improved",
+            "bias_or_rmse_improved",
+        ],
+        "meaningful_improvement": True,
+    }
+    payload["cause_assessment"] = {
+        "human_verdict": "inconclusive_narrowed",
+        "eliminated_causes": ["tropospheric"],
+        "remaining_causes": [
+            "orbit",
+            "terrain",
+            "unwrapper",
+            "cache_or_input_provenance",
+        ],
+        "next_test": "Run SPURT native candidate.",
+    }
+
+    parsed = DISPCellMetrics.model_validate(payload)
+
+    assert parsed.era5_diagnostic is not None
+    assert parsed.era5_diagnostic.mode == "on"
+    assert parsed.era5_diagnostic.meaningful_improvement is True
+    assert parsed.cause_assessment is not None
+    assert parsed.cause_assessment.human_verdict == "inconclusive_narrowed"
+    assert parsed.cause_assessment.eliminated_causes == ["tropospheric"]
+
+
+def test_phase10_models_reject_invalid_literals_and_extra_fields() -> None:
+    with pytest.raises(ValidationError):
+        Era5Diagnostic.model_validate({"mode": "enabled"})
+
+    with pytest.raises(ValidationError):
+        CauseAssessment.model_validate(
+            {
+                "eliminated_causes": ["troposphere"],
+                "remaining_causes": [],
+                "next_test": "",
+            }
+        )
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        Era5Diagnostic.model_validate({"mode": "off", "unexpected": True})
 
 
 @pytest.mark.parametrize(
@@ -138,6 +204,14 @@ def test_attributed_source_rejects_invalid_literal() -> None:
     base = _make_valid_disp_metrics()
     payload = base.model_dump()
     payload["ramp_attribution"]["attributed_source"] = "invalid-attr"
+    with pytest.raises(ValidationError):
+        DISPCellMetrics.model_validate(payload)
+
+
+def test_attributed_source_rejects_inconclusive_narrowed_literal() -> None:
+    base = _make_valid_disp_metrics()
+    payload = base.model_dump()
+    payload["ramp_attribution"]["attributed_source"] = "inconclusive_narrowed"
     with pytest.raises(ValidationError):
         DISPCellMetrics.model_validate(payload)
 

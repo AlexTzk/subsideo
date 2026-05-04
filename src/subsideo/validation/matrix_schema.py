@@ -510,6 +510,15 @@ class CSLCSelfConsistEUCellMetrics(CSLCSelfConsistNAMCellMetrics):
 CoherenceSource = Literal["phase3-cached", "fresh"]
 AttributedSource = Literal["phass", "orbit", "tropospheric", "mixed", "inconclusive"]
 DISPCellStatus = Literal["PASS", "FAIL", "CALIBRATING", "MIXED", "BLOCKER"]
+Era5Mode = Literal["on", "off"]
+CauseLiteral = Literal[
+    "tropospheric",
+    "orbit",
+    "terrain",
+    "unwrapper",
+    "cache_or_input_provenance",
+]
+CacheMode = Literal["reused", "regenerated", "redownloaded"]
 
 
 class PerIFGRamp(BaseModel):
@@ -635,6 +644,39 @@ class DISPProductQualityResultJson(ProductQualityResultJson):
     )
 
 
+class Era5Diagnostic(BaseModel):
+    """ERA5-on/off delta summary for Phase 10 DISP diagnostics."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Era5Mode
+    baseline_correlation: float | None = None
+    era5_correlation: float | None = None
+    correlation_delta: float | None = None
+    baseline_bias_mm_yr: float | None = None
+    era5_bias_mm_yr: float | None = None
+    bias_abs_delta_mm_yr: float | None = None
+    baseline_rmse_mm_yr: float | None = None
+    era5_rmse_mm_yr: float | None = None
+    rmse_delta_mm_yr: float | None = None
+    baseline_ramp_mean_magnitude_rad: float | None = None
+    era5_ramp_mean_magnitude_rad: float | None = None
+    ramp_magnitude_delta_rad: float | None = None
+    improvement_signals: list[str] = Field(default_factory=list)
+    meaningful_improvement: bool = False
+
+
+class CauseAssessment(BaseModel):
+    """Structured narrowed-cause record without changing AttributedSource."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    human_verdict: str = "inconclusive"
+    eliminated_causes: list[CauseLiteral] = Field(default_factory=list)
+    remaining_causes: list[CauseLiteral] = Field(default_factory=list)
+    next_test: str = ""
+
+
 class DISPCellMetrics(MetricsJson):
     """Phase 4 DISP comparison-adapter cell aggregate (CONTEXT D-11).
 
@@ -680,6 +722,17 @@ class DISPCellMetrics(MetricsJson):
             "status (CALIBRATING product_quality + FAIL reference_agreement). "
             "PASS / FAIL reserved for post-BINDING-promotion (v1.2+ per "
             "GATE-05). BLOCKER for stable-mask < 100 valid pixels."
+        ),
+    )
+    era5_diagnostic: Era5Diagnostic | None = Field(
+        default=None,
+        description="Optional Phase 10 ERA5-on/off diagnostic delta record.",
+    )
+    cause_assessment: CauseAssessment | None = Field(
+        default=None,
+        description=(
+            "Optional Phase 10 structured cause assessment. Human verdicts may "
+            "narrow causes while top-level attributed_source remains compatible."
         ),
     )
 
