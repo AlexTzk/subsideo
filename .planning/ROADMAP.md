@@ -45,10 +45,13 @@ Plans:
   2. Conclusions report whether ramp magnitude, ramp direction stability, reference correlation, bias, and RMSE improve relative to the v1.1 baselines (`r=0.049` SoCal, `r=0.336` Bologna).
   3. Shared orbit, DEM, slope, and terrain provenance diagnostics explain whether failures are atmospheric, terrain-driven, cache/provenance-related, or still inconclusive.
   4. Product-quality, reference-agreement, and ramp-attribution metrics remain structurally separate in sidecars and conclusions.
-**Plans**: TBD
+**Plans**: 4
 
 Plans:
-- [ ] 10-01-PLAN.md - TBD after discussion/planning
+- [ ] 10-01-PLAN.md - Schema and diagnostic helper contract
+- [ ] 10-02-PLAN.md - ERA5 toggle and separate diagnostic output routing
+- [ ] 10-03-PLAN.md - Orbit, DEM, terrain, and cache provenance sidecars
+- [ ] 10-04-PLAN.md - Matrix/conclusions rendering and live diagnostic rerun/blocker handling
 
 ### Phase 11: DISP Unwrapper & Deramping Candidates
 **Goal**: Evaluate the next DISP science candidate(s) from the v1.1 Unwrapper Selection brief without changing the native 5 x 10 m production output or the `prepare_for_reference(method=...)` validation discipline.
@@ -88,6 +91,6 @@ Phases execute in numeric order: 09 -> 10 -> 11 -> 12
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 09. CSLC EGMS Third Number & Binding Reruns | 5/5 | Complete | 2026-05-02 |
-| 10. DISP ERA5 & Ramp Diagnostics | 0/TBD | Not started | - |
+| 10. DISP ERA5 & Ramp Diagnostics | 0/4 | Ready to execute | - |
 | 11. DISP Unwrapper & Deramping Candidates | 0/TBD | Not started | - |
 | 12. DISP Conclusions & Release Readiness | 0/TBD | Not started | - |
