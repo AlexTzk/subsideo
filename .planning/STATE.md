@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: CSLC Binding & DISP Science Pass
 status: executing
 stopped_at: Phase 10 context gathered
-last_updated: "2026-05-04T00:05:24.718Z"
-last_activity: 2026-05-04 -- Phase 10 planning complete
+last_updated: "2026-05-04T05:42:13.318Z"
+last_activity: 2026-05-04 -- Phase 10 execution started
 progress:
   total_phases: 4
   completed_phases: 1
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-04 -- Phase 10 planning complete
+Phase: 10 (disp-era5-ramp-diagnostics) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 10
+Last activity: 2026-05-04 -- Phase 10 execution started
 
 **v1.2 scope:** Focus on CSLC and DISP. CSLC enters with strong v1.1 self-consistency baselines (SoCal coh=0.887 / residual=-0.109 mm/yr; Mojave coh=0.804 / residual=+1.127 mm/yr; Iberian coh=0.868 / residual=+0.347 mm/yr) and needs BINDING gate promotion plus deferred EGMS/AOI hardening. DISP enters with structurally complete N.Am./EU validation but reference-agreement FAILs (SoCal r=0.049, Bologna r=0.336), while stable-terrain residuals remain near zero; v1.2 starts with ERA5/ramp diagnostics before choosing an unwrapper/resolution candidate.
 

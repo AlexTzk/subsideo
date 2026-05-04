@@ -48,7 +48,7 @@ Plans:
 **Plans**: 4
 
 Plans:
-- [ ] 10-01-PLAN.md - Schema and diagnostic helper contract
+- [x] 10-01-PLAN.md - Schema and diagnostic helper contract
 - [ ] 10-02-PLAN.md - ERA5 toggle and separate diagnostic output routing
 - [ ] 10-03-PLAN.md - Orbit, DEM, terrain, and cache provenance sidecars
 - [ ] 10-04-PLAN.md - Matrix/conclusions rendering and live diagnostic rerun/blocker handling
@@ -91,6 +91,6 @@ Phases execute in numeric order: 09 -> 10 -> 11 -> 12
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 09. CSLC EGMS Third Number & Binding Reruns | 5/5 | Complete | 2026-05-02 |
-| 10. DISP ERA5 & Ramp Diagnostics | 0/4 | Ready to execute | - |
+| 10. DISP ERA5 & Ramp Diagnostics | 1/4 | In Progress|  |
 | 11. DISP Unwrapper & Deramping Candidates | 0/TBD | Not started | - |
 | 12. DISP Conclusions & Release Readiness | 0/TBD | Not started | - |
