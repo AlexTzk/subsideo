@@ -63,6 +63,7 @@ def _run_dolphin_phase_linking(
     n_parallel_bursts: int = 1,
     block_shape: tuple[int, int] = (512, 512),
     n_parallel_unwrap: int = 4,
+    unwrap_method: Literal["phass", "spurt"] = "phass",
 ) -> tuple[list[Path], list[Path]]:
     """Run dolphin PS/DS phase linking on a CSLC stack.
 
@@ -82,6 +83,10 @@ def _run_dolphin_phase_linking(
         Block size for phase linking (rows, cols).
     n_parallel_unwrap:
         Number of parallel unwrapping jobs.
+    unwrap_method:
+        Unwrapper to use: ``"phass"`` (default, production) or ``"spurt"``
+        (validation-only candidate per Phase 11 D-06). Default ``"phass"``
+        preserves the native production posture for all non-validation callers.
 
     Returns
     -------
@@ -100,11 +105,14 @@ def _run_dolphin_phase_linking(
 
     from dolphin.workflows.config._unwrap_options import UnwrapMethod
 
+    # Map the string override to the dolphin UnwrapMethod enum.
+    # Only "phass" and "spurt" are accepted (T-11-02-01 mitigation).
+    unwrap_method_enum = UnwrapMethod.SPURT if unwrap_method == "spurt" else UnwrapMethod.PHASS
+
     # OPERA CSLC HDF5 files store complex SLC data under /data/VV.
-    # Use PHASS (isce3 phase-and-slope unwrapper): tree-growing algorithm
-    # that always terminates, handles noisy/low-coherence data better
-    # than ICU, and is orders of magnitude faster than SNAPHU on large
-    # grids (SNAPHU can hang on >70M pixel grids).
+    # Default: PHASS (isce3 phase-and-slope unwrapper) — tree-growing algorithm
+    # that always terminates, handles noisy/low-coherence data better than ICU,
+    # and is orders of magnitude faster than SNAPHU on large grids.
     cfg = DisplacementWorkflow(
         cslc_file_list=[str(p) for p in cslc_file_list],
         input_options=InputOptions(subdataset="/data/VV"),
@@ -116,7 +124,7 @@ def _run_dolphin_phase_linking(
         ),
         unwrap_options=UnwrapOptions(
             run_unwrap=True,
-            unwrap_method=UnwrapMethod.PHASS,
+            unwrap_method=unwrap_method_enum,
             n_parallel_jobs=n_parallel_unwrap,
         ),
     )
@@ -430,6 +438,7 @@ def run_disp(
     block_shape: tuple[int, int] = (512, 512),
     n_parallel_unwrap: int = 4,
     era5_mode: Literal["on", "off"] = "on",
+    unwrap_method: Literal["phass", "spurt"] = "phass",
 ) -> DISPResult:
     """Run the full DISP-S1 displacement time-series pipeline.
 
@@ -459,6 +468,11 @@ def run_disp(
     era5_mode:
         ``"on"`` validates CDS credentials and writes ERA5 MintPy config;
         ``"off"`` disables tropospheric correction for local diagnostics.
+    unwrap_method:
+        Unwrapper selection: ``"phass"`` (default, native production) or
+        ``"spurt"`` (Phase 11 SPURT-native validation candidate, D-06).
+        The default ``"phass"`` preserves native production behaviour for
+        all callers that do not pass the override (T-11-02-01).
 
     Returns
     -------
@@ -472,6 +486,10 @@ def run_disp(
 
     if cdsapirc_path is None:
         cdsapirc_path = Path.home() / ".cdsapirc"
+
+    # T-11-02-01: validate unwrap_method before any I/O (fail fast)
+    if unwrap_method not in ("phass", "spurt"):
+        raise ValueError("unwrap_method must be 'phass' or 'spurt'")
 
     if era5_mode not in ("on", "off"):
         raise ValueError("era5_mode must be 'on' or 'off'")
@@ -493,6 +511,7 @@ def run_disp(
             n_parallel_bursts=n_parallel_bursts,
             block_shape=block_shape,
             n_parallel_unwrap=n_parallel_unwrap,
+            unwrap_method=unwrap_method,
         )
 
         # dolphin 0.42+ handles the full pipeline: phase linking, unwrapping,
