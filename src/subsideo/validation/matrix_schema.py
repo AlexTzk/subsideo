@@ -521,6 +521,59 @@ CauseLiteral = Literal[
 CacheMode = Literal["reused", "regenerated", "redownloaded"]
 
 
+class TerrainDiagnostics(BaseModel):
+    """Terrain/stable-mask provenance for Phase 10 DISP diagnostics."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    stable_mask_pixels: int
+    stable_mask_retention_fraction: float
+    elevation_min_m: float | None = None
+    elevation_max_m: float | None = None
+    slope_p50_deg: float | None = None
+    slope_p90_deg: float | None = None
+    terrain_vs_ramp_pearson_r: float | None = None
+
+
+class OrbitCoverageDiagnostic(BaseModel):
+    """Orbit filename/type and sensing-time coverage sanity."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sensing_time_iso: str
+    orbit_filename: str
+    orbit_type: str
+    validity_start_iso: str | None = None
+    validity_stop_iso: str | None = None
+    covers_sensing_time: bool | None = None
+
+
+class DemDiagnostics(BaseModel):
+    """DEM source/tile/hash and raster-quality provenance."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: str = "glo_30"
+    tile_names: list[str] = Field(default_factory=list)
+    dem_sha256: str | None = None
+    nodata_fraction: float | None = None
+    elevation_min_m: float | None = None
+    elevation_max_m: float | None = None
+    slope_p50_deg: float | None = None
+    slope_p90_deg: float | None = None
+
+
+class CacheProvenance(BaseModel):
+    """Hash and cache-mode record for major DISP inputs/outputs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    path: str
+    sha256: str | None = None
+    cache_mode: CacheMode
+
+
 class PerIFGRamp(BaseModel):
     """One row in RampAttribution.per_ifg (Phase 4 D-11)."""
 
@@ -734,6 +787,22 @@ class DISPCellMetrics(MetricsJson):
             "Optional Phase 10 structured cause assessment. Human verdicts may "
             "narrow causes while top-level attributed_source remains compatible."
         ),
+    )
+    terrain_diagnostics: TerrainDiagnostics | None = Field(
+        default=None,
+        description="Optional Phase 10 terrain/stable-mask provenance summary.",
+    )
+    orbit_provenance: list[OrbitCoverageDiagnostic] = Field(
+        default_factory=list,
+        description="Optional Phase 10 per-sensing-time orbit coverage provenance.",
+    )
+    dem_diagnostics: DemDiagnostics | None = Field(
+        default=None,
+        description="Optional Phase 10 DEM source/hash/elevation/slope provenance.",
+    )
+    cache_provenance: list[CacheProvenance] = Field(
+        default_factory=list,
+        description="Optional Phase 10 cache mode and input/output hash provenance.",
     )
 
 

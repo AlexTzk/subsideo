@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from subsideo.validation.matrix_schema import (
     CauseAssessment,
+    CacheProvenance,
     DISPCellMetrics,
     DISPProductQualityResultJson,
     Era5Diagnostic,
@@ -138,6 +139,77 @@ def test_phase10_diagnostics_are_additive_optional_fields() -> None:
     assert parsed.cause_assessment is not None
     assert parsed.cause_assessment.human_verdict == "inconclusive_narrowed"
     assert parsed.cause_assessment.eliminated_causes == ["tropospheric"]
+
+
+def test_phase10_provenance_diagnostics_are_schema_valid() -> None:
+    base = _make_valid_disp_metrics()
+    payload = base.model_dump()
+    payload["terrain_diagnostics"] = {
+        "stable_mask_pixels": 25,
+        "stable_mask_retention_fraction": 0.25,
+        "elevation_min_m": 12.0,
+        "elevation_max_m": 132.0,
+        "slope_p50_deg": 2.0,
+        "slope_p90_deg": 8.5,
+        "terrain_vs_ramp_pearson_r": -0.2,
+    }
+    payload["orbit_provenance"] = [
+        {
+            "sensing_time_iso": "2024-01-08T14:01:16",
+            "orbit_filename": "S1A_OPER_AUX_POEORB_OPOD_20240128T080731_V20240107T225942_20240109T005942.EOF",
+            "orbit_type": "POEORB",
+            "validity_start_iso": "2024-01-07T22:59:42",
+            "validity_stop_iso": "2024-01-09T00:59:42",
+            "covers_sensing_time": True,
+        }
+    ]
+    payload["dem_diagnostics"] = {
+        "source": "glo_30",
+        "tile_names": ["glo30_utm32611.tif"],
+        "dem_sha256": "0" * 64,
+        "nodata_fraction": 0.1,
+        "elevation_min_m": 12.0,
+        "elevation_max_m": 132.0,
+        "slope_p50_deg": 2.0,
+        "slope_p90_deg": 8.5,
+    }
+    payload["cache_provenance"] = [
+        {
+            "name": "velocity_tif",
+            "path": "eval-disp/disp-era5-on/dolphin/timeseries/velocity.tif",
+            "sha256": "1" * 64,
+            "cache_mode": "regenerated",
+        }
+    ]
+
+    parsed = DISPCellMetrics.model_validate(payload)
+
+    assert parsed.terrain_diagnostics is not None
+    assert parsed.terrain_diagnostics.stable_mask_pixels == 25
+    assert parsed.orbit_provenance[0].covers_sensing_time is True
+    assert parsed.dem_diagnostics is not None
+    assert parsed.dem_diagnostics.source == "glo_30"
+    assert parsed.cache_provenance[0].cache_mode == "regenerated"
+
+
+def test_phase10_provenance_defaults_preserve_legacy_disp_fixture() -> None:
+    parsed = DISPCellMetrics.model_validate(_make_valid_disp_metrics().model_dump())
+
+    assert parsed.terrain_diagnostics is None
+    assert parsed.orbit_provenance == []
+    assert parsed.dem_diagnostics is None
+    assert parsed.cache_provenance == []
+
+
+def test_cache_provenance_rejects_invalid_cache_mode() -> None:
+    with pytest.raises(ValidationError):
+        CacheProvenance.model_validate(
+            {
+                "name": "velocity_tif",
+                "path": "eval-disp/velocity.tif",
+                "cache_mode": "cached",
+            }
+        )
 
 
 def test_phase10_models_reject_invalid_literals_and_extra_fields() -> None:
