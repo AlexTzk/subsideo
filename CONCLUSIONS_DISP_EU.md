@@ -402,3 +402,53 @@ Per Phase 4 D-15 / D-16: this brief is the v1.1 closure handoff — the DISP-V2-
 ---
 
 **Phase 4 closure verdict (this cell):** cell_status = `MIXED` = CALIBRATING product_quality + FAIL reference_agreement (CONTEXT D-19: MIXED is the expected first-rollout status). The FAIL on reference-agreement is structurally correct — it documents the PHASS unwrapper limitation propagating per-IFG ramps into network inversion, not a subsideo-layer bug. The persistently-coherent-fraction = 0.000 is a real signal about Po-plain agricultural coherence, not a methodological gap. The named upgrade path is in the brief.
+
+## Phase 10 ERA5 diagnostic
+
+Phase 10 reran the Bologna DISP diagnostic with ERA5 tropospheric correction enabled. ERA5 data access was not blocked; `$HOME/.cdsapirc` was present and `make eval-disp-eu` completed after downloading/reusing the required SAFE, ERA5, EGMS, DEM, and CSLC inputs. The four known COMPASS post-step failures (`20210316`, `20210328`, `20210409`, `20210421`) were tolerated by the driver and did not prevent the 15-CSLC DISP run.
+
+### Baseline vs ERA5-on reference agreement
+
+| Metric | v1.1 baseline | Phase 10 ERA5-on | Criterion | Verdict |
+|--------|---------------|------------------|-----------|---------|
+| Pearson `r` | 0.3358 | 0.3358 | > 0.92 | **FAIL** |
+| Bias | +3.4608 mm/yr | +3.4608 mm/yr | < 3 mm/yr | **FAIL** |
+| RMSE | 5.2425 mm/yr | 5.2425 mm/yr | informational | unchanged |
+| Paired samples | 1,126,687 | 1,126,687 | — | unchanged |
+
+ERA5-on does not provide the two independent improvement signals required to change the Phase 11 candidate order. The Bologna result is effectively unchanged from the v1.1 baseline and still fails both binding reference-agreement criteria.
+
+### Ramp attribution delta
+
+| Field | v1.1 baseline | Phase 10 ERA5-on |
+|-------|---------------|------------------|
+| Mean ramp magnitude | 25.9980 rad | 25.9980 rad |
+| Direction sigma | 117.0968 deg | 117.0968 deg |
+| Ramp/coherence `r` | -0.5173 | -0.5173 |
+| Attribution label | `inconclusive` | `inconclusive` |
+
+The ERA5-on run leaves the same large, random-direction ramp signature. Product-quality, reference-agreement, and ramp-attribution remain separate evidence streams: stable-terrain residual is small (+0.14 mm/yr), but persistent coherence is 0.000 and reference agreement still fails.
+
+### Diagnostic provenance
+
+| Field | Phase 10 value |
+|-------|----------------|
+| Orbit coverage | POEORB files cover all recorded Bologna sensing times in the validated sidecar |
+| DEM | GLO-30 `glo30_utm32632.tif`, SHA-256 `2b51856728faf58a86a41e9fc99a55c69da9e1e44859a956773a1f38e28aa489` |
+| DEM nodata fraction | 0.0729 |
+| DEM slope p50 / p90 | 0.3175 deg / 5.3344 deg |
+| Stable-mask pixels | 3,881 |
+| Stable-mask retention | 0.000394 |
+| Stable-terrain slope p50 / p90 | 0.5690 deg / 2.4298 deg |
+| Terrain-vs-ramp correlation | null |
+| Cache mode summary | DEM and most CSLC cache entries reused; four SLC entries redownloaded; coherence freshly computed from cached CSLCs |
+
+### Cause assessment
+
+| Field | Value |
+|-------|-------|
+| `eliminated_causes` | none emitted by sidecar |
+| `remaining_causes` | orbit, PHASS/tile unwrap behavior, and tropospheric long-wavelength phase remain possible |
+| `next_test` | Phase 11 unwrapper candidates; ERA5-on is not promoted to required baseline |
+
+**Phase 11 guidance:** neither SoCal nor Bologna meets the ERA5 two-signal rule. Keep the v1.1 global order exactly: "SPURT native first, then PHASS deramping, then tophu/SNAPHU, then 20 x 20 m fallback."

@@ -23,6 +23,7 @@ final cross-section consistency pass.
 5. [DSWE F1 ceiling, held-out Balaton, and threshold-module design](#dswe-recalibration-methodology)
 6. [OPERA frame selection by exact UTC hour + spatial footprint](#opera-utc-frame-selection)
 7. [Cross-sensor comparison — precision-first framing (OPERA DIST vs EFFIS)](#cross-sensor-precision-first)
+8. [ERA5 tropospheric diagnostic](#era5-tropospheric-diagnostic)
 
 ---
 
@@ -824,3 +825,25 @@ The `EFFIS_LAYER_NAME = "burntareas/current"` REST resource path is the post-eve
 ### 7.4 Cross-reference to §4.3
 
 Section 4.3 of this document ("EFFIS class-definition mismatch caveat") provides the implementation-level evidence for the temporal mismatch described here. §4.3 documents the specific Phase 5 findings (Aveiro chained-retry monotonicity, Spain Sierra de la Culebra substitution, EMSR686 Evros activation). §7 is the methodology-level framing that §4.3 evidence supports: the precision-first policy statement in §7.2 applies to any future DIST-S1 cross-sensor comparison against EFFIS or similar post-event perimeter products, not only to the three Phase 5 events.
+
+## 8. Phase 10 DISP ERA5 Diagnostic
+
+<a name="era5-tropospheric-diagnostic"></a>
+
+### ERA5 tropospheric diagnostic
+
+ERA5 is a **diagnostic** input for Phase 10 DISP ramp attribution, not a new default baseline by itself. A cell may only promote ERA5-on into a required baseline when it shows at least two independent improvement signals across reference agreement and ramp behavior, such as improved correlation, lower absolute bias/RMSE, and reduced ramp magnitude without degrading product-quality evidence.
+
+The Phase 10 SoCal and Bologna runs both completed with ERA5 enabled and schema-valid `DISPCellMetrics` sidecars. Neither cell met the two-signal rule: SoCal reference agreement worsened, while Bologna remained effectively unchanged. Therefore Phase 11 keeps the v1.1 global candidate order instead of requiring ERA5-on for all unwrapper candidates.
+
+`inconclusive_narrowed` is a human-facing narrative label only. It may be useful in conclusions when ERA5, orbit coverage, DEM diagnostics, and terrain diagnostics reduce the plausible-cause set, but it must not collapse schema categories or become a hidden pass/fail bit.
+
+Product-quality, reference-agreement, and ramp-attribution remain separate:
+
+| Evidence stream | Meaning | Phase 10 example |
+|-----------------|---------|------------------|
+| Product-quality | Internal consistency on stable terrain | stable residual can be small even when persistent coherence is 0.000 |
+| Reference-agreement | External OPERA/EGMS agreement | both ERA5-on cells still fail `r > 0.92` and bias `< 3 mm/yr` |
+| Ramp-attribution | Per-IFG planar-ramp behavior and cause hints | both cells remain `inconclusive` despite ERA5-on |
+
+When neither DISP cell meets the ERA5 two-signal rule, the Phase 11 fallback order remains: "SPURT native first, then PHASS deramping, then tophu/SNAPHU, then 20 x 20 m fallback."

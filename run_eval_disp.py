@@ -857,7 +857,7 @@ if __name__ == "__main__":
         try:
             phase3 = _json.loads(phase3_metrics_path.read_text())
             socal = next(a for a in phase3.get("per_aoi", []) if a.get("aoi_name") == "SoCal")
-            m = socal.get("product_quality", {}).get("measurements", {})
+            m = (socal.get("product_quality") or {}).get("measurements", {})
             if m and "coherence_median_of_persistent" in m:
                 # Strip residual_mm_yr -- DISP residual is fresh (D-08)
                 coh_stats = {

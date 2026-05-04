@@ -354,3 +354,53 @@ Per Phase 4 D-15 / D-16: this brief is the v1.1 closure handoff — the DISP-V2-
 ---
 
 **Phase 4 closure verdict (this cell):** cell_status = `MIXED` = CALIBRATING product_quality + FAIL reference_agreement (CONTEXT D-19: MIXED is the expected first-rollout status). The FAIL on reference-agreement is structurally correct — it documents the PHASS unwrapper limitation propagating per-IFG ramps into network inversion, not a subsideo-layer bug. The named upgrade path is in the brief.
+
+## Phase 10 ERA5 diagnostic
+
+Phase 10 reran the SoCal DISP diagnostic with ERA5 tropospheric correction enabled. ERA5 data access was not blocked; `$HOME/.cdsapirc` was present and `make eval-disp-nam` completed after fixing a local cached-metrics null-handling bug in `run_eval_disp.py`.
+
+### Baseline vs ERA5-on reference agreement
+
+| Metric | v1.1 baseline | Phase 10 ERA5-on | Criterion | Verdict |
+|--------|---------------|------------------|-----------|---------|
+| Pearson `r` | 0.0490 | 0.0071 | > 0.92 | **FAIL** |
+| Bias | +23.6153 mm/yr | +55.4325 mm/yr | < 3 mm/yr | **FAIL** |
+| RMSE | 59.5567 mm/yr | 70.0391 mm/yr | informational | worse |
+| Paired samples | 481,392 | 481,392 | — | unchanged |
+
+ERA5-on does not provide the two independent improvement signals required to change the Phase 11 candidate order. The reference-agreement metrics worsen relative to the v1.1 baseline.
+
+### Ramp attribution delta
+
+| Field | v1.1 baseline | Phase 10 ERA5-on |
+|-------|---------------|------------------|
+| Mean ramp magnitude | 35.5881 rad | 35.5881 rad |
+| Direction sigma | 124.5336 deg | 124.5336 deg |
+| Ramp/coherence `r` | +0.1520 | +0.1520 |
+| Attribution label | `inconclusive` | `inconclusive` |
+
+The ERA5-on run leaves the same large, random-direction ramp signature. Product-quality, reference-agreement, and ramp-attribution remain separate evidence streams: stable-terrain residual is small (-0.04 mm/yr), but persistent coherence is 0.000 and reference agreement still fails.
+
+### Diagnostic provenance
+
+| Field | Phase 10 value |
+|-------|----------------|
+| Orbit coverage | POEORB files cover all SoCal sensing times in the validated sidecar |
+| DEM | GLO-30 `glo30_utm32611.tif`, SHA-256 `87d96370a6071a30c03a431b60b81da73b9646e47a1cb4576f990735ab5ebd8b` |
+| DEM nodata fraction | 0.0393 |
+| DEM slope p50 / p90 | 0.0021 deg / 0.0046 deg |
+| Stable-mask pixels | 125 |
+| Stable-mask retention | 0.0000094 |
+| Stable-terrain slope p50 / p90 | 7.6159 deg / 9.6042 deg |
+| Terrain-vs-ramp correlation | null |
+| Cache mode summary | DEM and CSLC cache entries reused; coherence freshly computed from cached CSLCs |
+
+### Cause assessment
+
+| Field | Value |
+|-------|-------|
+| `eliminated_causes` | none emitted by sidecar |
+| `remaining_causes` | orbit, PHASS/tile unwrap behavior, and tropospheric long-wavelength phase remain possible |
+| `next_test` | Phase 11 unwrapper candidates; ERA5-on is not promoted to required baseline |
+
+**Phase 11 guidance:** neither SoCal nor Bologna meets the ERA5 two-signal rule. Keep the v1.1 global order exactly: "SPURT native first, then PHASS deramping, then tophu/SNAPHU, then 20 x 20 m fallback."
