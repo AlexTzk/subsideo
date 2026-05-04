@@ -606,3 +606,202 @@ class TestMakeCandidateBlocker:
         restored = DISPCandidateOutcome.model_validate_json(raw)
         assert restored.status == "BLOCKER"
         assert restored.partial_metrics is True
+
+
+# ============================================================================
+# Task 1 (Plan 02): unwrap_method override in run_disp and
+#                   _run_dolphin_phase_linking (D-06: phass default preserved)
+# ============================================================================
+
+
+class TestRunDispUnwrapMethodOverride:
+    """run_disp accepts unwrap_method Literal['phass', 'spurt'] = 'phass'."""
+
+    def test_run_disp_has_unwrap_method_parameter_with_phass_default(self) -> None:
+        """run_disp signature must include unwrap_method: Literal['phass', 'spurt'] = 'phass'."""
+        import inspect
+        from subsideo.products.disp import run_disp
+
+        sig = inspect.signature(run_disp)
+        assert "unwrap_method" in sig.parameters, "run_disp must accept unwrap_method kwarg"
+        param = sig.parameters["unwrap_method"]
+        assert param.default == "phass", "Default must be 'phass' (D-06)"
+
+    def test_dolphin_phase_linking_has_unwrap_method_parameter(self) -> None:
+        """_run_dolphin_phase_linking must accept unwrap_method with 'phass' default."""
+        import inspect
+        from subsideo.products.disp import _run_dolphin_phase_linking
+
+        sig = inspect.signature(_run_dolphin_phase_linking)
+        assert "unwrap_method" in sig.parameters
+        param = sig.parameters["unwrap_method"]
+        assert param.default == "phass"
+
+    def test_run_disp_signature_has_two_unwrap_method_annotations(self) -> None:
+        """Acceptance: rg -n Literal['phass', 'spurt'] = 'phass' must appear >= 2 times."""
+        import ast
+        src_path = (
+            __file__.replace("tests/validation/test_disp_candidates.py", "")
+            + "src/subsideo/products/disp.py"
+        )
+        from pathlib import Path as _Path
+        text = _Path(src_path).read_text()
+        # Count occurrences of the literal annotation signature
+        count = text.count("unwrap_method: Literal[\"phass\", \"spurt\"] = \"phass\"")
+        assert count >= 2, (
+            f"Expected >= 2 occurrences of unwrap_method Literal annotation, got {count}"
+        )
+
+    def test_both_enum_names_present_in_disp_py(self) -> None:
+        """Acceptance: UnwrapMethod.SPURT and UnwrapMethod.PHASS must both appear."""
+        from pathlib import Path as _Path
+        src_path = (
+            __file__.replace("tests/validation/test_disp_candidates.py", "")
+            + "src/subsideo/products/disp.py"
+        )
+        text = _Path(src_path).read_text()
+        assert "UnwrapMethod.SPURT" in text, "UnwrapMethod.SPURT missing from disp.py"
+        assert "UnwrapMethod.PHASS" in text, "UnwrapMethod.PHASS missing from disp.py"
+
+    def test_validation_message_present_in_disp_py(self) -> None:
+        """Acceptance: exact validation message 'unwrap_method must be phass or spurt' present."""
+        from pathlib import Path as _Path
+        src_path = (
+            __file__.replace("tests/validation/test_disp_candidates.py", "")
+            + "src/subsideo/products/disp.py"
+        )
+        text = _Path(src_path).read_text()
+        assert "unwrap_method must be 'phass' or 'spurt'" in text, (
+            "Exact validation message missing from disp.py"
+        )
+
+    def test_invalid_unwrap_method_raises_value_error(self) -> None:
+        """run_disp raises ValueError for unwrap_method='bad'."""
+        from subsideo.products.disp import run_disp
+        import pytest
+
+        with pytest.raises(ValueError, match="unwrap_method must be 'phass' or 'spurt'"):
+            # Bypass CDS check by catching before it runs; but ValueError should fire first.
+            run_disp(
+                cslc_paths=[],
+                output_dir=__import__("pathlib").Path("/tmp/disp_test"),
+                unwrap_method="bad",  # type: ignore[arg-type]
+            )
+
+    def test_era5_not_added_to_unwrap_method_axis(self) -> None:
+        """ERA5 must not appear as a parameter alongside unwrap_method (D-13)."""
+        import inspect
+        from subsideo.products.disp import run_disp
+
+        sig = inspect.signature(run_disp)
+        param_names = list(sig.parameters.keys())
+        # unwrap_method must exist
+        assert "unwrap_method" in param_names
+        # no era5_unwrap or similar axis mixing
+        era5_axis = [p for p in param_names if "era5" in p and "unwrap" in p]
+        assert era5_axis == [], f"ERA5/unwrap axis mixing not allowed: {era5_axis}"
+
+
+# ============================================================================
+# Task 2 (Plan 02): SPURT candidate in eval scripts (structural / import checks)
+# ============================================================================
+
+
+class TestEvalScriptsSPURTCandidateWiring:
+    """Both eval scripts must wire spurt_native with correct imports and patterns."""
+
+    def _read_script(self, name: str) -> str:
+        from pathlib import Path as _Path
+        root = _Path(__file__).parents[2]
+        return (root / name).read_text()
+
+    def test_run_eval_disp_imports_candidate_helpers(self) -> None:
+        """run_eval_disp.py must import candidate_output_dir, candidate_status_from_metrics,
+        make_candidate_blocker."""
+        text = self._read_script("run_eval_disp.py")
+        for symbol in ("candidate_output_dir", "candidate_status_from_metrics", "make_candidate_blocker"):
+            assert symbol in text, f"run_eval_disp.py missing import/usage of {symbol}"
+
+    def test_run_eval_disp_egms_imports_candidate_helpers(self) -> None:
+        """run_eval_disp_egms.py must import candidate_output_dir, candidate_status_from_metrics,
+        make_candidate_blocker."""
+        text = self._read_script("run_eval_disp_egms.py")
+        for symbol in ("candidate_output_dir", "candidate_status_from_metrics", "make_candidate_blocker"):
+            assert symbol in text, f"run_eval_disp_egms.py missing import/usage of {symbol}"
+
+    def test_run_eval_disp_contains_spurt_native_candidate(self) -> None:
+        """run_eval_disp.py must reference 'spurt_native' candidate."""
+        text = self._read_script("run_eval_disp.py")
+        assert "spurt_native" in text, "run_eval_disp.py missing spurt_native candidate"
+
+    def test_run_eval_disp_egms_contains_spurt_native_candidate(self) -> None:
+        """run_eval_disp_egms.py must reference 'spurt_native' candidate."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert "spurt_native" in text, "run_eval_disp_egms.py missing spurt_native candidate"
+
+    def test_run_eval_disp_uses_unwrap_method_spurt(self) -> None:
+        """run_eval_disp.py must call run_disp with unwrap_method='spurt'."""
+        text = self._read_script("run_eval_disp.py")
+        assert 'unwrap_method="spurt"' in text or "unwrap_method='spurt'" in text, (
+            "run_eval_disp.py missing run_disp(..., unwrap_method='spurt') callsite"
+        )
+
+    def test_run_eval_disp_egms_uses_unwrap_method_spurt(self) -> None:
+        """run_eval_disp_egms.py must call run_disp with unwrap_method='spurt'."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert 'unwrap_method="spurt"' in text or "unwrap_method='spurt'" in text, (
+            "run_eval_disp_egms.py missing run_disp(..., unwrap_method='spurt') callsite"
+        )
+
+    def test_run_eval_disp_calls_prepare_for_reference_with_method(self) -> None:
+        """run_eval_disp.py must call prepare_for_reference(method=REFERENCE_MULTILOOK_METHOD)."""
+        text = self._read_script("run_eval_disp.py")
+        assert "method=REFERENCE_MULTILOOK_METHOD" in text, (
+            "run_eval_disp.py must call prepare_for_reference(..., method=REFERENCE_MULTILOOK_METHOD)"
+        )
+
+    def test_run_eval_disp_egms_calls_prepare_for_reference_with_method(self) -> None:
+        """run_eval_disp_egms.py must call prepare_for_reference(method=REFERENCE_MULTILOOK_METHOD)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert "method=REFERENCE_MULTILOOK_METHOD" in text, (
+            "run_eval_disp_egms.py must call prepare_for_reference(..., method=REFERENCE_MULTILOOK_METHOD)"
+        )
+
+    def test_run_eval_disp_no_era5_spurt_axis(self) -> None:
+        """run_eval_disp.py must not wire ERA5 into the SPURT candidate axis (D-13)."""
+        text = self._read_script("run_eval_disp.py")
+        import re
+        # ERA5 combined with spurt-candidate calls is forbidden (D-13)
+        matches = re.findall(r"spurt.*era5|ERA5.*spurt", text, re.IGNORECASE)
+        assert matches == [], f"run_eval_disp.py has ERA5/SPURT axis mixing: {matches}"
+
+    def test_run_eval_disp_egms_no_era5_spurt_axis(self) -> None:
+        """run_eval_disp_egms.py must not wire ERA5 into the SPURT candidate axis (D-13)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        import re
+        matches = re.findall(r"spurt.*era5|ERA5.*spurt", text, re.IGNORECASE)
+        assert matches == [], f"run_eval_disp_egms.py has ERA5/SPURT axis mixing: {matches}"
+
+    def test_run_eval_disp_no_tophu_or_snaphu_in_spurt_path(self) -> None:
+        """run_eval_disp.py must not trigger tophu/SNAPHU in the SPURT candidate path (D-14)."""
+        text = self._read_script("run_eval_disp.py")
+        # tophu/SNAPHU are not required by Phase 11 (D-14)
+        # We check that they are not newly added in proximity to the spurt_native block.
+        # A simple check: the script must not import tophu at top level.
+        assert "import tophu" not in text.split("if __name__")[0] if "if __name__" in text else True, (
+            "tophu must not be top-level-imported alongside SPURT candidate code"
+        )
+
+    def test_run_eval_disp_disp_candidate_outcome_used(self) -> None:
+        """run_eval_disp.py must use DISPCandidateOutcome."""
+        text = self._read_script("run_eval_disp.py")
+        assert "DISPCandidateOutcome" in text, (
+            "run_eval_disp.py must use DISPCandidateOutcome for SPURT candidate result"
+        )
+
+    def test_run_eval_disp_egms_disp_candidate_outcome_used(self) -> None:
+        """run_eval_disp_egms.py must use DISPCandidateOutcome."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert "DISPCandidateOutcome" in text, (
+            "run_eval_disp_egms.py must use DISPCandidateOutcome for SPURT candidate result"
+        )
