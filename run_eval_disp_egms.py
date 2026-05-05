@@ -1293,26 +1293,152 @@ if __name__ == "__main__":
         print(f"  Sanity check computation failed: {exc_sanity}")
         # Leave _bologna_sanity = None (D-07: include only when values are available)
 
-    # Step 3: No public hook to re-enter time-series from deramped IFGs -> BLOCKER (D-11)
-    _phass_blocker = make_candidate_blocker(
-        candidate="phass_post_deramp",
-        cell="bologna",
-        failed_stage="deramped_ifg_timeseries_reentry",
-        error_summary=(
-            "No supported deramped-IFG time-series re-entry: dolphin has no public "
-            "API to consume externally-deramped unwrapped IFGs before time-series "
-            "inversion. Partial evidence preserved in deramped_unwrapped/."
-        ),
-        evidence_paths=[str(_deramped_dir)],
-        cached_input_valid=True,
-        partial_metrics=True,
-    )
-    # Bologna: attach sanity check only when available (D-07)
-    _phass_blocker_final = _phass_blocker.model_copy(
-        update={"deformation_sanity": _bologna_sanity}
-    )
-    candidate_outcomes.append(_phass_blocker_final)
-    print(f"  PHASS post-deramp (Bologna): BLOCKER (deramped_ifg_timeseries_reentry)")
+    # Step 3: Run MintPy-style SBAS inversion on the deramped IFGs.
+    from subsideo.validation.selfconsistency import run_phass_sbas_inversion as _run_phass_sbas
+
+    _phass_sbas_dir = phass_deramp_dir / "sbas_inversion"
+    _phass_sbas_dir.mkdir(parents=True, exist_ok=True)
+    _phass_vel_path: _PhasePath | None = None
+    try:
+        if _phass_deramped_paths:
+            _phass_vel_path, _phass_dates, _ = _run_phass_sbas(
+                _phass_deramped_paths, _phass_sbas_dir
+            )
+            print(f"  PHASS SBAS velocity written: {_phass_vel_path}")
+        else:
+            print("  PHASS SBAS: no deramped IFGs available -- skipping inversion")
+    except Exception as exc_sbas:
+        phass_deramp_log.write_text(
+            f"sbas_inversion error: {type(exc_sbas).__name__}: {exc_sbas}\n"
+        )
+        print(f"  PHASS SBAS inversion failed: {exc_sbas}")
+        _phass_vel_path = None
+
+    # Compare PHASS SBAS velocity against EGMS L2a reference (same as baseline)
+    _phass_corr: float | None = None
+    _phass_bias: float | None = None
+    _phass_rmse: float | None = None
+    _phass_ramp_mean: float | None = None
+    _phass_ramp_dir_sigma: float | None = None
+    _phass_attributed: str | None = None
+
+    if _phass_vel_path is not None and _phass_vel_path.exists():
+        try:
+            import rasterio as _rio_phass
+            import numpy as _np_phass
+            from subsideo.validation.compare_disp import (
+                ReferenceGridSpec as _RGS,
+                prepare_for_reference as _prep_ref,
+            )
+            from subsideo.validation.metrics import (
+                bias as _bias_phass,
+                rmse as _rmse_phass,
+            )
+
+            # PHASS SBAS velocity is already in mm/yr
+            _phass_at_ps = _prep_ref(
+                native_velocity=_phass_vel_path,
+                reference_grid=egms_spec,
+                method=REFERENCE_MULTILOOK_METHOD,
+            )
+            _phass_arr = _np_phass.asarray(_phass_at_ps).astype(float)
+            _ref_phass_mm = egms_df["mean_velocity"].values.astype(_np_phass.float64)
+            _valid_phass = _np_phass.isfinite(_phass_arr) & _np_phass.isfinite(_ref_phass_mm)
+            n_valid_phass = int(_valid_phass.sum())
+            if n_valid_phass >= 100:
+                _phass_corr = float(
+                    _np_phass.corrcoef(_phass_arr[_valid_phass], _ref_phass_mm[_valid_phass])[0, 1]
+                )
+                _phass_bias = float(_bias_phass(_phass_arr[_valid_phass], _ref_phass_mm[_valid_phass]))
+                _phass_rmse = float(_rmse_phass(_phass_arr[_valid_phass], _ref_phass_mm[_valid_phass]))
+                print(
+                    f"  PHASS SBAS vs EGMS L2a: r={_phass_corr:.4f}  "
+                    f"bias={_phass_bias:+.2f} mm/yr  RMSE={_phass_rmse:.2f} mm/yr  N={n_valid_phass:,}"
+                )
+            else:
+                print(f"  PHASS SBAS: insufficient valid PS pairs ({n_valid_phass}) for comparison")
+
+            # Ramp attribution on deramped IFGs
+            from subsideo.validation.selfconsistency import (
+                auto_attribute_ramp as _auto_attr_phass,
+                compute_ramp_aggregate as _ramp_agg_phass,
+                fit_planar_ramp as _fit_ramp_phass,
+            )
+            if _phass_deramped_paths:
+                _phass_phase_list = []
+                _phass_coh_list: list[float] = []
+                _phass_cor_dir = disp_dir / "dolphin" / "interferograms"
+                for _dp in _phass_deramped_paths[:14]:
+                    with _rio_phass.open(_dp) as _ds:
+                        _phass_phase_list.append(_ds.read(1).astype(_np_phass.float32))
+                    _phass_cor_f = _phass_cor_dir / _dp.name.replace(".unw.deramped.tif", ".int.cor.tif")
+                    if _phass_cor_f.exists():
+                        with _rio_phass.open(_phass_cor_f) as _ds:
+                            _cor = _ds.read(1).astype(_np_phass.float64)
+                        _vc = _np_phass.isfinite(_cor) & (_cor > 0)
+                        _phass_coh_list.append(float(_cor[_vc].mean()) if _vc.any() else float("nan"))
+                    else:
+                        _phass_coh_list.append(float("nan"))
+                if _phass_phase_list:
+                    _phass_stk = _np_phass.stack(_phass_phase_list, axis=0)
+                    _phass_fd = _fit_ramp_phass(_phass_stk, mask=None)
+                    _phass_ca = _np_phass.array(_phass_coh_list, dtype=_np_phass.float64)
+                    _phass_agg = _ramp_agg_phass(_phass_fd, _phass_ca)
+                    _phass_ramp_mean = float(_phass_agg["mean_magnitude_rad"])
+                    _phass_ramp_dir_sigma = float(_phass_agg["direction_stability_sigma_deg"])
+                    _phass_attributed = _auto_attr_phass(
+                        direction_stability_sigma_deg=_phass_agg["direction_stability_sigma_deg"],
+                        magnitude_vs_coherence_pearson_r=_phass_agg["magnitude_vs_coherence_pearson_r"],
+                    )
+                    print(f"  PHASS ramp: mean={_phass_ramp_mean:.3f} rad  sigma={_phass_ramp_dir_sigma:.1f} deg  attr={_phass_attributed}")
+        except Exception as exc_phass_cmp:
+            phass_deramp_log.write_text(
+                f"comparison error: {type(exc_phass_cmp).__name__}: {exc_phass_cmp}\n"
+            )
+            print(f"  PHASS comparison failed: {type(exc_phass_cmp).__name__}: {exc_phass_cmp}")
+
+        _phass_status = candidate_status_from_metrics(
+            "phass_post_deramp",
+            correlation=_phass_corr,
+            bias_mm_yr=_phass_bias,
+            ramp_mean_magnitude_rad=_phass_ramp_mean,
+            attributed_source=_phass_attributed,  # type: ignore[arg-type]
+        )
+        print(f"  PHASS post-deramp candidate status (Bologna): {_phass_status}")
+        _phass_outcome = DISPCandidateOutcome(
+            candidate="phass_post_deramp",
+            cell="bologna",
+            status=_phass_status,
+            cached_input_valid=True,
+            reference_correlation=_phass_corr,
+            reference_bias_mm_yr=_phass_bias,
+            reference_rmse_mm_yr=_phass_rmse,
+            ramp_mean_magnitude_rad=_phass_ramp_mean,
+            ramp_direction_sigma_deg=_phass_ramp_dir_sigma,
+            attributed_source=_phass_attributed,  # type: ignore[arg-type]
+            partial_metrics=False,
+            deformation_sanity=_bologna_sanity,
+        )
+        candidate_outcomes.append(_phass_outcome)
+    else:
+        # SBAS inversion failed or no deramped paths -- fall back to BLOCKER
+        _phass_blocker = make_candidate_blocker(
+            candidate="phass_post_deramp",
+            cell="bologna",
+            failed_stage="sbas_inversion",
+            error_summary=(
+                "PHASS SBAS inversion failed or no deramped IFGs available. "
+                "Partial evidence preserved in deramped_unwrapped/."
+            ),
+            evidence_paths=[str(_deramped_dir)],
+            cached_input_valid=True,
+            partial_metrics=True,
+        )
+        _phass_blocker_final = _phass_blocker.model_copy(
+            update={"deformation_sanity": _bologna_sanity}
+        )
+        candidate_outcomes.append(_phass_blocker_final)
+        print("  PHASS post-deramp (Bologna): BLOCKER (sbas_inversion)")
     print(f"  Deformation sanity included: {_bologna_sanity is not None}")
 
     # ── Stage 12: Metrics serialisation ─────────────────────────────────────
