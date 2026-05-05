@@ -880,14 +880,17 @@ if __name__ == "__main__":
             coherence_source = "fresh"
             coh_stats = {}
 
+    # CR-06 fix: sorted_h5 defined unconditionally so SPURT candidate block can use it
+    # even when coherence_source == "phase3-cached" (avoid NameError on warm re-runs)
+    sorted_h5 = sorted(_PhasePath("eval-disp/cslc").rglob("*.h5"))
+    sorted_h5 = [p for p in sorted_h5 if "runconfig" not in p.name.lower()]
+
     if coherence_source == "fresh":
         # B1 root-cause fix: import the PUBLIC compute_ifg_coherence_stack from
         # selfconsistency.py (Plan 04-01 Task 3 promotion). Do NOT import from
         # run_eval_cslc_selfconsist_nam -- that symbol is now removed and only
         # exists at module level via the public selfconsistency.py promotion.
         print("  coherence: fresh-computing from cached CSLCs (boxcar 5x5)...")
-        sorted_h5 = sorted(_PhasePath("eval-disp/cslc").rglob("*.h5"))
-        sorted_h5 = [p for p in sorted_h5 if "runconfig" not in p.name.lower()]
         ifgrams_stack = compute_ifg_coherence_stack(sorted_h5, boxcar_px=5)
         stable_mask_cslc = _reproject_mask_to_grid(
             stable_mask, dem_transform, dem_crs, ifgrams_stack.shape[1:]
@@ -1185,17 +1188,18 @@ if __name__ == "__main__":
                         adapted.values if hasattr(adapted, "values") else _np_spurt.asarray(adapted)
                     )
                     adapted_mm = -adapted_arr.astype(float) * LAMBDA_S1_M / (4.0 * _np_spurt.pi) * 1000.0
-                    ref_arr = opera_da.values.astype(float)
+                    # CR-05 fix: opera_da is in m/yr; convert to mm/yr to match adapted_mm units
+                    ref_arr_mm = opera_da.values.astype(float) * 1000.0
                     valid_mask = (
                         _np_spurt.isfinite(adapted_mm)
-                        & _np_spurt.isfinite(ref_arr)
+                        & _np_spurt.isfinite(ref_arr_mm)
                         & (adapted_mm != 0)
                     )
                     n_valid_spurt = int(valid_mask.sum())
                     if n_valid_spurt >= 100:
-                        spurt_corr = float(_corr_fn(adapted_mm[valid_mask], ref_arr[valid_mask]))
-                        spurt_bias = float(_bias_fn(adapted_mm[valid_mask], ref_arr[valid_mask]) * 1000.0)
-                        spurt_rmse = float(_rmse_fn(adapted_mm[valid_mask], ref_arr[valid_mask]) * 1000.0)
+                        spurt_corr = float(_corr_fn(adapted_mm[valid_mask], ref_arr_mm[valid_mask]))
+                        spurt_bias = float(_bias_fn(adapted_mm[valid_mask], ref_arr_mm[valid_mask]))
+                        spurt_rmse = float(_rmse_fn(adapted_mm[valid_mask], ref_arr_mm[valid_mask]))
                         print(
                             f"  SPURT vs OPERA: r={spurt_corr:.4f}  "
                             f"bias={spurt_bias:+.2f} mm/yr  "
@@ -1217,28 +1221,51 @@ if __name__ == "__main__":
                     compute_ramp_aggregate,
                     fit_planar_ramp,
                 )
+                import rasterio as _rio_spurt2
                 spurt_unw_dir = spurt_candidate_dir / "dolphin" / "unwrapped"
                 spurt_unw_files = sorted(spurt_unw_dir.glob("*.unw.tif")) if spurt_unw_dir.exists() else []
                 if spurt_unw_files:
-                    spurt_ramps: list[float] = []
-                    spurt_dirs: list[float] = []
+                    # CR-01: build 3-D stack (N, H, W) before calling fit_planar_ramp
+                    # CR-03: collect per-IFG coherence means in the same loop
+                    spurt_phase_list = []
+                    spurt_coh_means_list: list[float] = []
+                    _spurt_cor_dir = spurt_candidate_dir / "dolphin" / "interferograms"
                     for _unw_f in spurt_unw_files[:14]:  # cap at 14 IFGs
-                        import rasterio as _rio_spurt2
                         with _rio_spurt2.open(_unw_f) as _ds:
-                            _phase = _ds.read(1).astype(float)
-                        _fit = fit_planar_ramp(_phase)
-                        if _np_spurt.isfinite(_fit.ramp_magnitude_rad):
-                            spurt_ramps.append(_fit.ramp_magnitude_rad)
-                            spurt_dirs.append(_fit.ramp_direction_deg)
-                    if spurt_ramps:
-                        _spurt_ramp_agg = compute_ramp_aggregate(spurt_ramps, spurt_dirs)
-                        spurt_ramp_mean = float(_spurt_ramp_agg.mean_magnitude_rad)
-                        spurt_ramp_dir_sigma = float(_spurt_ramp_agg.direction_stability_sigma_deg)
-                        _spurt_attr = auto_attribute_ramp(_spurt_ramp_agg)
+                            spurt_phase_list.append(_ds.read(1).astype(np.float32))
+                        _cor_f = _spurt_cor_dir / _unw_f.name.replace(".unw.tif", ".int.cor.tif")
+                        if _cor_f.exists():
+                            with _rio_spurt2.open(_cor_f) as _ds:
+                                _cor = _ds.read(1).astype(np.float64)
+                            _vc = np.isfinite(_cor) & (_cor > 0)
+                            spurt_coh_means_list.append(float(_cor[_vc].mean()) if _vc.any() else float("nan"))
+                        else:
+                            spurt_coh_means_list.append(float("nan"))
+                    if spurt_phase_list:
+                        # CR-01 fix: pass 3-D stack to fit_planar_ramp
+                        spurt_stack = np.stack(spurt_phase_list, axis=0)  # (N, H, W)
+                        _fit_dict = fit_planar_ramp(spurt_stack, mask=None)
+                        # CR-03 fix: build coherence array parallel to phase list
+                        spurt_coh_arr = np.array(spurt_coh_means_list, dtype=np.float64)
+                        _spurt_ramp_agg = compute_ramp_aggregate(_fit_dict, spurt_coh_arr)
+                        # CR-02 fix: access result via dict keys (not attributes)
+                        spurt_ramp_mean = float(_spurt_ramp_agg["mean_magnitude_rad"])
+                        spurt_ramp_dir_sigma = float(_spurt_ramp_agg["direction_stability_sigma_deg"])
+                        # CR-04 fix: call auto_attribute_ramp with keyword args
+                        _spurt_attr = auto_attribute_ramp(
+                            direction_stability_sigma_deg=_spurt_ramp_agg["direction_stability_sigma_deg"],
+                            magnitude_vs_coherence_pearson_r=_spurt_ramp_agg["magnitude_vs_coherence_pearson_r"],
+                        )
                         spurt_attributed = _spurt_attr
                         print(f"  SPURT ramp: mean={spurt_ramp_mean:.3f} rad  sigma={spurt_ramp_dir_sigma:.1f} deg  attr={spurt_attributed}")
             except Exception as exc_ramp:
+                # WR-01: surface the exception type; re-raise programming errors
+                spurt_log_path.write_text(
+                    f"ramp_attribution error: {type(exc_ramp).__name__}: {exc_ramp}\n"
+                )
                 print(f"  SPURT ramp attribution failed: {type(exc_ramp).__name__}: {exc_ramp}")
+                if isinstance(exc_ramp, (TypeError, ValueError, AttributeError)):
+                    raise
 
             spurt_status = candidate_status_from_metrics(
                 "spurt_native",
