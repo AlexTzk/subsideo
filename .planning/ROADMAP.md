@@ -12,7 +12,7 @@ v1.2 focuses on CSLC Binding & DISP Science Pass work. Phase 08 hardened CSLC va
 
 - [x] **Phase 09: CSLC EGMS Third Number & Binding Reruns** - Regenerate CSLC N.Am./EU sidecars and matrix rows as candidate BINDING outcomes; keep registry promotion blocked by named evidence where needed
 - [x] **Phase 10: DISP ERA5 & Ramp Diagnostics** - Rerun SoCal and Bologna DISP evaluations from cached stacks with ERA5 and shared orbit/DEM provenance diagnostics (completed 2026-05-04)
-- [ ] **Phase 11: DISP Unwrapper & Deramping Candidates** - Evaluate PHASS post-deramping and at least one alternative unwrapper/resolution candidate against unchanged references
+- [x] **Phase 11: DISP Unwrapper & Deramping Candidates** - Evaluate PHASS post-deramping and at least one alternative unwrapper/resolution candidate against unchanged references (completed 2026-05-05)
 - [ ] **Phase 12: DISP Conclusions & Release Readiness** - Choose the DISP production posture, update methodology/matrix/requirements traceability, and close the v1.2 release evidence
 
 ## Phase Details
@@ -79,7 +79,7 @@ Plans:
 - [x] 11-04-PLAN.md - Candidate sidecars and matrix hints
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 11-05-PLAN.md - Candidate conclusion sections
+- [x] 11-05-PLAN.md - Candidate conclusion sections
 
 ### Phase 12: DISP Conclusions & Release Readiness
 **Goal**: Close v1.2 by choosing the DISP production posture and updating all release-facing artifacts so CSLC/DISP outcomes, requirements, matrix cells, and methodology are traceable and audit-ready.
@@ -105,5 +105,5 @@ Phases execute in numeric order: 09 -> 10 -> 11 -> 12
 |-------|----------------|--------|-----------|
 | 09. CSLC EGMS Third Number & Binding Reruns | 5/5 | Complete | 2026-05-02 |
 | 10. DISP ERA5 & Ramp Diagnostics | 4/4 | Complete   | 2026-05-04 |
-| 11. DISP Unwrapper & Deramping Candidates | 4/5 | In Progress|  |
+| 11. DISP Unwrapper & Deramping Candidates | 5/5 | Complete   | 2026-05-05 |
 | 12. DISP Conclusions & Release Readiness | 0/TBD | Not started | - |
