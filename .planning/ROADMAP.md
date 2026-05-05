@@ -73,7 +73,7 @@ Plans:
 - [x] 11-02-PLAN.md - SPURT native candidate execution
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 11-03-PLAN.md - PHASS pre-inversion deramping candidate
+- [x] 11-03-PLAN.md - PHASS pre-inversion deramping candidate
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 11-04-PLAN.md - Candidate sidecars and matrix hints
@@ -105,5 +105,5 @@ Phases execute in numeric order: 09 -> 10 -> 11 -> 12
 |-------|----------------|--------|-----------|
 | 09. CSLC EGMS Third Number & Binding Reruns | 5/5 | Complete | 2026-05-02 |
 | 10. DISP ERA5 & Ramp Diagnostics | 4/4 | Complete   | 2026-05-04 |
-| 11. DISP Unwrapper & Deramping Candidates | 2/5 | In Progress|  |
+| 11. DISP Unwrapper & Deramping Candidates | 3/5 | In Progress|  |
 | 12. DISP Conclusions & Release Readiness | 0/TBD | Not started | - |
