@@ -689,6 +689,103 @@ def write_deramped_unwrapped_ifgs(
     return written, ramp_data
 
 
+def run_phass_sbas_inversion(
+    deramped_paths: list[Path],
+    output_dir: Path,
+) -> tuple[Path, list, list]:
+    """Run a simple SBAS least-squares inversion on deramped unwrapped IFG GeoTIFFs.
+
+    Implements a per-pixel least-squares inversion of the unwrapped phase stack to
+    derive cumulative displacement at each epoch, then fits a linear velocity.
+
+    Parameters
+    ----------
+    deramped_paths : list[Path]
+        GeoTIFF paths named ``YYYYMMDD_YYYYMMDD.unw.deramped.tif`` (one per IFG).
+        The date pair is parsed from the filename stem.
+    output_dir : Path
+        Destination directory; created if absent. ``velocity.tif`` is written here.
+
+    Returns
+    -------
+    velocity_path : Path
+        Path to the written ``velocity.tif`` (LOS velocity in mm/yr, float32).
+    dates_sorted : list[datetime.date]
+        All unique dates sorted ascending.
+    date_pairs : list[tuple[datetime.date, datetime.date]]
+        Per-IFG (ref_date, sec_date) pairs, in input order.
+    """
+    import datetime as _dt
+
+    import rasterio  # lazy per PATTERNS "Two-layer install + lazy imports"
+
+    LAMBDA = 0.05546576  # Sentinel-1 C-band wavelength (m)
+
+    # Parse date pairs from filenames: stem -> "YYYYMMDD_YYYYMMDD"
+    date_pairs: list[tuple[_dt.date, _dt.date]] = []
+    for p in deramped_paths:
+        parts = p.stem.split(".")[0].split("_")
+        ref_date = _dt.date(int(parts[0][:4]), int(parts[0][4:6]), int(parts[0][6:8]))
+        sec_date = _dt.date(int(parts[1][:4]), int(parts[1][4:6]), int(parts[1][6:8]))
+        date_pairs.append((ref_date, sec_date))
+
+    dates_sorted: list[_dt.date] = sorted({d for pair in date_pairs for d in pair})
+    date_to_idx = {d: i for i, d in enumerate(dates_sorted)}
+
+    # Read raster profile from first file
+    with rasterio.open(deramped_paths[0]) as ds:
+        profile = ds.profile.copy()
+        H, W = ds.height, ds.width
+
+    # SBAS design matrix A: (N_ifg x N_dates); drop first column to fix t0 = 0
+    n_ifg = len(date_pairs)
+    n_dates = len(dates_sorted)
+    A = np.zeros((n_ifg, n_dates), dtype=np.float32)
+    for i, (ref, sec) in enumerate(date_pairs):
+        A[i, date_to_idx[ref]] = -1.0
+        A[i, date_to_idx[sec]] = +1.0
+    A_reduced = A[:, 1:]  # (N_ifg, N_dates-1): first epoch pinned at 0
+
+    # Load IFG stack: (N_ifg, H, W)
+    y = np.zeros((n_ifg, H, W), dtype=np.float32)
+    for i, p in enumerate(deramped_paths):
+        with rasterio.open(p) as ds:
+            band = ds.read(1).astype(np.float32)
+        nan_mask = ~np.isfinite(band)
+        band[nan_mask] = 0.0  # replace NaN with 0 for least-squares
+        y[i] = band
+
+    # Per-pixel SBAS inversion via least-squares
+    y_flat = y.reshape(n_ifg, -1)  # (N_ifg, H*W)
+    result, _, _, _ = np.linalg.lstsq(A_reduced, y_flat, rcond=None)
+    # result: (N_dates-1, H*W) = cumulative displacement (rad) at each epoch
+
+    # Fit velocity via linear regression across epochs
+    t_years = np.array(
+        [(d - dates_sorted[0]).days / 365.25 for d in dates_sorted[1:]], dtype=np.float64
+    )
+    # Convert rad to mm: displacement_mm = displacement_rad * LAMBDA / (4*pi) * 1000
+    disp_mm = result.astype(np.float64) * (LAMBDA / (4.0 * np.pi) * 1000.0)  # (N_dates-1, H*W)
+    coeffs = np.polyfit(t_years, disp_mm, 1)  # (2, H*W)
+    velocity_mm_yr = coeffs[0].reshape(H, W).astype(np.float32)  # slope in mm/yr
+
+    # Write velocity GeoTIFF
+    output_dir.mkdir(parents=True, exist_ok=True)
+    velocity_path = output_dir / "velocity.tif"
+    write_profile = profile.copy()
+    write_profile.update(dtype="float32", count=1)
+    with rasterio.open(velocity_path, "w", **write_profile) as dst:
+        dst.write(velocity_mm_yr, 1)
+
+    logger.info(
+        "run_phass_sbas_inversion: {} IFGs, {} epochs -> {}",
+        n_ifg,
+        n_dates,
+        velocity_path,
+    )
+    return velocity_path, dates_sorted, date_pairs
+
+
 def compute_ifg_coherence_stack(
     hdf5_paths: list[Path],
     boxcar_px: int = 5,
