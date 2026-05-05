@@ -19,9 +19,9 @@ Promote CSLC-S1 from CALIBRATING to BINDING product-quality validation and turn 
 ### DISP-S1
 
 - [ ] **DISP-06**: User can rerun SoCal and Bologna DISP evaluations from cached CSLC stacks with an ERA5 tropospheric-correction toggle, and the conclusions report whether ramp magnitude, ramp direction stability, r, bias, and RMSE improve relative to the v1.1 baseline.
-- [ ] **DISP-07**: User can apply a PHASS post-deramping candidate to the v1.1 cached DISP stacks without changing the native 5 x 10 m production output, and compare product-quality and reference-agreement metrics against the unchanged v1.1 reference pipeline.
-- [ ] **DISP-08**: User can run at least one alternative unwrapper/resolution candidate from the v1.1 brief, selected from SPURT native, tophu/SNAPHU tiled, or 20 x 20 m fallback, with failure modes captured as structured metrics rather than terminal-only logs.
-- [ ] **DISP-09**: User can compare DISP candidate outputs on both N.Am. OPERA and EU EGMS references using the existing `prepare_for_reference(method=...)` discipline, with product-quality, reference-agreement, and ramp-attribution reported separately.
+- [x] **DISP-07**: User can apply a PHASS post-deramping candidate to the v1.1 cached DISP stacks without changing the native 5 x 10 m production output, and compare product-quality and reference-agreement metrics against the unchanged v1.1 reference pipeline.
+- [x] **DISP-08**: User can run at least one alternative unwrapper/resolution candidate from the v1.1 brief, selected from SPURT native, tophu/SNAPHU tiled, or 20 x 20 m fallback, with failure modes captured as structured metrics rather than terminal-only logs.
+- [x] **DISP-09**: User can compare DISP candidate outputs on both N.Am. OPERA and EU EGMS references using the existing `prepare_for_reference(method=...)` discipline, with product-quality, reference-agreement, and ramp-attribution reported separately.
 - [ ] **DISP-10**: User can open updated DISP conclusions that choose a next production posture: PASS, keep PHASS with deramping, switch unwrapper, use a coarser validation fallback, or defer with one remaining named blocker and dated unblock condition.
 
 ### RTC-S1 Support Only

@@ -94,7 +94,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 12-01-PLAN.md - TBD after Phase 11 evidence
+- [x] 12-01-PLAN.md - TBD after Phase 11 evidence (completed 2026-05-05)
 
 ## Progress
 
@@ -105,5 +105,5 @@ Phases execute in numeric order: 09 -> 10 -> 11 -> 12
 |-------|----------------|--------|-----------|
 | 09. CSLC EGMS Third Number & Binding Reruns | 5/5 | Complete | 2026-05-02 |
 | 10. DISP ERA5 & Ramp Diagnostics | 4/4 | Complete   | 2026-05-04 |
-| 11. DISP Unwrapper & Deramping Candidates | 5/5 | Complete   | 2026-05-05 |
+| 11. DISP Unwrapper & Deramping Candidates | 5/5 | Complete    | 2026-05-05 |
 | 12. DISP Conclusions & Release Readiness | 0/TBD | Not started | - |

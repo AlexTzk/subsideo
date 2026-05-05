@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: CSLC Binding & DISP Science Pass
-status: executing
+status: ready_to_plan
 stopped_at: Phase 11 context gathered
 last_updated: "2026-05-04T23:40:48.135Z"
 last_activity: 2026-05-04 -- Phase 11 execution started
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 14
   completed_plans: 9
-  percent: 64
+  percent: 75
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-04-20)
 
 ## Current Position
 
-Phase: 11 (disp-unwrapper-deramping-candidates) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 11
-Last activity: 2026-05-04 -- Phase 11 execution started
+Phase: 12
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-05
 
 **v1.2 scope:** Focus on CSLC and DISP. CSLC enters with strong v1.1 self-consistency baselines (SoCal coh=0.887 / residual=-0.109 mm/yr; Mojave coh=0.804 / residual=+1.127 mm/yr; Iberian coh=0.868 / residual=+0.347 mm/yr) and needs BINDING gate promotion plus deferred EGMS/AOI hardening. DISP enters with structurally complete N.Am./EU validation but reference-agreement FAILs (SoCal r=0.049, Bologna r=0.336), while stable-terrain residuals remain near zero; v1.2 starts with ERA5/ramp diagnostics before choosing an unwrapper/resolution candidate.
 
@@ -38,7 +38,7 @@ Last activity: 2026-05-04 -- Phase 11 execution started
 
 **Velocity:**
 
-- Total plans completed: 37 (v1.1); 21 (v1.0, shipped)
+- Total plans completed: 42 (v1.1); 21 (v1.0, shipped)
 - Average duration: —
 - Total execution time: ~3 hours
 
@@ -51,6 +51,7 @@ Last activity: 2026-05-04 -- Phase 11 execution started
 | 05 | 9 | - | - |
 | 08 | 4 | ~180min | ~45min |
 | 09 | 5 | - | - |
+| 11 | 5 | - | - |
 
 **Recent Trend:**
 
