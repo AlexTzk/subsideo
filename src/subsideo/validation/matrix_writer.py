@@ -492,6 +492,25 @@ def _render_disp_cell(
         and m.cause_assessment.eliminated_causes == ["tropospheric"]
     ):
         parts.append("narrowed=tropospheric")
+
+    # Phase 11: compact candidate hint (D-12 — PQ column only, never RA).
+    # Format: cand=spurt:PASS,deramp:FAIL  (sorted: spurt_native first)
+    # partial_metrics=True appends '*' to the status (D-11).
+    if m.candidate_outcomes:
+        _label_map = {"spurt_native": "spurt", "phass_post_deramp": "deramp"}
+        _order = ["spurt_native", "phass_post_deramp"]
+        by_candidate = {o.candidate: o for o in m.candidate_outcomes}
+        tokens: list[str] = []
+        for cand_key in _order:
+            if cand_key not in by_candidate:
+                continue
+            o = by_candidate[cand_key]
+            label = _label_map.get(cand_key, cand_key)
+            status = o.status + ("*" if o.partial_metrics else "")
+            tokens.append(f"{label}:{status}")
+        if tokens:
+            parts.append("cand=" + ",".join(tokens))
+
     pq_body = " / ".join(parts)
 
     # CALIBRATING italics; warning glyph if cell_status == BLOCKER (mirrors
