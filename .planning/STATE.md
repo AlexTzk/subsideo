@@ -4,14 +4,14 @@ milestone: v1.2
 milestone_name: CSLC Binding & DISP Science Pass
 status: executing
 stopped_at: Phase 11 context gathered
-last_updated: "2026-05-04T22:18:17.374Z"
-last_activity: 2026-05-04 -- Phase 10 execution started
+last_updated: "2026-05-04T23:40:48.135Z"
+last_activity: 2026-05-04 -- Phase 11 execution started
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 9
+  total_plans: 14
   completed_plans: 9
-  percent: 100
+  percent: 64
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 10 — disp-era5-ramp-diagnostics
+**Current focus:** Phase 11 — disp-unwrapper-deramping-candidates
 
 ## Current Position
 
-Phase: 10 (disp-era5-ramp-diagnostics) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 10
-Last activity: 2026-05-04 -- Phase 10 execution started
+Phase: 11 (disp-unwrapper-deramping-candidates) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 11
+Last activity: 2026-05-04 -- Phase 11 execution started
 
 **v1.2 scope:** Focus on CSLC and DISP. CSLC enters with strong v1.1 self-consistency baselines (SoCal coh=0.887 / residual=-0.109 mm/yr; Mojave coh=0.804 / residual=+1.127 mm/yr; Iberian coh=0.868 / residual=+0.347 mm/yr) and needs BINDING gate promotion plus deferred EGMS/AOI hardening. DISP enters with structurally complete N.Am./EU validation but reference-agreement FAILs (SoCal r=0.049, Bologna r=0.336), while stable-terrain residuals remain near zero; v1.2 starts with ERA5/ramp diagnostics before choosing an unwrapper/resolution candidate.
 
