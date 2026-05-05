@@ -805,3 +805,152 @@ class TestEvalScriptsSPURTCandidateWiring:
         assert "DISPCandidateOutcome" in text, (
             "run_eval_disp_egms.py must use DISPCandidateOutcome for SPURT candidate result"
         )
+
+
+# ============================================================================
+# Task 2 (Plan 03): PHASS post-deramp candidate wiring (D-01, D-02, D-03,
+#                   D-04, D-05, D-07, D-08, D-11)
+# ============================================================================
+
+
+class TestEvalScriptsPHASSPostDerampCandidateWiring:
+    """Both eval scripts must wire phass_post_deramp after spurt_native (D-04)."""
+
+    def _read_script(self, name: str) -> str:
+        from pathlib import Path as _Path
+        root = _Path(__file__).parents[2]
+        return (root / name).read_text()
+
+    def test_run_eval_disp_contains_phass_post_deramp(self) -> None:
+        """run_eval_disp.py must reference 'phass_post_deramp' (D-01, D-02)."""
+        text = self._read_script("run_eval_disp.py")
+        assert "phass_post_deramp" in text, (
+            "run_eval_disp.py missing phass_post_deramp candidate (D-01, D-02)"
+        )
+
+    def test_run_eval_disp_egms_contains_phass_post_deramp(self) -> None:
+        """run_eval_disp_egms.py must reference 'phass_post_deramp' (D-01, D-02)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert "phass_post_deramp" in text, (
+            "run_eval_disp_egms.py missing phass_post_deramp candidate (D-01, D-02)"
+        )
+
+    def test_run_eval_disp_phass_after_spurt_ordering(self) -> None:
+        """In run_eval_disp.py, phass_post_deramp block must appear after spurt_native (D-04)."""
+        text = self._read_script("run_eval_disp.py")
+        spurt_pos = text.find("spurt_native")
+        phass_pos = text.find("phass_post_deramp")
+        assert spurt_pos != -1, "spurt_native not found in run_eval_disp.py"
+        assert phass_pos != -1, "phass_post_deramp not found in run_eval_disp.py"
+        assert phass_pos > spurt_pos, (
+            f"phass_post_deramp (pos {phass_pos}) must appear after spurt_native (pos {spurt_pos}) per D-04"
+        )
+
+    def test_run_eval_disp_egms_phass_after_spurt_ordering(self) -> None:
+        """In run_eval_disp_egms.py, phass_post_deramp block must appear after spurt_native (D-04)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        spurt_pos = text.find("spurt_native")
+        phass_pos = text.find("phass_post_deramp")
+        assert spurt_pos != -1, "spurt_native not found in run_eval_disp_egms.py"
+        assert phass_pos != -1, "phass_post_deramp not found in run_eval_disp_egms.py"
+        assert phass_pos > spurt_pos, (
+            f"phass_post_deramp (pos {phass_pos}) must appear after spurt_native (pos {spurt_pos}) per D-04"
+        )
+
+    def test_run_eval_disp_uses_write_deramped_unwrapped_ifgs(self) -> None:
+        """run_eval_disp.py must call write_deramped_unwrapped_ifgs (D-05)."""
+        text = self._read_script("run_eval_disp.py")
+        assert "write_deramped_unwrapped_ifgs" in text, (
+            "run_eval_disp.py must call write_deramped_unwrapped_ifgs per D-05"
+        )
+
+    def test_run_eval_disp_egms_uses_write_deramped_unwrapped_ifgs(self) -> None:
+        """run_eval_disp_egms.py must call write_deramped_unwrapped_ifgs (D-05)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert "write_deramped_unwrapped_ifgs" in text, (
+            "run_eval_disp_egms.py must call write_deramped_unwrapped_ifgs per D-05"
+        )
+
+    def test_run_eval_disp_has_deramped_ifg_timeseries_reentry_blocker(self) -> None:
+        """run_eval_disp.py must use 'deramped_ifg_timeseries_reentry' as failed_stage (D-11)."""
+        text = self._read_script("run_eval_disp.py")
+        assert "deramped_ifg_timeseries_reentry" in text, (
+            "run_eval_disp.py missing BLOCKER failed_stage='deramped_ifg_timeseries_reentry' (D-11)"
+        )
+
+    def test_run_eval_disp_egms_has_deramped_ifg_timeseries_reentry_blocker(self) -> None:
+        """run_eval_disp_egms.py must use 'deramped_ifg_timeseries_reentry' as failed_stage (D-11)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert "deramped_ifg_timeseries_reentry" in text, (
+            "run_eval_disp_egms.py missing BLOCKER failed_stage='deramped_ifg_timeseries_reentry' (D-11)"
+        )
+
+    def test_run_eval_disp_socal_has_deformation_sanity_check(self) -> None:
+        """run_eval_disp.py (SoCal) must construct DISPDeformationSanityCheck (D-07)."""
+        text = self._read_script("run_eval_disp.py")
+        assert "DISPDeformationSanityCheck" in text, (
+            "run_eval_disp.py must use DISPDeformationSanityCheck for SoCal PHASS deramping (D-07)"
+        )
+
+    def test_run_eval_disp_egms_imports_deformation_sanity_check(self) -> None:
+        """run_eval_disp_egms.py (Bologna) must import DISPDeformationSanityCheck (D-07)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert "DISPDeformationSanityCheck" in text, (
+            "run_eval_disp_egms.py must import/use DISPDeformationSanityCheck (D-07)"
+        )
+
+    def test_run_eval_disp_sanity_check_thresholds_present(self) -> None:
+        """run_eval_disp.py must have sanity-check thresholds: 3.0 and 2.0 (D-07)."""
+        text = self._read_script("run_eval_disp.py")
+        assert "3.0" in text, "run_eval_disp.py missing trend_delta threshold 3.0 (D-07)"
+        assert "2.0" in text, "run_eval_disp.py missing stable_residual threshold 2.0 (D-07)"
+        # Verify these appear near the deformation sanity context
+        assert "trend_delta_mm_yr" in text, (
+            "run_eval_disp.py missing trend_delta_mm_yr field (DISPDeformationSanityCheck)"
+        )
+        assert "stable_residual_delta_mm_yr" in text, (
+            "run_eval_disp.py missing stable_residual_delta_mm_yr field (DISPDeformationSanityCheck)"
+        )
+
+    def test_run_eval_disp_egms_sanity_check_thresholds_present(self) -> None:
+        """run_eval_disp_egms.py must have sanity-check thresholds: 3.0 and 2.0 (D-07)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert "trend_delta_mm_yr" in text, (
+            "run_eval_disp_egms.py missing trend_delta_mm_yr field"
+        )
+        assert "stable_residual_delta_mm_yr" in text, (
+            "run_eval_disp_egms.py missing stable_residual_delta_mm_yr field"
+        )
+
+    def test_run_eval_disp_phass_blocker_error_summary_prefix(self) -> None:
+        """BLOCKER error_summary must begin with 'No supported deramped-IFG time-series re-entry:' (D-11)."""
+        text = self._read_script("run_eval_disp.py")
+        assert "No supported deramped-IFG time-series re-entry:" in text, (
+            "run_eval_disp.py BLOCKER error_summary must begin with canonical prefix (D-11)"
+        )
+
+    def test_run_eval_disp_egms_phass_blocker_error_summary_prefix(self) -> None:
+        """BLOCKER error_summary must begin with 'No supported deramped-IFG time-series re-entry:' (D-11)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        assert "No supported deramped-IFG time-series re-entry:" in text, (
+            "run_eval_disp_egms.py BLOCKER error_summary must begin with canonical prefix (D-11)"
+        )
+
+    def test_run_eval_disp_phass_partial_metrics_true_in_blocker(self) -> None:
+        """PHASS BLOCKER in run_eval_disp.py must have partial_metrics=True (D-11)."""
+        text = self._read_script("run_eval_disp.py")
+        # Must have partial_metrics=True somewhere after phass_post_deramp
+        phass_pos = text.find("phass_post_deramp")
+        partial_pos = text.find("partial_metrics=True", phass_pos)
+        assert partial_pos != -1, (
+            "run_eval_disp.py PHASS BLOCKER must set partial_metrics=True (D-11)"
+        )
+
+    def test_run_eval_disp_egms_phass_partial_metrics_true_in_blocker(self) -> None:
+        """PHASS BLOCKER in run_eval_disp_egms.py must have partial_metrics=True (D-11)."""
+        text = self._read_script("run_eval_disp_egms.py")
+        phass_pos = text.find("phass_post_deramp")
+        partial_pos = text.find("partial_metrics=True", phass_pos)
+        assert partial_pos != -1, (
+            "run_eval_disp_egms.py PHASS BLOCKER must set partial_metrics=True (D-11)"
+        )
