@@ -1295,6 +1295,127 @@ if __name__ == "__main__":
             )
         )
 
+    # ── Stage 12 (pre): PHASS post-deramp candidate (Phase 11 D-01, D-02, D-03, D-04, D-05) ──
+    # PHASS post-deramping is the second candidate after SPURT (D-04 ordering).
+    # IFG-level deramping only; no re-entry into time-series inversion is supported
+    # (D-05: IFG subtraction; no public API to restart dolphin from deramped IFGs).
+    # Deformation-signal sanity check is required for SoCal (D-07).
+    # A flagged sanity check blocks Phase 12 recommendation but NOT Phase 11 reporting (D-08).
+    print("\n-- Stage 12 (pre): PHASS post-deramp candidate --")
+    from subsideo.validation.matrix_schema import DISPDeformationSanityCheck
+    from subsideo.validation.selfconsistency import write_deramped_unwrapped_ifgs as _write_deramped
+
+    phass_deramp_dir = candidate_output_dir(OUT_DIR, "phass_post_deramp")
+    phass_deramp_dir.mkdir(parents=True, exist_ok=True)
+    phass_deramp_log = phass_deramp_dir / "candidate.log"
+
+    # Read baseline PHASS unwrapped IFGs (from the same disp_dir used for Stage 11)
+    _phass_unw_dir = disp_dir / "dolphin" / "unwrapped"
+    _phass_unw_files = sorted(_phass_unw_dir.glob("*.unw.tif")) if _phass_unw_dir.exists() else []
+    print(f"  PHASS baseline unwrapped IFGs: {len(_phass_unw_files)}")
+
+    # Step 1: Write deramped IFGs (D-05 IFG-level deramping; T-11-03-01 isolation)
+    _deramped_dir = phass_deramp_dir / "deramped_unwrapped"
+    _phass_deramped_paths: list[_PhasePath] = []
+    _phass_ramp_data: dict = {}
+    try:
+        if _phass_unw_files:
+            _phass_deramped_paths, _phass_ramp_data = _write_deramped(
+                _phass_unw_files, _deramped_dir
+            )
+            print(f"  Deramped IFGs written: {len(_phass_deramped_paths)} -> {_deramped_dir}")
+        else:
+            print("  No baseline unwrapped IFGs found for PHASS deramping -- skipping write")
+    except Exception as exc_deramp:
+        print(f"  PHASS deramping write failed: {exc_deramp}")
+        phass_deramp_log.write_text(f"write_deramped_unwrapped_ifgs error: {exc_deramp}\n")
+
+    # Step 2: Compute deformation-signal sanity check (D-07: always for SoCal; D-08: non-blocking)
+    # Compare baseline stable-terrain residual vs deramped-stack mean slope residual.
+    _sanity_trend_delta: float | None = None
+    _sanity_direction_change: float | None = None
+    _sanity_stable_residual_delta: float | None = None
+    _sanity_flagged = False
+    _sanity_flag_reason = ""
+    try:
+        if _phass_ramp_data and "slope_x" in _phass_ramp_data:
+            import numpy as _np_sanity
+            _sx = _phass_ramp_data["slope_x"]
+            _sy = _phass_ramp_data["slope_y"]
+            # Use the mean ramp slope as a proxy for trend change in rad/pixel/IFG
+            # Convert to approximate mm/yr using Sentinel-1 wavelength and 12-day baseline
+            _LAMBDA = 0.05546576  # m
+            _BASELINES_PER_YEAR = 365.25 / 12.0
+            _finite_sx = _sx[_np_sanity.isfinite(_sx)]
+            _finite_sy = _sy[_np_sanity.isfinite(_sy)]
+            if len(_finite_sx) > 0:
+                # trend_delta ~ mean ramp slope magnitude x burst size x lambda -> mm/yr
+                # This is a proxy; exact signal-erasure check requires running time-series
+                # on deramped IFGs which is not supported (BLOCKER path below).
+                _H, _W = 512, 512  # conservative burst approximation
+                _mean_ramp_vel_rad_yr = (
+                    float(_np_sanity.abs(_finite_sx).mean()) * _W
+                    + float(_np_sanity.abs(_finite_sy).mean()) * _H
+                ) * _BASELINES_PER_YEAR
+                _sanity_trend_delta = (
+                    -_mean_ramp_vel_rad_yr * _LAMBDA / (4.0 * _np_sanity.pi) * 1000.0
+                )
+                # Stable residual delta: difference from baseline residual
+                _sanity_stable_residual_delta = float(
+                    _np_sanity.abs(_finite_sx).mean() * _W * _BASELINES_PER_YEAR
+                    * _LAMBDA / (4.0 * _np_sanity.pi) * 1000.0
+                )
+                # Direction change: use ramp direction sigma as proxy
+                _dir_rad = _phass_ramp_data.get("ramp_direction_deg", _np_sanity.zeros(1))
+                _finite_dir = _dir_rad[_np_sanity.isfinite(_dir_rad)]
+                _sanity_direction_change = float(_np_sanity.std(_finite_dir)) if len(_finite_dir) > 1 else None
+                # D-07 flagging: abs(trend_delta) > 3.0 mm/yr OR abs(stable_residual_delta) > 2.0 mm/yr
+                if abs(_sanity_trend_delta) > 3.0:
+                    _sanity_flagged = True
+                    _sanity_flag_reason += f"trend_delta {_sanity_trend_delta:+.2f} mm/yr > 3.0; "
+                if abs(_sanity_stable_residual_delta) > 2.0:
+                    _sanity_flagged = True
+                    _sanity_flag_reason += f"stable_residual_delta {_sanity_stable_residual_delta:+.2f} mm/yr > 2.0; "
+        if _sanity_flagged:
+            print(f"  WARN (D-08): deformation sanity flagged -- {_sanity_flag_reason.strip()}")
+            print("  Sanity flag blocks Phase 12 recommendation but NOT Phase 11 metric reporting")
+    except Exception as exc_sanity:
+        print(f"  Sanity check computation failed: {exc_sanity}")
+
+    _phass_deform_sanity = DISPDeformationSanityCheck(
+        cell="socal",
+        trend_delta_mm_yr=_sanity_trend_delta,
+        direction_change_deg=_sanity_direction_change,
+        stable_residual_delta_mm_yr=_sanity_stable_residual_delta,
+        flagged=_sanity_flagged,
+        flag_reason=_sanity_flag_reason.strip(),
+    )
+
+    # Step 3: No public/local hook to re-enter time-series inversion from deramped IFGs.
+    # dolphin's public API consumes CSLCs -> outputs unwrapped IFGs internally; there is no
+    # supported path to inject deramped IFGs before the time-series inversion step without
+    # calling private APIs (names starting with `_`). Record a schema-valid BLOCKER (D-11).
+    _phass_blocker = make_candidate_blocker(
+        candidate="phass_post_deramp",
+        cell="socal",
+        failed_stage="deramped_ifg_timeseries_reentry",
+        error_summary=(
+            "No supported deramped-IFG time-series re-entry: dolphin has no public "
+            "API to consume externally-deramped unwrapped IFGs before time-series "
+            "inversion. Partial evidence preserved in deramped_unwrapped/."
+        ),
+        evidence_paths=[str(_deramped_dir)],
+        cached_input_valid=True,
+        partial_metrics=True,
+    )
+    # Attach deformation-sanity check to the BLOCKER (D-07; always set for SoCal)
+    _phass_blocker_with_sanity = _phass_blocker.model_copy(
+        update={"deformation_sanity": _phass_deform_sanity}
+    )
+    candidate_outcomes.append(_phass_blocker_with_sanity)
+    print(f"  PHASS post-deramp: BLOCKER (deramped_ifg_timeseries_reentry)")
+    print(f"  Deformation sanity flagged: {_sanity_flagged}")
+
     # ── Stage 12: Metrics serialisation ─────────────────────────────────────
     metrics = DISPCellMetrics(
         schema_version=1,

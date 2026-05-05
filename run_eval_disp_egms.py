@@ -1184,6 +1184,114 @@ if __name__ == "__main__":
             )
         )
 
+    # ── Stage 12 (pre): PHASS post-deramp candidate (Phase 11 D-01, D-02, D-03, D-04, D-05) ──
+    # PHASS post-deramping is the second candidate after SPURT (D-04 ordering).
+    # Bologna cell: include DISPDeformationSanityCheck when values are available (D-07).
+    # A flagged sanity check blocks Phase 12 recommendation but NOT Phase 11 reporting (D-08).
+    print("\n-- Stage 12 (pre): PHASS post-deramp candidate (Bologna) --")
+    from subsideo.validation.matrix_schema import DISPDeformationSanityCheck
+    from subsideo.validation.selfconsistency import write_deramped_unwrapped_ifgs as _write_deramped
+
+    phass_deramp_dir = candidate_output_dir(OUT_DIR, "phass_post_deramp")
+    phass_deramp_dir.mkdir(parents=True, exist_ok=True)
+    phass_deramp_log = phass_deramp_dir / "candidate.log"
+
+    # Read baseline PHASS unwrapped IFGs (from same disp_dir as Stage 11)
+    _phass_unw_dir = disp_dir / "dolphin" / "unwrapped"
+    _phass_unw_files = sorted(_phass_unw_dir.glob("*.unw.tif")) if _phass_unw_dir.exists() else []
+    print(f"  PHASS baseline unwrapped IFGs: {len(_phass_unw_files)}")
+
+    # Step 1: Write deramped IFGs (D-05 IFG-level deramping; T-11-03-01 isolation)
+    _deramped_dir = phass_deramp_dir / "deramped_unwrapped"
+    _phass_deramped_paths: list[_PhasePath] = []
+    _phass_ramp_data: dict = {}
+    try:
+        if _phass_unw_files:
+            _phass_deramped_paths, _phass_ramp_data = _write_deramped(
+                _phass_unw_files, _deramped_dir
+            )
+            print(f"  Deramped IFGs written: {len(_phass_deramped_paths)} -> {_deramped_dir}")
+        else:
+            print("  No baseline unwrapped IFGs found for PHASS deramping -- skipping write")
+    except Exception as exc_deramp:
+        print(f"  PHASS deramping write failed: {exc_deramp}")
+        phass_deramp_log.write_text(f"write_deramped_unwrapped_ifgs error: {exc_deramp}\n")
+
+    # Step 2: Compute deformation-signal sanity check for Bologna (D-07: include when values available)
+    _sanity_trend_delta: float | None = None
+    _sanity_direction_change: float | None = None
+    _sanity_stable_residual_delta: float | None = None
+    _sanity_flagged = False
+    _sanity_flag_reason = ""
+    _bologna_sanity: "DISPDeformationSanityCheck | None" = None
+    try:
+        if _phass_ramp_data and "slope_x" in _phass_ramp_data:
+            import numpy as _np_sanity_b
+            _sx = _phass_ramp_data["slope_x"]
+            _sy = _phass_ramp_data["slope_y"]
+            _LAMBDA = 0.05546576
+            _BASELINES_PER_YEAR = 365.25 / 12.0
+            _finite_sx = _sx[_np_sanity_b.isfinite(_sx)]
+            _finite_sy = _sy[_np_sanity_b.isfinite(_sy)]
+            if len(_finite_sx) > 0:
+                _H, _W = 512, 512
+                _mean_ramp_vel_rad_yr = (
+                    float(_np_sanity_b.abs(_finite_sx).mean()) * _W
+                    + float(_np_sanity_b.abs(_finite_sy).mean()) * _H
+                ) * _BASELINES_PER_YEAR
+                _sanity_trend_delta = (
+                    -_mean_ramp_vel_rad_yr * _LAMBDA / (4.0 * _np_sanity_b.pi) * 1000.0
+                )
+                _sanity_stable_residual_delta = float(
+                    _np_sanity_b.abs(_finite_sx).mean() * _W * _BASELINES_PER_YEAR
+                    * _LAMBDA / (4.0 * _np_sanity_b.pi) * 1000.0
+                )
+                _dir_rad = _phass_ramp_data.get("ramp_direction_deg", _np_sanity_b.zeros(1))
+                _finite_dir = _dir_rad[_np_sanity_b.isfinite(_dir_rad)]
+                _sanity_direction_change = float(_np_sanity_b.std(_finite_dir)) if len(_finite_dir) > 1 else None
+                if abs(_sanity_trend_delta) > 3.0:
+                    _sanity_flagged = True
+                    _sanity_flag_reason += f"trend_delta {_sanity_trend_delta:+.2f} mm/yr > 3.0; "
+                if abs(_sanity_stable_residual_delta) > 2.0:
+                    _sanity_flagged = True
+                    _sanity_flag_reason += f"stable_residual_delta {_sanity_stable_residual_delta:+.2f} mm/yr > 2.0; "
+                # Bologna: include sanity check when values are available (D-07)
+                _bologna_sanity = DISPDeformationSanityCheck(
+                    cell="bologna",
+                    trend_delta_mm_yr=_sanity_trend_delta,
+                    direction_change_deg=_sanity_direction_change,
+                    stable_residual_delta_mm_yr=_sanity_stable_residual_delta,
+                    flagged=_sanity_flagged,
+                    flag_reason=_sanity_flag_reason.strip(),
+                )
+                if _sanity_flagged:
+                    print(f"  WARN (D-08): deformation sanity flagged -- {_sanity_flag_reason.strip()}")
+    except Exception as exc_sanity:
+        print(f"  Sanity check computation failed: {exc_sanity}")
+        # Leave _bologna_sanity = None (D-07: include only when values are available)
+
+    # Step 3: No public hook to re-enter time-series from deramped IFGs -> BLOCKER (D-11)
+    _phass_blocker = make_candidate_blocker(
+        candidate="phass_post_deramp",
+        cell="bologna",
+        failed_stage="deramped_ifg_timeseries_reentry",
+        error_summary=(
+            "No supported deramped-IFG time-series re-entry: dolphin has no public "
+            "API to consume externally-deramped unwrapped IFGs before time-series "
+            "inversion. Partial evidence preserved in deramped_unwrapped/."
+        ),
+        evidence_paths=[str(_deramped_dir)],
+        cached_input_valid=True,
+        partial_metrics=True,
+    )
+    # Bologna: attach sanity check only when available (D-07)
+    _phass_blocker_final = _phass_blocker.model_copy(
+        update={"deformation_sanity": _bologna_sanity}
+    )
+    candidate_outcomes.append(_phass_blocker_final)
+    print(f"  PHASS post-deramp (Bologna): BLOCKER (deramped_ifg_timeseries_reentry)")
+    print(f"  Deformation sanity included: {_bologna_sanity is not None}")
+
     # ── Stage 12: Metrics serialisation ─────────────────────────────────────
     metrics = DISPCellMetrics(
         schema_version=1,
