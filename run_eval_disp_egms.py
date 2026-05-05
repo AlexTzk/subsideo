@@ -798,6 +798,7 @@ if __name__ == "__main__":
     import re as _re_phase4
 
     from subsideo.validation.matrix_schema import (
+        DISPCandidateOutcome,
         DISPCellMetrics,
         DISPProductQualityResultJson,
         Era5Diagnostic,
@@ -806,6 +807,11 @@ if __name__ == "__main__":
         RampAggregate,
         RampAttribution,
         ReferenceAgreementResultJson,
+    )
+    from subsideo.validation.disp_candidates import (
+        candidate_output_dir,
+        candidate_status_from_metrics,
+        make_candidate_blocker,
     )
     from subsideo.validation.disp_diagnostics import (
         cache_provenance,
@@ -1015,6 +1021,170 @@ if __name__ == "__main__":
         cache_provenance("velocity_tif", velocity_path, velocity_cache_mode),
     ]
 
+    # ── Stage 11: SPURT native candidate (Phase 11 D-01, D-02, D-04) ──────────
+    # SPURT is executed BEFORE PHASS deramping per D-04.
+    # Outputs are isolated under OUT_DIR/candidates/spurt_native (T-11-01-03).
+    # No ERA5 axis (D-13). No tophu/SNAPHU fallback (D-14).
+    print("\n-- Stage 11: SPURT native candidate --")
+    candidate_outcomes: list[DISPCandidateOutcome] = []
+
+    spurt_candidate_dir = candidate_output_dir(OUT_DIR, "spurt_native")
+    spurt_candidate_dir.mkdir(parents=True, exist_ok=True)
+    spurt_log_path = spurt_candidate_dir / "candidate.log"
+
+    try:
+        spurt_result = run_disp(
+            cslc_paths=sorted_h5,
+            output_dir=spurt_candidate_dir,
+            era5_mode="off",
+            unwrap_method="spurt",
+            threads_per_worker=8,
+            n_parallel_bursts=2,
+            block_shape=(512, 512),
+            n_parallel_unwrap=8,
+        )
+        print(f"  SPURT result valid: {spurt_result.valid}")
+        print(f"  SPURT velocity: {spurt_result.velocity_path}")
+
+        spurt_velocity_path = spurt_result.velocity_path
+        if spurt_velocity_path is not None and spurt_velocity_path.exists():
+            # Compare SPURT velocity against EGMS L2a PS reference (T-11-02-03)
+            spurt_corr: float | None = None
+            spurt_bias: float | None = None
+            spurt_rmse: float | None = None
+            spurt_ramp_mean: float | None = None
+            spurt_ramp_dir_sigma: float | None = None
+            spurt_attributed: str | None = None
+
+            try:
+                from subsideo.validation.compare_disp import prepare_for_reference
+                from subsideo.validation.metrics import (
+                    bias as _bias_fn,
+                    rmse as _rmse_fn,
+                )
+                import numpy as _np_spurt
+
+                spurt_at_ps = prepare_for_reference(
+                    native_velocity=spurt_velocity_path,
+                    reference_grid=egms_spec,
+                    method=REFERENCE_MULTILOOK_METHOD,
+                )
+                SENTINEL1_WAVELENGTH_M_SPURT = 0.05546576
+                spurt_at_ps_mm_yr = (
+                    -spurt_at_ps * SENTINEL1_WAVELENGTH_M_SPURT / (4.0 * _np_spurt.pi) * 1000.0
+                )
+                _ref_ps = egms_df["mean_velocity"].values.astype(_np_spurt.float64)
+                _valid_spurt = _np_spurt.isfinite(spurt_at_ps_mm_yr) & _np_spurt.isfinite(_ref_ps)
+                n_valid_spurt = int(_valid_spurt.sum())
+
+                if n_valid_spurt >= 100:
+                    spurt_corr = float(
+                        _np_spurt.corrcoef(spurt_at_ps_mm_yr[_valid_spurt], _ref_ps[_valid_spurt])[0, 1]
+                    )
+                    spurt_bias = float(
+                        _bias_fn(spurt_at_ps_mm_yr[_valid_spurt], _ref_ps[_valid_spurt])
+                    )
+                    spurt_rmse = float(
+                        _rmse_fn(spurt_at_ps_mm_yr[_valid_spurt], _ref_ps[_valid_spurt])
+                    )
+                    print(
+                        f"  SPURT vs EGMS L2a: r={spurt_corr:.4f}  "
+                        f"bias={spurt_bias:+.2f} mm/yr  "
+                        f"RMSE={spurt_rmse:.2f} mm/yr  N={n_valid_spurt:,}"
+                    )
+                else:
+                    print(f"  SPURT: insufficient valid PS pairs ({n_valid_spurt}) for comparison")
+
+            except Exception as exc_compare:
+                print(f"  SPURT comparison failed: {type(exc_compare).__name__}: {exc_compare}")
+                spurt_log_path.write_text(f"comparison error: {exc_compare}\n")
+
+            # Compute SPURT ramp attribution
+            try:
+                from subsideo.validation.selfconsistency import (
+                    auto_attribute_ramp,
+                    compute_ramp_aggregate,
+                    fit_planar_ramp,
+                )
+                import numpy as _np_spurt2
+                spurt_unw_dir = spurt_candidate_dir / "dolphin" / "unwrapped"
+                spurt_unw_files = sorted(spurt_unw_dir.glob("*.unw.tif")) if spurt_unw_dir.exists() else []
+                if spurt_unw_files:
+                    spurt_ramps: list[float] = []
+                    spurt_dirs: list[float] = []
+                    for _unw_f in spurt_unw_files[:14]:
+                        import rasterio as _rio_spurt2
+                        with _rio_spurt2.open(_unw_f) as _ds:
+                            _phase = _ds.read(1).astype(float)
+                        _fit = fit_planar_ramp(_phase)
+                        if _np_spurt2.isfinite(_fit.ramp_magnitude_rad):
+                            spurt_ramps.append(_fit.ramp_magnitude_rad)
+                            spurt_dirs.append(_fit.ramp_direction_deg)
+                    if spurt_ramps:
+                        _spurt_ramp_agg = compute_ramp_aggregate(spurt_ramps, spurt_dirs)
+                        spurt_ramp_mean = float(_spurt_ramp_agg.mean_magnitude_rad)
+                        spurt_ramp_dir_sigma = float(_spurt_ramp_agg.direction_stability_sigma_deg)
+                        spurt_attributed = auto_attribute_ramp(_spurt_ramp_agg)
+                        print(f"  SPURT ramp: mean={spurt_ramp_mean:.3f} rad  sigma={spurt_ramp_dir_sigma:.1f} deg  attr={spurt_attributed}")
+            except Exception as exc_ramp:
+                print(f"  SPURT ramp attribution failed: {type(exc_ramp).__name__}: {exc_ramp}")
+
+            spurt_status = candidate_status_from_metrics(
+                "spurt_native",
+                correlation=spurt_corr,
+                bias_mm_yr=spurt_bias,
+                ramp_mean_magnitude_rad=spurt_ramp_mean,
+                attributed_source=spurt_attributed,  # type: ignore[arg-type]
+            )
+            print(f"  SPURT candidate status: {spurt_status}")
+            candidate_outcomes.append(
+                DISPCandidateOutcome(
+                    candidate="spurt_native",
+                    cell="bologna",
+                    status=spurt_status,
+                    cached_input_valid=True,
+                    reference_correlation=spurt_corr,
+                    reference_bias_mm_yr=spurt_bias,
+                    reference_rmse_mm_yr=spurt_rmse,
+                    ramp_mean_magnitude_rad=spurt_ramp_mean,
+                    ramp_direction_sigma_deg=spurt_ramp_dir_sigma,
+                    attributed_source=spurt_attributed,  # type: ignore[arg-type]
+                    partial_metrics=False,
+                )
+            )
+        else:
+            print("  SPURT produced no velocity.tif -- recording BLOCKER")
+            candidate_outcomes.append(
+                make_candidate_blocker(
+                    candidate="spurt_native",
+                    cell="bologna",
+                    failed_stage="spurt_unwrap_or_timeseries",
+                    error_summary=(
+                        f"run_disp returned no velocity_path. "
+                        f"valid={spurt_result.valid} "
+                        f"errors={spurt_result.validation_errors}"
+                    ),
+                    evidence_paths=[str(spurt_log_path)],
+                    cached_input_valid=True,
+                    partial_metrics=False,
+                )
+            )
+    except Exception as exc_spurt:
+        print(f"  SPURT candidate FAILED: {type(exc_spurt).__name__}: {exc_spurt}")
+        spurt_log_path.write_text(f"{type(exc_spurt).__name__}: {exc_spurt}\n")
+        candidate_outcomes.append(
+            make_candidate_blocker(
+                candidate="spurt_native",
+                cell="bologna",
+                failed_stage="spurt_unwrap_or_timeseries",
+                error_summary=f"{type(exc_spurt).__name__}: {exc_spurt}",
+                evidence_paths=[str(spurt_log_path)],
+                cached_input_valid=True,
+                partial_metrics=False,
+            )
+        )
+
+    # ── Stage 12: Metrics serialisation ─────────────────────────────────────
     metrics = DISPCellMetrics(
         schema_version=1,
         product_quality=pq,
@@ -1026,6 +1196,7 @@ if __name__ == "__main__":
         dem_diagnostics=dem_diagnostics,
         cache_provenance=cache_provenance_records,
         cell_status=cell_status,
+        candidate_outcomes=candidate_outcomes,
         criterion_ids_applied=[
             "disp.selfconsistency.coherence_min",
             "disp.selfconsistency.residual_mm_yr_max",
