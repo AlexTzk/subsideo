@@ -3,8 +3,13 @@
 Covers fit_planar_ramp algorithm correctness, NaN edge case, mask honoring,
 compute_ramp_aggregate aggregate computation, auto_attribute_ramp 4-branch
 table.
+
+Phase 11 Plan 03: deramp_ifg_stack and write_deramped_unwrapped_ifgs helpers.
 """
 from __future__ import annotations
+
+import tempfile
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -12,7 +17,9 @@ import pytest
 from subsideo.validation.selfconsistency import (
     auto_attribute_ramp,
     compute_ramp_aggregate,
+    deramp_ifg_stack,
     fit_planar_ramp,
+    write_deramped_unwrapped_ifgs,
 )
 
 
@@ -138,3 +145,208 @@ def test_auto_attribute_ramp_honors_custom_cutoffs() -> None:
         )
         == "phass"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 11 Plan 03: deramp_ifg_stack and write_deramped_unwrapped_ifgs
+# ---------------------------------------------------------------------------
+
+
+def _make_plane_stack(
+    n_ifg: int,
+    height: int,
+    width: int,
+    slope_x: float = 0.05,
+    slope_y: float = 0.03,
+    intercept: float = 2.0,
+    residual_scale: float = 0.1,
+    rng_seed: int = 42,
+) -> np.ndarray:
+    """Make an (N, H, W) stack of plane + small residuals."""
+    rng = np.random.default_rng(seed=rng_seed)
+    yy, xx = np.indices((height, width), dtype=np.float64)
+    plane = slope_x * xx + slope_y * yy + intercept
+    residuals = rng.uniform(-residual_scale, residual_scale, size=(n_ifg, height, width))
+    return (plane[np.newaxis, :, :] + residuals).astype(np.float64)
+
+
+class TestDerampIfgStack:
+    """Unit tests for deramp_ifg_stack."""
+
+    def test_planar_residuals_approximately_zero_after_deramp(self) -> None:
+        """After deramping, fitted slopes of the output should be near zero."""
+        height, width = 256, 256
+        stack = _make_plane_stack(4, height, width, slope_x=0.05, slope_y=0.03)
+        deramped, ramp_data = deramp_ifg_stack(stack, mask=None)
+        # Fit residual slopes on deramped output
+        residual_ramp = fit_planar_ramp(deramped)
+        assert residual_ramp["slope_x"].shape == (4,)
+        # Slopes should be close to zero (within 1e-3 rad/pixel)
+        finite_mask = np.isfinite(residual_ramp["slope_x"])
+        assert finite_mask.any(), "At least one deramped IFG should have a valid slope"
+        assert np.abs(residual_ramp["slope_x"][finite_mask]).max() < 0.01
+        assert np.abs(residual_ramp["slope_y"][finite_mask]).max() < 0.01
+
+    def test_non_planar_residual_values_remain_finite(self) -> None:
+        """Non-planar values (Gaussian bumps) survive deramping and are finite."""
+        height, width = 128, 128
+        yy, xx = np.indices((height, width), dtype=np.float64)
+        plane = 0.04 * xx + 0.02 * yy + 1.0
+        # Add a Gaussian bump as the non-planar signal
+        bump = 1.5 * np.exp(-((xx - 64) ** 2 + (yy - 64) ** 2) / (2 * 20**2))
+        raw = (plane + bump)[np.newaxis, :, :]
+        deramped, ramp_data = deramp_ifg_stack(raw)
+        assert np.isfinite(deramped).all(), "Deramped output must be fully finite for clean input"
+
+    def test_nan_where_source_not_finite(self) -> None:
+        """NaN pixels in the source are preserved as NaN in the deramped output."""
+        height, width = 64, 64
+        stack = _make_plane_stack(2, height, width)
+        # Introduce NaN in a patch
+        stack[:, 10:20, 10:20] = np.nan
+        deramped, _ = deramp_ifg_stack(stack)
+        # The NaN region should remain NaN in the output
+        assert np.all(np.isnan(deramped[:, 10:20, 10:20]))
+        # Remaining region should be finite
+        assert np.isfinite(deramped[:, 30:50, 30:50]).all()
+
+    def test_returns_ramp_data_dict_with_correct_keys(self) -> None:
+        """ramp_data returned must have the same keys as fit_planar_ramp output."""
+        stack = _make_plane_stack(3, 64, 64)
+        _, ramp_data = deramp_ifg_stack(stack)
+        expected_keys = {"ramp_magnitude_rad", "ramp_direction_deg", "slope_x", "slope_y", "intercept_rad"}
+        assert set(ramp_data.keys()) == expected_keys
+
+    def test_invalid_2d_input_raises_value_error(self) -> None:
+        """2-D input must raise ValueError (delegated from fit_planar_ramp path)."""
+        bad = np.zeros((100, 100), dtype=np.float64)
+        with pytest.raises(ValueError, match="must be 3-D"):
+            deramp_ifg_stack(bad)
+
+    def test_mask_parameter_is_forwarded(self) -> None:
+        """mask= kwarg is passed through to fit_planar_ramp correctly."""
+        height, width = 128, 128
+        stack = _make_plane_stack(2, height, width)
+        mask = np.ones((height, width), dtype=bool)
+        mask[:50, :] = False  # restrict to lower half
+        # Should not raise; mask is forwarded
+        deramped, ramp_data = deramp_ifg_stack(stack, mask=mask)
+        assert deramped.shape == stack.shape
+
+
+class TestWriteDerampedUnwrappedIfgs:
+    """Unit tests for write_deramped_unwrapped_ifgs (disk I/O helper)."""
+
+    def test_output_paths_named_with_deramped_suffix(self) -> None:
+        """Written files must be named {source_stem}.deramped.tif."""
+        import rasterio
+        from rasterio.transform import from_bounds
+
+        height, width = 64, 64
+        stack_data = _make_plane_stack(2, height, width)
+        transform = from_bounds(0, 0, 1, 1, width, height)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            unw_paths = []
+            for i in range(2):
+                p = tmp / f"20240101_2024011{i+2}.unw.tif"
+                profile = {
+                    "driver": "GTiff", "dtype": "float32",
+                    "width": width, "height": height, "count": 1,
+                    "crs": "EPSG:32611", "transform": transform,
+                }
+                with rasterio.open(p, "w", **profile) as dst:
+                    dst.write(stack_data[i].astype(np.float32), 1)
+                unw_paths.append(p)
+
+            out_dir = tmp / "deramped"
+            written, ramp_data = write_deramped_unwrapped_ifgs(unw_paths, out_dir)
+
+            assert len(written) == 2
+            for src, dest in zip(unw_paths, written):
+                expected_name = src.stem + ".deramped.tif"
+                assert dest.name == expected_name, f"Expected {expected_name}, got {dest.name}"
+                assert dest.exists(), f"Output file {dest} does not exist"
+
+    def test_output_directory_is_created(self) -> None:
+        """write_deramped_unwrapped_ifgs must create output_dir if absent."""
+        import rasterio
+        from rasterio.transform import from_bounds
+
+        height, width = 32, 32
+        stack_data = _make_plane_stack(1, height, width)
+        transform = from_bounds(0, 0, 1, 1, width, height)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            p = tmp / "20240101_20240113.unw.tif"
+            profile = {
+                "driver": "GTiff", "dtype": "float32",
+                "width": width, "height": height, "count": 1,
+                "crs": "EPSG:32611", "transform": transform,
+            }
+            with rasterio.open(p, "w", **profile) as dst:
+                dst.write(stack_data[0].astype(np.float32), 1)
+
+            out_dir = tmp / "nested" / "deramped_output"
+            written, _ = write_deramped_unwrapped_ifgs([p], out_dir)
+            assert out_dir.exists()
+            assert len(written) == 1
+
+    def test_source_profile_preserved(self) -> None:
+        """Output GeoTIFF must use the same CRS and dtype as the source."""
+        import rasterio
+        from rasterio.transform import from_bounds
+
+        height, width = 64, 64
+        stack_data = _make_plane_stack(1, height, width)
+        transform = from_bounds(0, 0, 1, 1, width, height)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            p = tmp / "20240101_20240113.unw.tif"
+            profile = {
+                "driver": "GTiff", "dtype": "float32",
+                "width": width, "height": height, "count": 1,
+                "crs": "EPSG:32611", "transform": transform,
+            }
+            with rasterio.open(p, "w", **profile) as dst:
+                dst.write(stack_data[0].astype(np.float32), 1)
+
+            out_dir = tmp / "deramped"
+            written, _ = write_deramped_unwrapped_ifgs([p], out_dir)
+
+            with rasterio.open(written[0]) as ds:
+                assert ds.crs.to_epsg() == 32611
+                assert ds.dtypes[0] == "float32"
+                assert ds.width == width
+                assert ds.height == height
+
+    def test_returns_ramp_data_dict(self) -> None:
+        """ramp_data returned must have fit_planar_ramp keys."""
+        import rasterio
+        from rasterio.transform import from_bounds
+
+        height, width = 64, 64
+        stack_data = _make_plane_stack(2, height, width)
+        transform = from_bounds(0, 0, 1, 1, width, height)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            unw_paths = []
+            for i in range(2):
+                p = tmp / f"20240101_2024011{i+2}.unw.tif"
+                profile = {
+                    "driver": "GTiff", "dtype": "float32",
+                    "width": width, "height": height, "count": 1,
+                    "crs": "EPSG:32611", "transform": transform,
+                }
+                with rasterio.open(p, "w", **profile) as dst:
+                    dst.write(stack_data[i].astype(np.float32), 1)
+                unw_paths.append(p)
+
+            out_dir = tmp / "deramped"
+            _, ramp_data = write_deramped_unwrapped_ifgs(unw_paths, out_dir)
+            expected_keys = {"ramp_magnitude_rad", "ramp_direction_deg", "slope_x", "slope_y", "intercept_rad"}
+            assert set(ramp_data.keys()) == expected_keys
