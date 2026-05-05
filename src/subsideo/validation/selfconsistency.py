@@ -552,6 +552,143 @@ def _load_cslc_hdf5(p: Path) -> np.ndarray:
     raise RuntimeError(f"No VV/HH CSLC dataset in {p}")
 
 
+def deramp_ifg_stack(
+    ifgrams_stack: np.ndarray,
+    mask: np.ndarray | None = None,
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """Subtract fitted planar ramps from each IFG in the stack (D-05).
+
+    Calls :func:`fit_planar_ramp` to get per-IFG plane coefficients, then
+    subtracts ``slope_x[i]*xx + slope_y[i]*yy + intercept_rad[i]`` from each
+    IFG. NaN pixels in the source are preserved as NaN in the output.
+
+    Parameters
+    ----------
+    ifgrams_stack : (N, H, W) float np.ndarray
+        Unwrapped phase in radians per IFG.
+    mask : (H, W) bool np.ndarray | None
+        Optional restriction passed through to ``fit_planar_ramp``.
+
+    Returns
+    -------
+    deramped_stack : (N, H, W) float np.ndarray
+        Stack with per-IFG planar ramps subtracted.
+    ramp_data : dict[str, np.ndarray]
+        Raw output of :func:`fit_planar_ramp` (slope_x, slope_y,
+        intercept_rad, ramp_magnitude_rad, ramp_direction_deg).
+
+    Raises
+    ------
+    ValueError
+        Delegated from :func:`fit_planar_ramp` when ``ifgrams_stack`` is not 3-D.
+    """
+    # fit_planar_ramp raises ValueError for non-3-D input
+    ramp_data = fit_planar_ramp(ifgrams_stack, mask=mask)
+
+    n_ifg, height, width = ifgrams_stack.shape
+    yy, xx = np.indices((height, width), dtype=np.float64)
+
+    deramped = ifgrams_stack.astype(np.float64).copy()
+    slope_x = ramp_data["slope_x"]
+    slope_y = ramp_data["slope_y"]
+    intercept = ramp_data["intercept_rad"]
+
+    for idx in range(n_ifg):
+        sx, sy, ic = float(slope_x[idx]), float(slope_y[idx]), float(intercept[idx])
+        if not (np.isfinite(sx) and np.isfinite(sy) and np.isfinite(ic)):
+            # Insufficient valid pixels for this IFG — skip deramping
+            continue
+        plane = sx * xx + sy * yy + ic
+        # Preserve NaN from source
+        src_nan = ~np.isfinite(ifgrams_stack[idx])
+        deramped[idx] -= plane
+        deramped[idx][src_nan] = np.nan
+
+    return deramped, ramp_data
+
+
+def write_deramped_unwrapped_ifgs(
+    unwrapped_paths: list[Path],
+    output_dir: Path,
+    mask: np.ndarray | None = None,
+) -> tuple[list[Path], dict[str, np.ndarray]]:
+    """Read unwrapped IFG GeoTIFFs, deramp, and write to output_dir.
+
+    Reads each GeoTIFF band into a 3-D stack, calls :func:`deramp_ifg_stack`,
+    and writes one output GeoTIFF per source path into ``output_dir``. Each
+    output file is named ``{source_stem}.deramped.tif``. The source rasterio
+    profile is preserved so CRS, transform, and dtype are carried through.
+
+    This implements D-05 (IFG-level deramping) as a validation-only
+    transformation. The baseline production output is never modified.
+
+    Parameters
+    ----------
+    unwrapped_paths : list[Path]
+        Source unwrapped-IFG GeoTIFF paths (one per IFG).
+    output_dir : Path
+        Destination directory; created if it does not exist (D-11 partial
+        output safety: always write to a candidate-isolated directory per
+        T-11-03-01 — never overwrite source paths).
+    mask : (H, W) bool np.ndarray | None
+        Optional per-pixel mask forwarded to :func:`deramp_ifg_stack`.
+
+    Returns
+    -------
+    written_paths : list[Path]
+        Ordered list of deramped output paths corresponding to
+        ``unwrapped_paths``.
+    ramp_data : dict[str, np.ndarray]
+        Per-IFG ramp coefficients from :func:`fit_planar_ramp`.
+    """
+    import rasterio  # lazy per PATTERNS "Two-layer install + lazy imports"
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load all IFGs into a 3-D stack to pass to deramp_ifg_stack at once.
+    bands: list[np.ndarray] = []
+    profiles: list[dict] = []
+    for p in unwrapped_paths:
+        with rasterio.open(p) as ds:
+            bands.append(ds.read(1).astype(np.float64))
+            profiles.append(ds.profile.copy())
+
+    if not bands:
+        return [], {
+            "ramp_magnitude_rad": np.zeros(0, dtype=np.float64),
+            "ramp_direction_deg": np.zeros(0, dtype=np.float64),
+            "slope_x": np.zeros(0, dtype=np.float64),
+            "slope_y": np.zeros(0, dtype=np.float64),
+            "intercept_rad": np.zeros(0, dtype=np.float64),
+        }
+
+    stack = np.stack(bands, axis=0)  # (N, H, W)
+    deramped_stack, ramp_data = deramp_ifg_stack(stack, mask=mask)
+
+    written: list[Path] = []
+    for i, (src_path, profile) in enumerate(zip(unwrapped_paths, profiles)):
+        out_name = src_path.stem + ".deramped.tif"
+        out_path = output_dir / out_name
+        # Write using the source profile (preserves CRS, transform, dtype)
+        write_profile = profile.copy()
+        write_profile.update(dtype="float32")
+        with rasterio.open(out_path, "w", **write_profile) as dst:
+            dst.write(deramped_stack[i].astype(np.float32), 1)
+        written.append(out_path)
+        logger.debug(
+            "write_deramped_unwrapped_ifgs: wrote {} ({:.1f} MB)",
+            out_path.name,
+            out_path.stat().st_size / 1e6,
+        )
+
+    logger.info(
+        "write_deramped_unwrapped_ifgs: {} IFGs deramped -> {}",
+        len(written),
+        output_dir,
+    )
+    return written, ramp_data
+
+
 def compute_ifg_coherence_stack(
     hdf5_paths: list[Path],
     boxcar_px: int = 5,
