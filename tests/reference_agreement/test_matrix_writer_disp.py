@@ -6,6 +6,7 @@ from pathlib import Path
 
 from subsideo.validation.matrix_schema import (
     CauseAssessment,
+    DISPCandidateOutcome,
     DISPCellMetrics,
     DISPProductQualityResultJson,
     Era5Diagnostic,
@@ -21,6 +22,28 @@ from subsideo.validation.matrix_writer import (
 )
 
 
+def _make_candidate_outcome(
+    candidate: str,
+    *,
+    status: str = "PASS",
+    cell: str = "socal",
+    partial_metrics: bool = False,
+) -> DISPCandidateOutcome:
+    """Minimal DISPCandidateOutcome builder for test fixtures."""
+    kwargs: dict = dict(
+        candidate=candidate,
+        cell=cell,
+        status=status,
+        cached_input_valid=True,
+        partial_metrics=partial_metrics,
+    )
+    if status == "BLOCKER":
+        kwargs["failed_stage"] = "unwrap"
+        kwargs["error_summary"] = "test error"
+        kwargs["evidence_paths"] = ["/tmp/log.txt"]
+    return DISPCandidateOutcome(**kwargs)
+
+
 def _make_disp_metrics(
     *,
     coherence_source: str = "phase3-cached",
@@ -32,6 +55,7 @@ def _make_disp_metrics(
     bias_mm_yr: float = 23.6,
     include_era5_diagnostic: bool = False,
     include_cause_assessment: bool = False,
+    candidate_outcomes: list[DISPCandidateOutcome] | None = None,
 ) -> DISPCellMetrics:
     pq = DISPProductQualityResultJson(
         measurements={
@@ -108,6 +132,7 @@ def _make_disp_metrics(
         runtime_conda_list_hash=None,
         era5_diagnostic=era5_diagnostic,
         cause_assessment=cause_assessment,
+        candidate_outcomes=candidate_outcomes or [],
     )
 
 
@@ -312,3 +337,84 @@ cells:
     assert "[phase3-cached]" in text
     # Make sure RUN_FAILED is NOT present (would indicate dispatch fell through)
     assert "RUN_FAILED" not in text
+
+
+# -------------------- Phase 11 candidate hints (D-12) --------------------
+
+
+def test_render_disp_cell_candidate_hints_in_pq_col(tmp_path: Path) -> None:
+    """candidate_outcomes appear in pq_col as cand=... compact text (D-12)."""
+    p = tmp_path / "metrics.json"
+    outcomes = [
+        _make_candidate_outcome("spurt_native", status="PASS"),
+        _make_candidate_outcome("phass_post_deramp", status="FAIL"),
+    ]
+    _write(p, _make_disp_metrics(candidate_outcomes=outcomes))
+    cols = _render_disp_cell(p, region="nam")
+    assert cols is not None
+    pq_col, ra_col = cols
+    # Compact hint must appear in PQ column
+    assert "cand=" in pq_col
+    assert "spurt:PASS" in pq_col
+    assert "deramp:FAIL" in pq_col
+    # RA column must NOT contain candidate text (D-12 separation)
+    assert "cand=" not in ra_col
+
+
+def test_render_disp_cell_candidate_hints_sorted_spurt_first(tmp_path: Path) -> None:
+    """spurt_native appears before phass_post_deramp in cand= hint (D-12)."""
+    p = tmp_path / "metrics.json"
+    # Supply in reverse order; output must still be sorted spurt first.
+    outcomes = [
+        _make_candidate_outcome("phass_post_deramp", status="BLOCKER"),
+        _make_candidate_outcome("spurt_native", status="PASS"),
+    ]
+    _write(p, _make_disp_metrics(candidate_outcomes=outcomes))
+    cols = _render_disp_cell(p, region="nam")
+    assert cols is not None
+    pq_col, _ = cols
+    assert "cand=" in pq_col
+    # spurt must come before deramp in the string
+    spurt_pos = pq_col.index("spurt:PASS")
+    deramp_pos = pq_col.index("deramp:BLOCKER")
+    assert spurt_pos < deramp_pos
+
+
+def test_render_disp_cell_candidate_partial_metrics_appends_star(tmp_path: Path) -> None:
+    """partial_metrics=True appends '*' to the status label (D-11)."""
+    p = tmp_path / "metrics.json"
+    outcomes = [
+        _make_candidate_outcome("spurt_native", status="BLOCKER", partial_metrics=True),
+        _make_candidate_outcome("phass_post_deramp", status="FAIL"),
+    ]
+    _write(p, _make_disp_metrics(candidate_outcomes=outcomes))
+    cols = _render_disp_cell(p, region="nam")
+    assert cols is not None
+    pq_col, _ = cols
+    assert "spurt:BLOCKER*" in pq_col
+    assert "deramp:FAIL" in pq_col  # no star on non-partial
+
+
+def test_render_disp_cell_no_candidate_outcomes_no_cand_hint(tmp_path: Path) -> None:
+    """Sidecars without candidate_outcomes produce no cand= text (backward compat)."""
+    p = tmp_path / "metrics.json"
+    _write(p, _make_disp_metrics())
+    cols = _render_disp_cell(p, region="nam")
+    assert cols is not None
+    pq_col, ra_col = cols
+    assert "cand=" not in pq_col
+    assert "cand=" not in ra_col
+
+
+def test_render_disp_cell_ra_col_never_contains_cand(tmp_path: Path) -> None:
+    """RA column must not contain cand= regardless of candidate status (D-12)."""
+    p = tmp_path / "metrics.json"
+    outcomes = [
+        _make_candidate_outcome("spurt_native", status="PASS"),
+        _make_candidate_outcome("phass_post_deramp", status="PASS"),
+    ]
+    _write(p, _make_disp_metrics(candidate_outcomes=outcomes))
+    cols = _render_disp_cell(p, region="eu")
+    assert cols is not None
+    _, ra_col = cols
+    assert "cand=" not in ra_col
