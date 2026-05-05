@@ -404,3 +404,28 @@ The ERA5-on run leaves the same large, random-direction ramp signature. Product-
 | `next_test` | Phase 11 unwrapper candidates; ERA5-on is not promoted to required baseline |
 
 **Phase 11 guidance:** neither SoCal nor Bologna meets the ERA5 two-signal rule. Keep the v1.1 global order exactly: "SPURT native first, then PHASS deramping, then tophu/SNAPHU, then 20 x 20 m fallback."
+
+---
+
+## Phase 11 unwrapper and deramping candidates
+
+> Phase 11 remains validation-only: native 5 x 10 m production output and explicit `prepare_for_reference(method=REFERENCE_MULTILOOK_METHOD)` comparison discipline are unchanged. Phase 12 consumes these candidate outcomes to choose production posture.
+
+The table below summarises the four candidate-cell outcomes recorded in `eval-disp/metrics.json` (`candidate_outcomes` array). Numbers come directly from the schema-valid sidecar; `—` indicates a null field in the sidecar (no completed comparison was possible). Candidate status rows are separate from the product-quality, reference-agreement, and ramp-attribution evidence reported in §§ 11–13 above (D-12).
+
+### SoCal candidate outcome table (Phase 11)
+
+| candidate | status | partial_metrics | r | bias_mm_yr | rmse_mm_yr | mean_ramp_rad | deformation_sanity_flagged | blocker_or_note |
+|-----------|--------|-----------------|---|------------|------------|----------------|---------------------------|-----------------|
+| spurt_native | BLOCKER | False | — | — | — | — | — | failed_stage=`spurt_unwrap_or_timeseries`; `run_disp` returned no velocity_path; error: `[Errno 32] Broken pipe`; evidence: `eval-disp/candidates/spurt_native/candidate.log` |
+| phass_post_deramp | BLOCKER* | True | — | — | — | — | True | failed_stage=`deramped_ifg_timeseries_reentry`; dolphin has no public API to consume externally-deramped IFGs before time-series inversion; deformation sanity: trend_delta=-390.89 mm/yr, stable_residual_delta=+117.97 mm/yr (both exceed thresholds); deformation-sanity flag is a Phase 12 production-recommendation blocker per D-08 and does not block Phase 11 metric reporting; partial evidence preserved in `eval-disp/candidates/phass_post_deramp/deramped_unwrapped/` |
+
+\* `partial_metrics=True` — deramped IFG outputs were written but time-series re-entry was blocked; comparable PASS/FAIL evidence is not available (D-11).
+
+### ERA5 carry-forward (D-13)
+
+Phase 10 ERA5-on diagnostics did not promote ERA5 into a required Phase 11 baseline. SoCal reference-agreement worsened relative to the v1.1 baseline (r=0.0071 vs 0.0490, bias=+55.43 vs +23.62 mm/yr). ERA5 is retained as a diagnostic option for Phase 12 only.
+
+### Candidate posture for Phase 12 (D-14)
+
+SPURT native and PHASS post-deramping both blocked on SoCal in Phase 11. tophu/SNAPHU tiled unwrapping and the 20 x 20 m resolution fallback remain the next ladder steps; they are deferred to Phase 12 unless Phase 12 planning determines they are necessary earlier. Phase 12 consumes these candidate outcomes to choose production posture.
