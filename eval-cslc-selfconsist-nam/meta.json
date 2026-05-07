@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "git_sha": "0ac4ffa00e0623a5781c946b2b8d259c65c3333f",
+  "git_sha": "395b4fab5dba1e9850a538982ce14546e7cd10f1",
   "git_dirty": true,
-  "run_started_iso": "2026-05-01T08:22:45Z",
-  "run_duration_s": 497.47481393814087,
+  "run_started_iso": "2026-05-07T11:01:01Z",
+  "run_duration_s": 246.19591331481934,
   "python_version": "3.12.13",
   "platform": "macOS-26.3.1-arm64-arm-64bit",
   "input_hashes": {}
