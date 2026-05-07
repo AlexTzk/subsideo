@@ -379,7 +379,7 @@ ERA5-on does not provide the two independent improvement signals required to cha
 | Ramp/coherence `r` | +0.1520 | +0.1520 |
 | Attribution label | `inconclusive` | `inconclusive` |
 
-The ERA5-on run leaves the same large, random-direction ramp signature. Product-quality, reference-agreement, and ramp-attribution remain separate evidence streams: stable-terrain residual is small (-0.04 mm/yr), but persistent coherence is 0.000 and reference agreement still fails.
+The ERA5-on run leaves the same large, random-direction ramp signature. Product-quality, reference-agreement, and ramp-attribution remain separate evidence streams: stable-terrain residual is small (-0.04 mm/yr), persistent coherence is 0.887 (above the 0.7 CALIBRATING bar — SoCal §11.1), and reference agreement still fails.
 
 ### Diagnostic provenance
 
