@@ -277,9 +277,7 @@ stable-mask diagnostics.
 | Cross-sensor precision-first framing (OPERA DIST vs EFFIS) | §7 documents |
 | OPERA frame selection by exact UTC hour (reference-agreement plumbing) | §6 documents |
 
-(These sections are appended by later phases per CONTEXT D-15 append-only
-policy. Phase 3 owns only §1 + §2 in this document; no stub headings for
-later sections are pre-created.)
+(These sections were appended by their authoring phases per CONTEXT D-15 append-only policy. Phase 3 authored §1 + §2; §3 was appended by Phase 4; §§4–7 by Phases 5–6; §8 by Phase 10; §§9–12 by Phase 12.)
 
 ---
 
