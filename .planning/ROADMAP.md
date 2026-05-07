@@ -13,7 +13,7 @@ v1.2 focuses on CSLC Binding & DISP Science Pass work. Phase 08 hardened CSLC va
 - [x] **Phase 09: CSLC EGMS Third Number & Binding Reruns** - Regenerate CSLC N.Am./EU sidecars and matrix rows as candidate BINDING outcomes; keep registry promotion blocked by named evidence where needed
 - [x] **Phase 10: DISP ERA5 & Ramp Diagnostics** - Rerun SoCal and Bologna DISP evaluations from cached stacks with ERA5 and shared orbit/DEM provenance diagnostics (completed 2026-05-04)
 - [x] **Phase 11: DISP Unwrapper & Deramping Candidates** - Evaluate PHASS post-deramping and at least one alternative unwrapper/resolution candidate against unchanged references (completed 2026-05-05)
-- [ ] **Phase 12: DISP Conclusions & Release Readiness** - Choose the DISP production posture, update methodology/matrix/requirements traceability, and close the v1.2 release evidence
+- [x] **Phase 12: DISP Conclusions & Release Readiness** - Choose the DISP production posture, update methodology/matrix/requirements traceability, and close the v1.2 release evidence
 
 ## Phase Details
 
@@ -96,14 +96,14 @@ Plans:
 Plans:
 
 **Wave 1** *(parallel)*
-- [ ] 12-01-PLAN.md - DISP conclusions Phase 12 Production Posture sections (N.Am. + EU)
-- [ ] 12-02-PLAN.md - Validation methodology §9–§12 additions and ToC update
+- [x] 12-01-PLAN.md - DISP conclusions Phase 12 Production Posture sections (N.Am. + EU)
+- [x] 12-02-PLAN.md - Validation methodology §9–§12 additions and ToC update
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 12-03-PLAN.md - results/matrix.md v1.2 header and DISP DEFERRED row update
+- [x] 12-03-PLAN.md - results/matrix.md v1.2 header and DISP DEFERRED row update
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 12-04-PLAN.md - REQUIREMENTS.md requirement checkbox and traceability closure
+- [x] 12-04-PLAN.md - REQUIREMENTS.md requirement checkbox and traceability closure
 
 ## Progress
 
@@ -115,4 +115,4 @@ Phases execute in numeric order: 09 -> 10 -> 11 -> 12
 | 09. CSLC EGMS Third Number & Binding Reruns | 5/5 | Complete | 2026-05-02 |
 | 10. DISP ERA5 & Ramp Diagnostics | 4/4 | Complete   | 2026-05-04 |
 | 11. DISP Unwrapper & Deramping Candidates | 5/5 | Complete    | 2026-05-05 |
-| 12. DISP Conclusions & Release Readiness | 0/4 | Not started | - |
+| 12. DISP Conclusions & Release Readiness | 4/4 | Complete | 2026-05-07 |
