@@ -111,7 +111,7 @@ Even with all of this, **1 of 6 slices still permanently failed** during the suc
 
 ### 3.5 EGMStoolkit quirks
 
-EGMStoolkit 0.3.0 is GitHub-only, pip-installs as dist-info-only due to a broken `setup.cfg` (missing `package_dir = =src` + `[options.packages.find] where = src`). Fixed by patching the upstream setup.cfg locally at `/Users/alex/repos/EGMStoolkit` and installing editable.
+EGMStoolkit 0.3.0 (Note: CLAUDE.md recommends 0.2.15; 0.3.0 was used for this eval run after manual patch to broken setup.cfg. Either version requires source install from GitHub.) is GitHub-only, pip-installs as dist-info-only due to a broken `setup.cfg` (missing `package_dir = =src` + `[options.packages.find] where = src`). Fixed by patching the upstream setup.cfg locally at `/Users/alex/repos/EGMStoolkit` and installing editable.
 
 Runtime quirks found during the dry-run:
 

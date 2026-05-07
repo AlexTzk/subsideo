@@ -924,7 +924,7 @@ The blocker name `required_aoi_binding_blocker` is reused across AOIs to keep ma
 
 ### 10.3 EGMStoolkit tooling state (as of v1.2)
 
-EGMStoolkit 0.3.0 (GitHub-only, broken `setup.cfg` requiring manual patch) is the current tooling. The EGMS download endpoint requires a short opaque `?id=<token>` copied from a portal-generated download link — there is no M2M programmatic path as of 2026-04-15 (investigated in `CONCLUSIONS_DISP_EU.md` §3.6). The CLMS M2M JWT flow (`@@oauth2-token` → Bearer → `@datarequest_post`) returns empty `downloadable_files` for all EGMS datasets. Any future phase resolving the Iberian blocker must either use a manually-obtained token or document a new programmatic path.
+EGMStoolkit 0.3.0 (Note: CLAUDE.md recommends 0.2.15; 0.3.0 was used for this eval run after manual patch to broken setup.cfg. Either version requires source install from GitHub.) (GitHub-only, broken `setup.cfg` requiring manual patch) is the current tooling. The EGMS download endpoint requires a short opaque `?id=<token>` copied from a portal-generated download link — there is no M2M programmatic path as of 2026-04-15 (investigated in `CONCLUSIONS_DISP_EU.md` §3.6). The CLMS M2M JWT flow (`@@oauth2-token` → Bearer → `@datarequest_post`) returns empty `downloadable_files` for all EGMS datasets. Any future phase resolving the Iberian blocker must either use a manually-obtained token or document a new programmatic path.
 
 ---
 
