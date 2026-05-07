@@ -91,10 +91,19 @@ Plans:
   3. `docs/validation_methodology.md` includes v1.2 additions for CSLC gate promotion/deferment, EGMS L2a residual handling, DISP ERA5/deramping/unwrapper diagnostics, and CALIBRATING-to-BINDING conditions.
   4. `results/matrix.md` has v1.2 CSLC/DISP N.Am./EU outcomes with no empty cells and no collapsed product-quality/reference-agreement verdicts.
   5. `REQUIREMENTS.md` traceability has no stale v1.1 Pending rows and maps every v1.2 requirement to exactly one phase.
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [x] 12-01-PLAN.md - TBD after Phase 11 evidence (completed 2026-05-05)
+
+**Wave 1** *(parallel)*
+- [ ] 12-01-PLAN.md - DISP conclusions Phase 12 Production Posture sections (N.Am. + EU)
+- [ ] 12-02-PLAN.md - Validation methodology §9–§12 additions and ToC update
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 12-03-PLAN.md - results/matrix.md v1.2 header and DISP DEFERRED row update
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 12-04-PLAN.md - REQUIREMENTS.md requirement checkbox and traceability closure
 
 ## Progress
 
@@ -106,4 +115,4 @@ Phases execute in numeric order: 09 -> 10 -> 11 -> 12
 | 09. CSLC EGMS Third Number & Binding Reruns | 5/5 | Complete | 2026-05-02 |
 | 10. DISP ERA5 & Ramp Diagnostics | 4/4 | Complete   | 2026-05-04 |
 | 11. DISP Unwrapper & Deramping Candidates | 5/5 | Complete    | 2026-05-05 |
-| 12. DISP Conclusions & Release Readiness | 0/TBD | Not started | - |
+| 12. DISP Conclusions & Release Readiness | 0/4 | Not started | - |

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: milestone
-status: planning
-stopped_at: Phase 12 context gathered (2026-05-06)
+status: planned
+stopped_at: Phase 12 planned (2026-05-06) — 4 plans ready to execute
 last_updated: "2026-05-06T00:00:00.000Z"
 last_activity: 2026-05-06
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 14
+  total_plans: 18
   completed_plans: 14
-  percent: 100
+  percent: 78
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-20)
 
 **Core value:** Produce scientifically accurate, OPERA-spec-compliant SAR/InSAR geospatial products over EU AOIs — validated against official reference products to prove correctness.
-**Current focus:** Phase 11 — disp-unwrapper-deramping-candidates
+**Current focus:** Phase 12 — disp-conclusions-release-readiness
 
 ## Current Position
 
 Phase: 12
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-05
+Status: Ready to execute (4 plans planned)
+Last activity: 2026-05-06
 
 **v1.2 scope:** Focus on CSLC and DISP. CSLC enters with strong v1.1 self-consistency baselines (SoCal coh=0.887 / residual=-0.109 mm/yr; Mojave coh=0.804 / residual=+1.127 mm/yr; Iberian coh=0.868 / residual=+0.347 mm/yr) and needs BINDING gate promotion plus deferred EGMS/AOI hardening. DISP enters with structurally complete N.Am./EU validation but reference-agreement FAILs (SoCal r=0.049, Bologna r=0.336), while stable-terrain residuals remain near zero; v1.2 starts with ERA5/ramp diagnostics before choosing an unwrapper/resolution candidate.
 
