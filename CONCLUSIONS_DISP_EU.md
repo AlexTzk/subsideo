@@ -373,6 +373,8 @@ The residual at +0.12 mm/yr on stable terrain is a strong product-quality signal
 | `magnitude_vs_coherence_pearson_r` | -0.5173 | > 0.5 → phass-class | negatively correlated (coh-correlated would be > 0.5) |
 | `n_ifgs` | 9 | — | sequential 12-day pairs from 19-epoch S1A+S1B stack (cross-constellation 6-day pairs filtered out) |
 
+Note: `n_ifgs = 9` counts only the sequential 12-day pairs from the 19-epoch stack (consistent with the N.Am. §13.2 convention: 14 pairs from a 15-epoch stack). The v1.0 §4.3 "38 unwrapping QC warnings" counts dolphin's full network interferogram set including non-sequential pairs — a different, larger set.
+
 ### 13.3 Auto-attribute label
 
 **Label:** `inconclusive`
