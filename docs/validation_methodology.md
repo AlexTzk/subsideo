@@ -24,6 +24,10 @@ final cross-section consistency pass.
 6. [OPERA frame selection by exact UTC hour + spatial footprint](#opera-utc-frame-selection)
 7. [Cross-sensor comparison — precision-first framing (OPERA DIST vs EFFIS)](#cross-sensor-precision-first)
 8. [ERA5 tropospheric diagnostic](#era5-tropospheric-diagnostic)
+9. [CSLC CALIBRATING-to-BINDING conditions](#cslc-calibrating-to-binding)
+10. [EGMS L2a reference methodology and named-blocker pattern](#egms-l2a-reference-methodology)
+11. [DISP ERA5/deramping/unwrapper diagnostics](#disp-era5-deramping-unwrapper-diagnostics)
+12. [DISP deferred posture and v1.3 handoff](#disp-deferred-posture)
 
 ---
 
