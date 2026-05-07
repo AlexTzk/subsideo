@@ -10,6 +10,7 @@ Promote CSLC-S1 from CALIBRATING to BINDING product-quality validation and turn 
 
 - [ ] **CSLC-07**: User can run `make eval-cslc-nam` and `make eval-cslc-eu` with BINDING self-consistency gates whose thresholds are calibrated from the v1.1 SoCal, Mojave/Coso-Searles, and Iberian results plus any v1.2 added AOIs; the matrix no longer reports CSLC as merely CALIBRATING.
   - Phase 8 proposed BINDING threshold rationale: use `median_of_persistent >= 0.75` (coherence >= 0.75) and stable-terrain residual `<= 2.0 mm/yr` (residual <= 2.0 mm/yr) for the Phase 9 promotion candidate. This is conservative relative to the v1.1 calibration points: SoCal coherence `0.887` / residual `-0.109 mm/yr`, Mojave/Coso-Searles coherence `0.804` / residual `+1.127 mm/yr`, and Iberian Meseta-North coherence `0.868` / residual `+0.347 mm/yr`. Phase 9 reruns may confirm, narrow, or block promotion based on regenerated AOI and stable-mask diagnostics; Phase 8 does not silently move the gate.
+  - *Partial — candidate BINDING evidence with named blockers (Mojave: required_aoi_binding_blocker, Iberian: required_aoi_binding_blocker). Full BINDING deferred to v1.3 pending AOI expansion.*
 - [ ] **CSLC-08**: User can inspect stable-terrain masks whose coast and water buffers are projected in metres before buffering, with regression tests proving the mask is geometrically correct across UTM zones and does not silently over-trim SoCal-style coastal bursts.
 - [ ] **CSLC-09**: User can regenerate CSLC AOI probe artifacts from real ASF/CDSE acquisition searches, with fabricated sensing windows removed and validated burst/date tuples for the existing N.Am. AOIs plus at least two EU fallback AOIs beyond Iberian Meseta-North.
 - [ ] **CSLC-10**: User can run the EU CSLC cell with the EGMS L2a stable-PS residual populated through the current EGMStoolkit class API or a maintained adapter, without breaking the numpy<2 validation environment.
@@ -18,11 +19,11 @@ Promote CSLC-S1 from CALIBRATING to BINDING product-quality validation and turn 
 
 ### DISP-S1
 
-- [ ] **DISP-06**: User can rerun SoCal and Bologna DISP evaluations from cached CSLC stacks with an ERA5 tropospheric-correction toggle, and the conclusions report whether ramp magnitude, ramp direction stability, r, bias, and RMSE improve relative to the v1.1 baseline.
+- [x] **DISP-06**: User can rerun SoCal and Bologna DISP evaluations from cached CSLC stacks with an ERA5 tropospheric-correction toggle, and the conclusions report whether ramp magnitude, ramp direction stability, r, bias, and RMSE improve relative to the v1.1 baseline.
 - [x] **DISP-07**: User can apply a PHASS post-deramping candidate to the v1.1 cached DISP stacks without changing the native 5 x 10 m production output, and compare product-quality and reference-agreement metrics against the unchanged v1.1 reference pipeline.
 - [x] **DISP-08**: User can run at least one alternative unwrapper/resolution candidate from the v1.1 brief, selected from SPURT native, tophu/SNAPHU tiled, or 20 x 20 m fallback, with failure modes captured as structured metrics rather than terminal-only logs.
 - [x] **DISP-09**: User can compare DISP candidate outputs on both N.Am. OPERA and EU EGMS references using the existing `prepare_for_reference(method=...)` discipline, with product-quality, reference-agreement, and ramp-attribution reported separately.
-- [ ] **DISP-10**: User can open updated DISP conclusions that choose a next production posture: PASS, keep PHASS with deramping, switch unwrapper, use a coarser validation fallback, or defer with one remaining named blocker and dated unblock condition.
+- [x] **DISP-10**: User can open updated DISP conclusions that choose a next production posture: PASS, keep PHASS with deramping, switch unwrapper, use a coarser validation fallback, or defer with one remaining named blocker and dated unblock condition.
 
 ### RTC-S1 Support Only
 
@@ -32,10 +33,10 @@ Promote CSLC-S1 from CALIBRATING to BINDING product-quality validation and turn 
 
 ### Matrix, Methodology, and Release Readiness
 
-- [ ] **VAL-01**: User can run `make eval-cslc-nam`, `make eval-cslc-eu`, `make eval-disp-nam`, and `make eval-disp-eu` independently from cached intermediates, and each cell writes validated `metrics.json` plus `meta.json` sidecars consumed by the manifest-driven matrix.
-- [ ] **VAL-02**: User can read `docs/validation_methodology.md` and find v1.2 additions covering CSLC gate promotion, EGMS L2a residual handling, DISP ERA5/deramping/unwrapper diagnostics, and the conditions under which CALIBRATING gates became BINDING.
-- [ ] **VAL-03**: User can open `results/matrix.md` and see v1.2 CSLC/DISP N.Am./EU outcomes with no empty cells and no collapsed product-quality/reference-agreement verdicts.
-- [ ] **VAL-04**: User opens the consolidated REQUIREMENTS.md traceability table after v1.2 closure and finds zero stale "Pending" rows for v1.1 requirements that VERIFICATION.md marked SATISFIED, plus every v1.2 requirement mapped to exactly one phase.
+- [x] **VAL-01**: User can run `make eval-cslc-nam`, `make eval-cslc-eu`, `make eval-disp-nam`, and `make eval-disp-eu` independently from cached intermediates, and each cell writes validated `metrics.json` plus `meta.json` sidecars consumed by the manifest-driven matrix.
+- [x] **VAL-02**: User can read `docs/validation_methodology.md` and find v1.2 additions covering CSLC gate promotion, EGMS L2a residual handling, DISP ERA5/deramping/unwrapper diagnostics, and the conditions under which CALIBRATING gates became BINDING.
+- [x] **VAL-03**: User can open `results/matrix.md` and see v1.2 CSLC/DISP N.Am./EU outcomes with no empty cells and no collapsed product-quality/reference-agreement verdicts.
+- [x] **VAL-04**: User opens the consolidated REQUIREMENTS.md traceability table after v1.2 closure and finds zero stale "Pending" rows for v1.1 requirements that VERIFICATION.md marked SATISFIED, plus every v1.2 requirement mapped to exactly one phase.
 
 ## Future Requirements
 
