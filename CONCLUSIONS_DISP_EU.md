@@ -459,16 +459,37 @@ The ERA5-on run leaves the same large, random-direction ramp signature. Product-
 
 > Phase 11 remains validation-only: native 5 x 10 m production output and explicit `prepare_for_reference(method=REFERENCE_MULTILOOK_METHOD)` comparison discipline are unchanged. Phase 12 consumes these candidate outcomes to choose production posture.
 
-The table below summarises the four candidate-cell outcomes recorded in `eval-disp-egms/metrics.json` (`candidate_outcomes` array). Numbers come directly from the schema-valid sidecar; `—` indicates a null field in the sidecar (no completed comparison was possible). Candidate status rows are separate from the product-quality, reference-agreement, and ramp-attribution evidence reported in §§ 11–13 above (D-12).
+The table below summarises the candidate-cell outcomes recorded in `eval-disp-egms/metrics.json` (`candidate_outcomes` array). Numbers come directly from the schema-valid sidecar. Candidate status rows are separate from the product-quality, reference-agreement, and ramp-attribution evidence reported in §§ 11–13 above (D-12).
 
 ### Bologna candidate outcome table (Phase 11)
 
-| candidate | status | partial_metrics | r | bias_mm_yr | rmse_mm_yr | mean_ramp_rad | deformation_sanity_flagged | blocker_or_note |
-|-----------|--------|-----------------|---|------------|------------|----------------|---------------------------|-----------------|
-| spurt_native | BLOCKER | False | — | — | — | — | — | failed_stage=`spurt_unwrap_or_timeseries`; `run_disp` returned no velocity_path; error: `ModuleNotFoundError: No module named 'spurt'` (spurt not installed in subsideo conda env); evidence: `eval-disp-egms/candidates/spurt_native/candidate.log` |
-| phass_post_deramp | BLOCKER* | True | — | — | — | — | True | failed_stage=`deramped_ifg_timeseries_reentry`; dolphin has no public API to consume externally-deramped IFGs before time-series inversion; deformation sanity: trend_delta=-593.03 mm/yr, stable_residual_delta=+74.96 mm/yr (both exceed thresholds); deformation-sanity flag is a Phase 12 production-recommendation blocker per D-08 and does not block Phase 11 metric reporting; partial evidence preserved in `eval-disp-egms/candidates/phass_post_deramp/deramped_unwrapped/` |
+Updated 2026-05-06 from completed `run_eval_disp_egms.py` run (SPURT 0.1.1 installed, PHASS SBAS wired). Both candidates ran to completion and produced measured metrics.
 
-\* `partial_metrics=True` — deramped IFG outputs were written but time-series re-entry was blocked; comparable PASS/FAIL evidence is not available (D-11).
+| candidate | status | r | bias_mm_yr | rmse_mm_yr | mean_ramp_rad | ramp_sigma_deg | deformation_sanity_flagged | note |
+|-----------|--------|---|------------|------------|----------------|----------------|---------------------------|------|
+| spurt_native | **FAIL** | 0.3245 | +3.442 | 5.220 | 20.836 | 7.1 | False | Ramp attribution = orbit-class (σ < 30°); r and bias both fail criteria; SPURT nearest to the bias threshold (3.44 vs 3.0 mm/yr); status=FAIL on both r and bias |
+| phass_post_deramp | **FAIL** | 0.0523 | -3.069 | 96.131 | 48.168 | 113.3 | True | Deformation sanity flagged: trend_delta=-593.03 mm/yr, stable_residual_delta=+74.96 mm/yr; large ramps persist and worsen after deramping; attributed_source=inconclusive; status=FAIL on both r and bias |
+
+**Previous BLOCKER status explained:** prior Phase 11 runs reported `cand=spurt:BLOCKER,deramp:BLOCKER` because SPURT was not installed and the PHASS SBAS re-entry path was not wired. Phase 11 fixed both (SPURT 0.1.1 via `pip install spurt`; PHASS SBAS inversion via `run_phass_sbas_inversion` in `selfconsistency.py`). The BLOCKER entries are superseded by the measured FAIL evidence above.
+
+### Cross-cell comparison (Bologna vs SoCal)
+
+The Bologna Phase 11 results differ meaningfully from SoCal:
+
+| metric | SoCal spurt | Bologna spurt | SoCal phass_deramp | Bologna phass_deramp |
+|--------|-------------|---------------|-------------------|---------------------|
+| r | 0.0027 | **0.3245** | -0.116 | 0.0523 |
+| bias_mm_yr | +19.89 | **+3.44** | +21.96 | -3.07 |
+| rmse_mm_yr | 37.99 | **5.22** | 77.43 | 96.13 |
+| mean_ramp_rad | 0.198 | 20.836 | 33.23 | 48.168 |
+| ramp_sigma_deg | 84.8 | **7.1** | 97.3 | 113.3 |
+| ramp_attribution | inconclusive | **orbit** | inconclusive | inconclusive |
+
+Key observations:
+- **SPURT is much stronger on Bologna than SoCal**: r=0.325 vs r=0.003; bias=3.44 vs 19.89 mm/yr; RMSE=5.22 vs 37.99 mm/yr. SPURT's 3D MCF solver achieves higher connected-component coverage on the flatter Bologna burst than on SoCal's complex topography.
+- **SPURT ramps are orbit-class in Bologna** (σ=7.1°) — residual ramps after SPURT unwrapping cluster in a consistent direction, pointing toward orbital baseline as the remaining error source. This is unlike SoCal (inconclusive at σ=84.8°). If the orbit-class ramp component were corrected (e.g. via precise baseline deramping), SPURT has a plausible path to meeting the 3 mm/yr bias threshold.
+- **SPURT is the nearest candidate to a pass on Bologna**: bias=3.44 mm/yr fails the 3.0 mm/yr criterion by only 0.44 mm/yr; r=0.325 still fails > 0.92 by a large margin and would require better deramping or a longer stack.
+- **PHASS post-deramp degrades both cells**: SBAS re-inversion after external deramping is numerically unstable. The deformation sanity flag (trend_delta=-593 mm/yr in Bologna, -391 mm/yr in SoCal) is a consistent cross-cell symptom.
 
 ### ERA5 carry-forward (D-13)
 
@@ -476,4 +497,45 @@ Phase 10 ERA5-on diagnostics did not promote ERA5 into a required Phase 11 basel
 
 ### Candidate posture for Phase 12 (D-14)
 
-SPURT native and PHASS post-deramping both blocked on Bologna in Phase 11. tophu/SNAPHU tiled unwrapping and the 20 x 20 m resolution fallback remain the next ladder steps; they are deferred to Phase 12 unless Phase 12 planning determines they are necessary earlier. Phase 12 consumes these candidate outcomes to choose production posture.
+SPURT native and PHASS post-deramping both **FAIL** on Bologna in Phase 11 with measured evidence:
+
+- **SPURT native FAIL diagnosis:** r=0.325 fails > 0.92 by a large margin but bias=3.44 mm/yr is only 0.44 mm/yr above the 3.0 threshold. The orbit-class ramp attribution (σ=7.1°) points to a systematic baseline contribution; correcting this orbit component is the most actionable next step. SPURT is the preferred candidate for tophu/SNAPHU integration or baseline-deramping augmentation in Phase 12.
+- **PHASS post-deramp FAIL diagnosis:** deramping amplifies the SBAS inversion instability (trend_delta=-593 mm/yr). The deformation sanity flag is a Phase 12 production-recommendation blocker per D-08. PHASS post-deramping is deprioritised relative to SPURT and tophu on both cells.
+
+tophu/SNAPHU tiled unwrapping and the 20×20 m resolution fallback remain the next ladder steps for Phase 12. Phase 12 consumes these candidate outcomes to choose production posture.
+
+---
+
+## Phase 12 Production Posture
+
+> Written 2026-05-06 by Phase 12 (disp-conclusions-release-readiness) to choose the v1.2 production posture from Phase 10–11 candidate evidence. The §§ 11–14 and Phase 10/11 sections above are the evidence base; this section is the decision record. Bologna-first framing reflects the orbit-class ramp attribution as the gating blocker.
+
+### Posture Label
+
+**DEFERRED — v1.3 milestone, tophu/SNAPHU tiled unwrapping with orbital baseline deramping.**
+
+Neither SPURT native nor PHASS post-deramping passes DISP criteria (r > 0.92 AND bias < 3 mm/yr) on either validation cell (Bologna or SoCal). No production recommendation is made for v1.2. DISP-S1 remains a research-grade output until the unblock condition below is met.
+
+### Named Blocker
+
+The named blocker is the **SPURT orbit-class ramp on Bologna** (direction stability σ=7.1°, identifying a systematic orbital baseline contribution to the residual per-IFG ramps). This is the gating blocker because SPURT is the nearest candidate (Bologna bias=3.44 mm/yr vs 3.0 mm/yr criterion; SoCal SPURT r=0.003/bias=+19.89 mm/yr is further from criteria).
+
+The orbit-class attribution (σ=7.1° is well below the 30° cutoff) is the diagnostic pointer: precise baseline deramping during unwrapping (as implemented by tophu/SNAPHU with orbital baseline correction) is the targeted intervention. Bologna's bias threshold proximity (0.44 mm/yr from passing) makes it the more achievable gate, but single-cell PASS is not sufficient to unblock — both cells must pass simultaneously.
+
+SoCal's SPURT ramp attribution is inconclusive (σ=84.8°) — correcting Bologna's orbit-class ramp is the priority. If the baseline correction also closes SoCal's larger gap (r=0.003 → > 0.92), the unblock condition is met.
+
+### Unblock Condition
+
+Both cells (SoCal + Bologna) must pass **r > 0.92 AND bias < 3 mm/yr** in the same tophu/SNAPHU run with orbital baseline deramping enabled. Bologna's bias threshold proximity (0.44 mm/yr from passing) makes it the more achievable gate, but single-cell PASS is not sufficient to unblock. The unblock milestone is v1.3.
+
+### SPURT Interim Note
+
+SPURT native is the interim best available candidate as of v1.2 but does not pass criteria on either cell. Bologna r=0.325/bias=+3.44 mm/yr; SoCal r=0.003/bias=+19.89 mm/yr. Bologna is the nearest to passing (bias threshold margin 0.44 mm/yr). Use SPURT native only if production cannot wait for v1.3; document the criteria failures in any such deployment.
+
+### PHASS Post-Deramping Retirement
+
+PHASS post-deramping is retired from the candidate ladder. The structural failure is **SBAS re-inversion instability on externally deramped IFGs**: subtracting fitted planar ramps from per-IFG unwrapped phases before network inversion destabilizes the SBAS solver. The cross-cell deformation sanity flag is consistent and extreme (Bologna trend_delta=-593.03 mm/yr; SoCal trend_delta=-390.89 mm/yr) — these magnitudes are an order of magnitude larger than any plausible physical deformation signal. This is a method incompatibility, not a parameter-tuning issue. PHASS post-deramping should not appear as a candidate step in v1.3.
+
+### v1.3 Recommended First Step
+
+v1.3 recommended first step: tophu/SNAPHU tiled unwrapping (3×3 spatial tiles, 30 m downsample factor) with orbital baseline deramping applied before network inversion. Run both SoCal and Bologna in the same tophu/SNAPHU configuration. The orbit-class ramp attribution on Bologna (σ=7.1°) provides a testable hypothesis: if tophu/SNAPHU with orbital baseline correction closes the 0.44 mm/yr gap on Bologna and also improves SoCal r above 0.92, the unblock condition is met. Evaluate against unchanged OPERA/EGMS references using `prepare_for_reference(method='block_mean')` discipline.
