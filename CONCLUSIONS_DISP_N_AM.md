@@ -415,12 +415,14 @@ The table below summarises the four candidate-cell outcomes recorded in `eval-di
 
 ### SoCal candidate outcome table (Phase 11)
 
-| candidate | status | partial_metrics | r | bias_mm_yr | rmse_mm_yr | mean_ramp_rad | deformation_sanity_flagged | blocker_or_note |
-|-----------|--------|-----------------|---|------------|------------|----------------|---------------------------|-----------------|
-| spurt_native | BLOCKER | False | — | — | — | — | — | failed_stage=`spurt_unwrap_or_timeseries`; `run_disp` returned no velocity_path; error: `[Errno 32] Broken pipe`; evidence: `eval-disp/candidates/spurt_native/candidate.log` |
-| phass_post_deramp | BLOCKER* | True | — | — | — | — | True | failed_stage=`deramped_ifg_timeseries_reentry`; dolphin has no public API to consume externally-deramped IFGs before time-series inversion; deformation sanity: trend_delta=-390.89 mm/yr, stable_residual_delta=+117.97 mm/yr (both exceed thresholds); deformation-sanity flag is a Phase 12 production-recommendation blocker per D-08 and does not block Phase 11 metric reporting; partial evidence preserved in `eval-disp/candidates/phass_post_deramp/deramped_unwrapped/` |
+Updated 2026-05-05 from completed `run_eval_disp.py` run (SPURT 0.1.1 installed, PHASS SBAS wired). Both candidates ran to completion and produced measured metrics.
 
-\* `partial_metrics=True` — deramped IFG outputs were written but time-series re-entry was blocked; comparable PASS/FAIL evidence is not available (D-11).
+| candidate | status | r | bias_mm_yr | rmse_mm_yr | mean_ramp_rad | ramp_sigma_deg | N_valid | deformation_sanity_flagged | note |
+|-----------|--------|---|------------|------------|----------------|----------------|---------|---------------------------|------|
+| spurt_native | **FAIL** | 0.0027 | +19.89 | 37.99 | 0.198 | 84.8 | 40,050 | False | Very low N (40k vs 2.8M for PHASS) — SPURT valid-pixel mask is sparse; ramp attr=inconclusive; status=FAIL on both r and bias |
+| phass_post_deramp | **FAIL** | -0.116 | +21.96 | 77.43 | 33.23 | 97.3 | 2,858,805 | True | Deformation sanity flagged: trend_delta=-390.89 mm/yr, stable_residual=+117.97 mm/yr; large ramps persist after deramping; attr=inconclusive; status=FAIL on both r and bias |
+
+**Previous BLOCKER status explained:** prior runs reported `cand=spurt:BLOCKER,deramp:BLOCKER` because SPURT was not installed and the PHASS SBAS re-entry path was not wired. Phase 11 fixed both (SPURT 0.1.1 via `pip install spurt`; PHASS SBAS inversion via `run_phass_sbas_inversion` in `selfconsistency.py`). The BLOCKER entries are superseded by the measured FAIL evidence above.
 
 ### ERA5 carry-forward (D-13)
 
@@ -428,4 +430,43 @@ Phase 10 ERA5-on diagnostics did not promote ERA5 into a required Phase 11 basel
 
 ### Candidate posture for Phase 12 (D-14)
 
-SPURT native and PHASS post-deramping both blocked on SoCal in Phase 11. tophu/SNAPHU tiled unwrapping and the 20 x 20 m resolution fallback remain the next ladder steps; they are deferred to Phase 12 unless Phase 12 planning determines they are necessary earlier. Phase 12 consumes these candidate outcomes to choose production posture.
+SPURT native and PHASS post-deramping both **FAIL** on SoCal in Phase 11 with measured evidence:
+
+- **SPURT native FAIL diagnosis:** r=0.003 is noise-floor; N=40,050 valid pixels is ~71× smaller than PHASS (2.8M). SPURT's 3D MCF solver leaves sparse connected-component coverage at this 5×10 m grid; the small valid-pixel set is not representative. The near-zero ramp magnitude (0.198 rad mean) is a positive signal — SPURT does not introduce large ramps — but the velocity field is still uncorrelated with OPERA.
+- **PHASS post-deramp FAIL diagnosis:** deramping removes ramp signatures but the deformation sanity flags (trend_delta=-390.89 mm/yr) indicate the SBAS inversion is numerically unstable on the deramped IFG set. The large RMSE (77 mm/yr vs SPURT's 38 mm/yr) confirms deramping did not improve and may have degraded the result.
+
+tophu/SNAPHU tiled unwrapping and the 20×20 m resolution fallback remain the next ladder steps for Phase 12. EGMS (Bologna) candidate outcomes from the same Phase 11 run are documented in `CONCLUSIONS_DISP_EU.md`.
+
+---
+
+## Phase 12 Production Posture
+
+> Written 2026-05-06 by Phase 12 (disp-conclusions-release-readiness) to choose the v1.2 production posture from Phase 10–11 candidate evidence. The §§ 11–14 and Phase 10/11 sections above are the evidence base; this section is the decision record.
+
+### Posture Label
+
+**DEFERRED — v1.3 milestone, tophu/SNAPHU tiled unwrapping with orbital baseline deramping.**
+
+Neither SPURT native nor PHASS post-deramping passes DISP criteria (r > 0.92 AND bias < 3 mm/yr) on either validation cell (SoCal or Bologna). No production recommendation is made for v1.2. DISP-S1 remains a research-grade output until the unblock condition below is met.
+
+### Named Blocker
+
+The named blocker is the **SPURT orbit-class ramp on Bologna** (direction stability σ=7.1°, identifying a systematic orbital baseline contribution). Bologna is the gating cell: SPURT is the nearest candidate to meeting the bias threshold (Bologna bias=3.44 mm/yr vs 3.0 mm/yr criterion, only 0.44 mm/yr away), but the orbit-class ramp must be corrected before it can pass. The orbit-class attribution (σ=7.1° is well below the 30° cutoff) provides a testable diagnostic: precise baseline deramping during unwrapping is the targeted intervention.
+
+SoCal SPURT r=0.003/bias=+19.89 mm/yr is further from criteria and driven by sparse connected-component coverage (N=40,050 vs 2.8M for PHASS) at the 5×10 m grid. SoCal's ramp attribution is inconclusive (σ=84.8°) — correcting Bologna's orbit-class ramp is the priority, but the unblock condition requires both cells to pass simultaneously.
+
+### Unblock Condition
+
+Both cells (SoCal + Bologna) must pass **r > 0.92 AND bias < 3 mm/yr** in the same tophu/SNAPHU run with orbital baseline deramping enabled. Single-cell PASS is not sufficient to unblock. The unblock milestone is v1.3.
+
+### SPURT Interim Note
+
+SPURT native is the interim best available candidate as of v1.2 but does not pass criteria on either cell. Bologna is the nearest (bias=3.44 mm/yr vs 3.0 mm/yr criterion; r=0.325 vs 0.92 criterion). SoCal SPURT r=0.003/bias=+19.89 mm/yr. Use SPURT native only if production cannot wait for v1.3; document the criteria failures in any such deployment.
+
+### PHASS Post-Deramping Retirement
+
+PHASS post-deramping is retired from the candidate ladder. The structural failure is **SBAS re-inversion instability on externally deramped IFGs**: subtracting fitted planar ramps from per-IFG unwrapped phases before network inversion destabilizes the SBAS solver. The symptom is cross-cell consistent and extreme (SoCal trend_delta=-390.89 mm/yr; Bologna trend_delta=-593.03 mm/yr). This is a method incompatibility, not a parameter-tuning issue. A deformation sanity check flagged both cells. PHASS post-deramping should not appear as a candidate step in v1.3.
+
+### v1.3 Recommended First Step
+
+v1.3 recommended first step: tophu/SNAPHU tiled unwrapping (3×3 spatial tiles, 30 m downsample factor as per OPERA DISP internal configuration) with orbital baseline deramping applied before network inversion. Run both SoCal and Bologna in the same tophu/SNAPHU configuration and evaluate against unchanged OPERA/EGMS references using `prepare_for_reference(method='block_mean')` discipline. The orbit-class ramp attribution on Bologna (σ=7.1°) provides a testable hypothesis: if tophu/SNAPHU with orbital baseline correction closes the 0.44 mm/yr gap on Bologna and also improves SoCal r above 0.92, the unblock condition is met.
