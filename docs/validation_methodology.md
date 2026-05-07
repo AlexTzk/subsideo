@@ -963,7 +963,7 @@ PHASS post-deramping (subtracting fitted planar ramps from per-IFG unwrapped pha
 
 These thresholds are conservative relative to the known subsidence signal at Bologna (3–10 mm/yr). A flagged sanity check blocks a Phase 12 production recommendation for PHASS post-deramping — it does not prevent Phase 11 from recording candidate metrics.
 
-Phase 11 outcomes: SoCal trend_delta=-390.89 mm/yr (flagged); Bologna trend_delta=-593.03 mm/yr (flagged). The cross-cell consistency and extreme magnitude indicate SBAS inversion instability caused by external IFG-level deramping, not a data artifact. See §12.2 for the PHASS retirement decision.
+Phase 11 outcomes: SoCal trend_delta=-390.89 mm/yr (flagged; threshold 3.0 mm/yr), stable_residual_delta=+117.97 mm/yr (flagged; threshold 2.0 mm/yr); Bologna trend_delta=-593.03 mm/yr (flagged), stable_residual_delta=+74.96 mm/yr (flagged). Both thresholds fired on both cells. The cross-cell consistency and extreme magnitude indicate SBAS inversion instability caused by external IFG-level deramping, not a data artifact. See §12.2 for the PHASS retirement decision.
 
 ### 11.4 SPURT orbit-class attribution (Bologna)
 
