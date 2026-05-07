@@ -15,7 +15,7 @@ CALIBRATING cells are *italicised*. See `validation/criteria.py` for the 13-entr
 | RTC | EU | — | 3/5 PASS (2 FAIL) ⚠ |
 | CSLC | NAM | BINDING BLOCKER / coh=0.80 / resid=1.1 mm/yr / blocker=required_aoi_binding_blocker (Mojave) ⚠ | amp_r=0.96 / amp_rmse=2.2 dB |
 | CSLC | EU | BINDING BLOCKER / coh=0.86 / resid=0.4 mm/yr / blocker=required_aoi_binding_blocker (Iberian) ⚠ | amp_r=0.00 / amp_rmse=0.0 dB |
-| DISP | NAM | DEFERRED — spurt:FAIL / deramp:retired / unblock=tophu-SNAPHU+orbital-deramping / interim=spurt-native(caveated) (see CONCLUSIONS_DISP_N_AM.md §Phase12) | 0.007 (> 0.92 FAIL) / 55.43 (< 3 FAIL) |
+| DISP | NAM | DEFERRED — spurt:FAIL / deramp:retired / unblock=tophu-SNAPHU+orbital-deramping / interim=spurt-native(caveated) (see CONCLUSIONS_DISP_N_AM.md §Phase12) | 0.003 (> 0.92 FAIL) / 19.89 (< 3 FAIL) |
 | DISP | EU | DEFERRED — spurt:FAIL / deramp:retired / unblock=tophu-SNAPHU+orbital-deramping / interim=spurt-native(caveated) (see CONCLUSIONS_DISP_EU.md §Phase12) | 0.3358 (> 0.92 FAIL) / 3.461 (< 3 FAIL) |
 | DIST | NAM | — | DEFERRED (CMR: operational_not_found) |
 | DIST | EU | — | 0/3 PASS (3 FAIL) \| worst f1=0.000 (aveiro) |
