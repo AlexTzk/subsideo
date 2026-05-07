@@ -851,3 +851,167 @@ Product-quality, reference-agreement, and ramp-attribution remain separate:
 | Ramp-attribution | Per-IFG planar-ramp behavior and cause hints | both cells remain `inconclusive` despite ERA5-on |
 
 When neither DISP cell meets the ERA5 two-signal rule, the Phase 11 fallback order remains: "SPURT native first, then PHASS deramping, then tophu/SNAPHU, then 20 x 20 m fallback."
+
+---
+
+## 9. CSLC CALIBRATING-to-BINDING conditions
+
+<a name="cslc-calibrating-to-binding"></a>
+
+**TL;DR:** A CSLC product-quality gate may be promoted from CALIBRATING to BINDING when both signal thresholds are met on all active AOIs with no named blocker outstanding. If a named blocker exists, the gate stays BINDING BLOCKER with structured evidence until the per-AOI unblock condition is met.
+
+### 9.1 Problem statement (ADR-style)
+
+The Phase 1 CALIBRATING discipline (§2.5 of this document) requires ≥ 3 measured data points before promotion and sets `binding_after_milestone='v1.2'` on CSLC self-consistency criteria. Phase 8 proposed BINDING thresholds, and Phase 9 executed reruns against those thresholds. Both N.Am. and EU CSLC cells landed as BINDING BLOCKER in Phase 9, not BINDING PASS. This section documents the promotion rule, the named-blocker definition, and the per-AOI conditions that must be met before a future phase can promote.
+
+### 9.2 Two-signal promotion rule
+
+A CSLC gate promotion from CALIBRATING to BINDING requires ALL of the following to be true simultaneously:
+1. All active AOIs produce `median_of_persistent >= 0.75` (Phase 8 proposed threshold; conservative relative to observed values: SoCal=0.887, Mojave/Coso-Searles=0.804, Iberian=0.868).
+2. All active AOIs produce `stable_terrain_residual_mm_yr <= 2.0` (Phase 8 proposed threshold; conservative: SoCal=-0.109, Mojave=+1.127, Iberian=+0.347).
+3. No named blocker is outstanding for any active AOI.
+4. Regenerated sidecars (not stale v1.1 cache reads) back the threshold comparison.
+
+If condition (3) is not met, the gate renders as BINDING BLOCKER with the blocker name in the matrix cell (e.g., `required_aoi_binding_blocker (Mojave)`). BINDING BLOCKER is not CALIBRATING — it represents structured evidence that the threshold is achievable but an external dependency is blocking the final measurement.
+
+### 9.3 Named-blocker definition
+
+A named blocker is an evidence-backed reason why a required measurement cannot be produced, where the reason is external to the algorithm under test. Named blockers must include:
+- Blocker name (a unique string e.g., `required_aoi_binding_blocker`)
+- Cell and AOI affected
+- Evidence of the blocking condition (API failure log, frame-search result, stable-PS count)
+- Dated unblock condition (what must change + in which milestone)
+
+Named blockers are NOT "the measurement failed" — they are "the measurement cannot yet be produced for this specific external reason." A FAIL on coherence is not a named blocker; it is a BINDING FAIL.
+
+### 9.4 Per-AOI unblock conditions (v1.2 state)
+
+| AOI | Blocker name | Blocking condition | Unblock condition | Target milestone |
+|-----|-------------|-------------------|-------------------|-----------------|
+| Mojave/Coso-Searles (N.Am.) | `required_aoi_binding_blocker` | No reliable OPERA CSLC frame match for the Coso-Searles fallback burst in the regenerated Phase 9 frame search | A valid OPERA CSLC frame match is found and amplitude sanity is populated with measured r and RMSE | v1.3 |
+| Iberian (EU) | `required_aoi_binding_blocker` | EGMS L2a third number unavailable: EGMStoolkit programmatic download gap means the stable-PS residual for the Iberian burst cannot be populated (§10 documents the tooling state) | A programmatic EGMS L2a download path succeeds AND stable-PS residual is populated for the Iberian burst | v1.3 |
+
+### 9.5 Future promotion guidance
+
+When a future phase resolves both per-AOI blockers above: regenerate metrics sidecars against the Phase 8/9 thresholds, confirm no new blockers exist, update `criteria.py` to flip `type='CALIBRATING'` to `type='BINDING'` for the CSLC self-consistency coherence and residual criteria, and regenerate the results matrix. The promotion must be a single atomic commit with regenerated sidecars + criteria.py change + matrix update. No silent criteria drift.
+
+---
+
+## 10. EGMS L2a reference methodology and named-blocker pattern
+
+<a name="egms-l2a-reference-methodology"></a>
+
+**TL;DR:** EGMS L2a per-burst PS point clouds are the EU DISP reference. The spatial join uses `prepare_for_reference(method='block_mean')` discipline at PS coordinates. Named blockers for EGMS-dependent cells must document the EGMStoolkit tooling state, the token/credential gap, and the stable-PS count as of the blocking run.
+
+### 10.1 EGMS L2a as EU reference
+
+EGMS L2a is the European Ground Motion Service Level 2a per-burst PS product distributed by Copernicus Land Monitoring Service (release `2018_2022`, EPSG:3035). It provides per-track, per-orbit PS velocities with mm/yr precision calibrated against a stable reference set. For EU DISP cells, it is the primary reference-agreement target (§5.2 in `CONCLUSIONS_DISP_EU.md` §5).
+
+The comparison pipeline:
+1. Load EGMS L2a CSVs via EGMStoolkit, reprojecting ETRS89-LAEA (EPSG:3035) easting/northing to WGS84.
+2. Build a geopandas point layer, clip to raster bounds, sample subsideo LOS velocity at each PS coordinate via `rasterio.DatasetReader.sample` (nearest-neighbour).
+3. Convert subsideo velocity rad/yr → mm/yr using `SENTINEL1_WAVELENGTH_M = 0.05546576`.
+4. Compute Pearson r, bias, RMSE over the finite paired subset.
+
+The `prepare_for_reference(method='block_mean')` constant governs the multilook kernel per the §3 multilook ADR, even though form (c) point-sampling does not apply a spatial kernel per se — the constant documents the cell's multilook discipline for matrix-row consistency with SoCal.
+
+### 10.2 Phase 9 named-blocker pattern for EGMS-dependent CSLC cells
+
+Phase 9 introduced the candidate-BINDING-with-named-blocker pattern for CSLC EU cells where EGMS L2a is required but unavailable. The pattern:
+1. Run the CSLC eval to the point of requiring EGMS.
+2. If EGMS download fails or stable-PS count falls below `min_valid_points`, write a structured named-blocker record with: the EGMStoolkit version, the EGMS token/credential state (short `?id=<token>` vs CLMS M2M API — currently no programmatic M2M path for EGMS as of 2026-04-15), the stable-PS count before and after filtering, and the error or fallback outcome.
+3. Render the matrix cell as BINDING BLOCKER with the blocker name, not as CALIBRATING or BINDING FAIL.
+
+The blocker name `required_aoi_binding_blocker` is reused across AOIs to keep matrix rendering consistent; the per-AOI evidence distinguishes them.
+
+### 10.3 EGMStoolkit tooling state (as of v1.2)
+
+EGMStoolkit 0.3.0 (GitHub-only, broken `setup.cfg` requiring manual patch) is the current tooling. The EGMS download endpoint requires a short opaque `?id=<token>` copied from a portal-generated download link — there is no M2M programmatic path as of 2026-04-15 (investigated in `CONCLUSIONS_DISP_EU.md` §3.6). The CLMS M2M JWT flow (`@@oauth2-token` → Bearer → `@datarequest_post`) returns empty `downloadable_files` for all EGMS datasets. Any future phase resolving the Iberian blocker must either use a manually-obtained token or document a new programmatic path.
+
+---
+
+## 11. DISP ERA5/deramping/unwrapper diagnostics
+
+<a name="disp-era5-deramping-unwrapper-diagnostics"></a>
+
+**TL;DR:** Phase 10 established the ERA5 two-signal rule. Phase 11 ran SPURT native and PHASS post-deramping candidates against unchanged OPERA/EGMS references. PHASS post-deramping is retired due to SBAS inversion instability. SPURT's orbit-class ramp on Bologna (σ=7.1°) is the named blocker for v1.3.
+
+> Cross-reference: §8 documents the Phase 10 ERA5 diagnostic run and the two-signal rule outcomes. This section documents the Phase 11 candidate evaluation methodology and the resulting Phase 12 posture evidence.
+
+### 11.1 ERA5 two-signal rule (Phase 10)
+
+ERA5 may only be promoted from diagnostic to required baseline when it shows at least two independent improvement signals simultaneously:
+- Improved Pearson r (reference-agreement category)
+- Lower absolute bias or RMSE (reference-agreement category)
+- Reduced ramp magnitude without degrading product-quality evidence (ramp-attribution category)
+
+Phase 10 outcomes: SoCal ERA5-on worsened reference agreement (r=0.0071 vs baseline 0.0490; bias=+55.43 vs +23.62 mm/yr). Bologna ERA5-on was effectively unchanged (r=0.3358 both runs; bias=+3.46 both runs). Neither cell met the two-signal rule. Phase 11 proceeded with the v1.1 global candidate order (SPURT first, then PHASS deramping) without ERA5 as a required baseline.
+
+### 11.2 Phase 11 candidate evaluation methodology
+
+Each candidate run:
+1. Produces isolated output in `candidates/{candidate_name}/` directory (not overwriting baseline PHASS output).
+2. Compares against the unchanged OPERA/EGMS reference using `prepare_for_reference(method=REFERENCE_MULTILOOK_METHOD)` — the same `block_mean` kernel as baseline.
+3. Records a structured `DISPCandidateOutcome` sidecar with status (PASS/FAIL/BLOCKER), r, bias_mm_yr, rmse_mm_yr, mean_ramp_rad, ramp_sigma_deg, N_valid, and deformation_sanity_flagged.
+4. Does not change native 5×10 m production output or `run_disp()` production defaults.
+
+Candidate evidence surfaces in `metrics.json` as a `candidate_outcomes` list, in matrix compact hints as `cand=` entries in the product-quality column only (reference-agreement and ramp-attribution columns are unchanged), and in conclusions appendix sections.
+
+### 11.3 PHASS deramping deformation sanity check
+
+PHASS post-deramping (subtracting fitted planar ramps from per-IFG unwrapped phases before SBAS network inversion) is evaluated with a deformation sanity check that flags the candidate when:
+- `abs(trend_delta_mm_yr) > 3.0` (velocity trend shifts by more than 3 mm/yr after deramping vs baseline)
+- `abs(stable_residual_delta_mm_yr) > 2.0` (stable-terrain residual shifts by more than 2 mm/yr after deramping)
+
+These thresholds are conservative relative to the known subsidence signal at Bologna (3–10 mm/yr). A flagged sanity check blocks a Phase 12 production recommendation for PHASS post-deramping — it does not prevent Phase 11 from recording candidate metrics.
+
+Phase 11 outcomes: SoCal trend_delta=-390.89 mm/yr (flagged); Bologna trend_delta=-593.03 mm/yr (flagged). The cross-cell consistency and extreme magnitude indicate SBAS inversion instability caused by external IFG-level deramping, not a data artifact. See §12.2 for the PHASS retirement decision.
+
+### 11.4 SPURT orbit-class attribution (Bologna)
+
+SPURT native produces ramp attribution with `ramp_sigma_deg=7.1°` on Bologna — below the 30° orbit-class cutoff. This identifies a systematic orbital baseline contribution to the residual per-IFG ramps. By contrast, SoCal SPURT attribution is inconclusive (σ=84.8°). The orbit-class signal on Bologna is a diagnostic pointer: the residual 0.44 mm/yr bias gap (3.44 mm/yr measured vs 3.0 mm/yr criterion) has a testable intervention — tophu/SNAPHU with orbital baseline deramping applied before network inversion.
+
+---
+
+## 12. DISP deferred posture and v1.3 handoff
+
+<a name="disp-deferred-posture"></a>
+
+**TL;DR:** v1.2 closes with a DEFERRED posture for DISP production. Named blocker: SPURT orbit-class ramp on Bologna (σ=7.1°). Unblock: tophu/SNAPHU tiled unwrapping with orbital baseline deramping, both cells passing r > 0.92 AND bias < 3 mm/yr in the same run. SPURT native is the interim best candidate with explicit criteria-failure caveats. PHASS post-deramping is retired.
+
+### 12.1 DEFERRED posture decision
+
+Neither SPURT native nor PHASS post-deramping passed DISP reference-agreement criteria on either cell in Phase 11. Criteria: r > 0.92 AND bias < 3 mm/yr simultaneously.
+
+| candidate | cell | r | bias_mm_yr | criteria met |
+|-----------|------|---|------------|-------------|
+| spurt_native | SoCal | 0.003 | +19.89 | Neither |
+| spurt_native | Bologna | 0.325 | +3.44 | Neither |
+| phass_post_deramp | SoCal | -0.116 | +21.96 | Neither (sanity-flagged) |
+| phass_post_deramp | Bologna | 0.052 | -3.07 | Neither (sanity-flagged) |
+
+No production recommendation can be made until the unblock conditions are met. The v1.2 production posture is DEFERRED.
+
+### 12.2 PHASS post-deramping retirement
+
+PHASS post-deramping is retired from the candidate ladder. The structural failure mode is SBAS re-inversion instability on externally deramped IFGs: the SBAS solver absorbs the subtracted ramp signal into unphysical long-wavelength deformation trends (trend_delta=-390.89 mm/yr SoCal, -593.03 mm/yr Bologna). The deformation sanity flag fired on both cells with consistent cross-cell magnitude. This is a method incompatibility — not a parameter-tuning issue and not specific to a single AOI. PHASS post-deramping should not appear as a v1.3 candidate step.
+
+### 12.3 Named blocker and unblock condition
+
+Named blocker: SPURT orbit-class ramp on Bologna (σ=7.1°), identifying a systematic orbital baseline contribution to the residual per-IFG ramps.
+
+Unblock condition: Both SoCal and Bologna must pass r > 0.92 AND bias < 3 mm/yr in the same tophu/SNAPHU run with orbital baseline deramping enabled. Single-cell PASS is not sufficient.
+
+Target milestone: v1.3.
+
+### 12.4 Interim SPURT status
+
+SPURT native is the best available candidate as of v1.2 but does not pass criteria on either cell. Bologna is the nearest (bias=3.44 mm/yr, 0.44 mm/yr from the 3.0 threshold; r=0.325, still far from 0.92). SoCal SPURT r=0.003/bias=+19.89 mm/yr is substantially further from criteria, driven by sparse connected-component coverage at the 5×10 m grid (N=40,050 vs 2.8M for PHASS). Use SPURT native only if production cannot wait for v1.3; document the criteria failures explicitly in any such deployment.
+
+### 12.5 v1.3 recommended candidate order
+
+1. **tophu/SNAPHU tiled unwrapping with orbital baseline deramping** — primary v1.3 candidate. The orbit-class attribution on Bologna (σ=7.1°) provides a testable hypothesis. Targets: both cells pass r > 0.92 AND bias < 3 mm/yr.
+2. **20×20 m resolution fallback** — evaluate only if tophu/SNAPHU does not pass. This approach raises the architectural question of whether a 4× resolution-downgraded subsideo product remains OPERA-spec-compliant; the v1.3 milestone roadmapper should address this before committing.
+3. **ERA5 + tophu/SNAPHU combined** — evaluate as a diagnostic option within v1.3 if tophu/SNAPHU alone does not pass the two-signal rule across both cells.
+
+PHASS post-deramping is explicitly excluded from the v1.3 candidate order per §12.2.
